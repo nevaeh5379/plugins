@@ -18,7 +18,7 @@
 import React from 'react'
 import { FaRedo, FaColumns, FaCog } from "react-icons/fa"
 import { MenuBar } from './MenuBar'
-import { FaX } from 'react-icons/fa6'
+import { FaX, FaBars } from 'react-icons/fa6'
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
 interface ToolbarProps {
@@ -33,6 +33,7 @@ interface ToolbarProps {
   onSave?: () => void
   onCloseAll?: () => void
   onOpenSettings?: () => void
+  onToggleSidebar?: () => void
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -47,6 +48,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSave,
   onCloseAll,
   onOpenSettings,
+  onToggleSidebar,
 }) => {
   // Build breadcrumb from active file path
   const breadcrumbs = activeFilePath
@@ -82,6 +84,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div className="re-toolbar">
       <div className="re-toolbar-left">
+        <button
+          className="re-btn re-btn-icon re-toolbar-hamburger"
+          onClick={onToggleSidebar}
+          title="Toggle sidebar"
+        >
+          <FaBars />
+        </button>
         <span className="re-toolbar-title">Risu Editor</span>
         <MenuBar 
           onSave={onSave || (() => {})} 

@@ -46,6 +46,7 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
   characterName,
 }) => {
   const [rawMode, setRawMode] = useState(false)
+  const [metaOpen, setMetaOpen] = useState(false)
 
   // Parse incoming JSON into a working entry. We keep parse errors so the
   // user can drop into raw mode and fix them.
@@ -119,6 +120,13 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
           {entry.comment || entry.key || (isFolder ? 'Folder' : 'Lorebook Entry')}
         </span>
         <button
+          className="re-btn re-btn-icon-text re-lore-meta-toggle"
+          onClick={() => setMetaOpen((o) => !o)}
+          title="Toggle info panel"
+        >
+          {metaOpen ? '✕ Close info' : '⚙ Info'}
+        </button>
+        <button
           className="re-btn re-btn-icon-text"
           onClick={() => setRawMode(true)}
           title="Switch to raw JSON view"
@@ -159,7 +167,7 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
             </>
           )}
         </div>
-        <aside className="re-lore-meta">
+        <aside className={`re-lore-meta${metaOpen ? ' re-lore-meta-open' : ''}`}>
           <Field label="Title (comment)">
             <input
               className="re-input"

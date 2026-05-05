@@ -54,16 +54,24 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, items, onClose }
   }, [x, y, items])
 
   useEffect(() => {
-    const handleDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    const handleDown = (e: MouseEvent | TouchEvent) => {
+      const target = (e.target as Node) || null
+      if (menuRef.current && target && !menuRef.current.contains(target)) onClose()
     }
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('mousedown', handleDown)
-    document.addEventListener('keydown', handleKey)
+    // Defer attaching listeners by one tick so the same touch/click that
+    // opened the menu doesn't immediately close it.
+    const id = setTimeout(() => {
+      document.addEventListener('mousedown', handleDown)
+      document.addEventListener('touchstart', handleDown)
+      document.addEventListener('keydown', handleKey)
+    }, 0)
     return () => {
+      clearTimeout(id)
       document.removeEventListener('mousedown', handleDown)
+      document.removeEventListener('touchstart', handleDown)
       document.removeEventListener('keydown', handleKey)
     }
   }, [onClose])

@@ -42,6 +42,22 @@ export interface CustomScript {
   ableFlag?: boolean
 }
 
+/** A trigger effect entry. Only the Lua variant is structurally typed —
+ * V1/V2 effects are kept as opaque objects since the editor doesn't model them. */
+export interface TriggerLuaEffect {
+  type: 'triggerlua' | 'triggercode'
+  code: string
+}
+export type TriggerEffect = TriggerLuaEffect | { type: string; [k: string]: any }
+
+export interface TriggerScript {
+  comment: string
+  type: 'start' | 'manual' | 'output' | 'input' | 'display' | 'request'
+  conditions: any[]
+  effect: TriggerEffect[]
+  lowLevelAccess?: boolean
+}
+
 export interface RisuCharacter {
   type?: 'character'
   name: string
@@ -58,7 +74,7 @@ export interface RisuCharacter {
   chaId: string
   sdData: [string, string][]
   customscript: CustomScript[]
-  triggerscript: any[]
+  triggerscript: TriggerScript[]
   utilityBot: boolean
   exampleMessage: string
   removedQuotes?: boolean
