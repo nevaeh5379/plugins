@@ -213,6 +213,7 @@ button {
   width: var(--re-sidebar-width);
   min-width: var(--re-sidebar-width);
   background: var(--re-bg-sidebar);
+  height: 100%;
   border-right: 1px solid var(--re-border);
   display: flex;
   flex-direction: column;
