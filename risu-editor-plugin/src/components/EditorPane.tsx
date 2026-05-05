@@ -15,10 +15,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-import React, { useRef, useCallback, useEffect } from 'react'
-import Editor, { OnMount, OnChange } from '@monaco-editor/react'
-import type { editor } from 'monaco-editor'
+import React from 'react'
 import { PreviewPane } from './PreviewPane'
+import { UniversalEditor } from './editors/UniversalEditor'
 
 interface EditorPaneProps {
   content: string | null
@@ -37,35 +36,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   showPreview = false,
   characterName,
 }) => {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-
-  const handleMount: OnMount = useCallback((editor) => {
-    editorRef.current = editor
-    editor.focus()
-  }, [])
-
-  const handleChange: OnChange = useCallback(
-    (value) => {
-      if (value !== undefined) {
-        onChange(value)
-      }
-    },
-    [onChange]
-  )
-
-  // Update editor content when file path changes
-  useEffect(() => {
-    if (editorRef.current && content !== null) {
-      const currentModel = editorRef.current.getModel()
-      if (currentModel) {
-        const currentValue = currentModel.getValue()
-        if (currentValue !== content) {
-          editorRef.current.setValue(content)
-        }
-      }
-    }
-  }, [filePath]) // eslint-disable-line react-hooks/exhaustive-deps
-
   if (content === null || filePath === null) {
     return (
       <div className="re-editor-pane">
@@ -84,40 +54,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
   const editorContent = (
     <div className="re-editor-pane">
-      <Editor
-        key={filePath}
-        defaultValue={content}
+      <UniversalEditor
+        content={content}
         language={language}
-        theme="risu-dark"
-        onChange={handleChange}
-        onMount={handleMount}
-        options={{
-          fontSize: 14,
-          lineHeight: 22,
-          fontFamily: "'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace",
-          minimap: { enabled: false },
-          scrollBeyondLastLine: false,
-          wordWrap: 'on',
-          wrappingStrategy: 'advanced',
-          padding: { top: 12, bottom: 12 },
-          renderLineHighlight: 'line',
-          smoothScrolling: true,
-          cursorBlinking: 'smooth',
-          cursorSmoothCaretAnimation: 'on',
-          bracketPairColorization: { enabled: true },
-          automaticLayout: true,
-          tabSize: 2,
-          formatOnPaste: true,
-          suggest: {
-            showWords: false,
-          },
-        }}
-        loading={
-          <div className="re-loading">
-            <div className="re-spinner" />
-            <span>Loading editor...</span>
-          </div>
-        }
+        filePath={filePath}
+        onChange={onChange}
       />
     </div>
   )

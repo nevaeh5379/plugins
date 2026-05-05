@@ -20,14 +20,17 @@ import type { VFSNode } from '../lib/virtualFS'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 
 interface TabBarProps {
+  paneId: string
   openTabs: VFSNode[]
   activeTabPath: string | null
-  onTabSelect: (path: string) => void
-  onTabClose: (path: string) => void
-  onCloseAll?: () => void
-  onCloseOthers?: (path: string) => void
-  onCloseToLeft?: (path: string) => void
-  onCloseToRight?: (path: string) => void
+  onTabSelect: (paneId: string, path: string) => void
+  onTabClose: (paneId: string, path: string) => void
+  onTabReorder: (paneId: string, dragPath: string, dropPath: string) => void
+  onSplitPane?: (paneId: string, node?: VFSNode) => void
+  onCloseAll?: (paneId: string) => void
+  onCloseOthers?: (paneId: string, path: string) => void
+  onCloseToLeft?: (paneId: string, path: string) => void
+  onCloseToRight?: (paneId: string, path: string) => void
 }
 
 interface CtxMenuState {
@@ -37,16 +40,20 @@ interface CtxMenuState {
 }
 
 export const TabBar: React.FC<TabBarProps> = ({
+  paneId,
   openTabs,
   activeTabPath,
   onTabSelect,
   onTabClose,
+  onTabReorder,
+  onSplitPane,
   onCloseAll,
   onCloseOthers,
   onCloseToLeft,
   onCloseToRight,
 }) => {
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null)
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null)
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, tabPath: string) => {
@@ -55,37 +62,61 @@ export const TabBar: React.FC<TabBarProps> = ({
 
       const items: MenuItem[] = [
         {
+          label: '오른쪽으로 분할',
+          onClick: () => onSplitPane?.(paneId, openTabs[tabIndex]),
+        },
+        { label: '', divider: true },
+        {
           label: '닫기',
           shortcut: 'Ctrl+W',
-          onClick: () => onTabClose(tabPath),
+          onClick: () => onTabClose(paneId, tabPath),
         },
         {
           label: '이것 제외 닫기',
-          onClick: () => onCloseOthers?.(tabPath),
+          onClick: () => onCloseOthers?.(paneId, tabPath),
           disabled: openTabs.length <= 1,
         },
         { label: '', divider: true },
         {
           label: '왼쪽에 모두 닫기',
-          onClick: () => onCloseToLeft?.(tabPath),
+          onClick: () => onCloseToLeft?.(paneId, tabPath),
           disabled: tabIndex <= 0,
         },
         {
           label: '오른쪽 모두 닫기',
-          onClick: () => onCloseToRight?.(tabPath),
+          onClick: () => onCloseToRight?.(paneId, tabPath),
           disabled: tabIndex >= openTabs.length - 1,
         },
         { label: '', divider: true },
         {
           label: '모두 닫기',
-          onClick: () => onCloseAll?.(),
+          onClick: () => onCloseAll?.(paneId),
         },
       ]
 
       setCtxMenu({ x: e.clientX, y: e.clientY, items })
     },
-    [openTabs, onTabClose, onCloseAll, onCloseOthers, onCloseToLeft, onCloseToRight]
+    [paneId, openTabs, onTabClose, onCloseAll, onCloseOthers, onCloseToLeft, onCloseToRight, onSplitPane]
   )
+
+  const handleDragStart = (e: React.DragEvent, tabPath: string) => {
+    e.dataTransfer.setData('text/plain', tabPath)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent, tabPath: string) => {
+    e.preventDefault()
+    setDragOverPath(tabPath)
+  }
+
+  const handleDrop = (e: React.DragEvent, tabPath: string) => {
+    e.preventDefault()
+    setDragOverPath(null)
+    const sourcePath = e.dataTransfer.getData('text/plain')
+    if (sourcePath && sourcePath !== tabPath) {
+      onTabReorder(paneId, sourcePath, tabPath)
+    }
+  }
 
   if (openTabs.length === 0) return null
 
@@ -95,9 +126,14 @@ export const TabBar: React.FC<TabBarProps> = ({
         {openTabs.map((tab) => (
           <div
             key={tab.path}
-            className={`re-tab${activeTabPath === tab.path ? ' active' : ''}${tab.dirty ? ' dirty' : ''}`}
-            onClick={() => onTabSelect(tab.path)}
+            className={`re-tab${activeTabPath === tab.path ? ' active' : ''}${tab.dirty ? ' dirty' : ''}${dragOverPath === tab.path ? ' drag-over' : ''}`}
+            onClick={() => onTabSelect(paneId, tab.path)}
             onContextMenu={(e) => handleContextMenu(e, tab.path)}
+            draggable
+            onDragStart={(e) => handleDragStart(e, tab.path)}
+            onDragOver={(e) => handleDragOver(e, tab.path)}
+            onDragLeave={() => setDragOverPath(null)}
+            onDrop={(e) => handleDrop(e, tab.path)}
             title={tab.path}
           >
             <span className="re-tab-name">{tab.name}</span>
@@ -105,7 +141,7 @@ export const TabBar: React.FC<TabBarProps> = ({
               className="re-tab-close"
               onClick={(e) => {
                 e.stopPropagation()
-                onTabClose(tab.path)
+                onTabClose(paneId, tab.path)
               }}
             >
               ×

@@ -36,6 +36,7 @@ export interface FileExplorerCallbacks {
 interface FileExplorerProps extends FileExplorerCallbacks {
   root: VFSNode | null
   selectedPath: string | null
+  width?: number
 }
 
 // ─── Context Menu State ──────────────────────────────────────────────────────
@@ -346,6 +347,7 @@ const TreeItem: React.FC<TreeItemProps> = ({
 export const FileExplorer: React.FC<FileExplorerProps> = ({
   root,
   selectedPath,
+  width,
   ...callbacks
 }) => {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => {
@@ -403,7 +405,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
   if (!root) {
     return (
-      <div className="re-sidebar">
+      <div className="re-sidebar" style={width ? { width, minWidth: width } : undefined}>
         <div className="re-sidebar-header">Explorer</div>
         <div className="re-sidebar-tree">
           <div style={{ padding: '20px 12px', color: 'var(--re-text-muted)', fontSize: '12px' }}>
@@ -415,7 +417,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
   }
 
   return (
-    <div className="re-sidebar">
+    <div className="re-sidebar" style={width ? { width, minWidth: width } : undefined}>
       <div className="re-sidebar-header">Explorer</div>
       <div className="re-sidebar-tree">
         <TreeItem

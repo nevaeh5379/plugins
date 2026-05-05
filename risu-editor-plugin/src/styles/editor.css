@@ -1,5 +1,8 @@
 /* ── Risu Editor Plugin Styles — VSCode Dark Modern ── */
+.cm-theme-dark {
+  height: 100%;
 
+}
 :root {
   /* Backgrounds */
   --re-bg-editor:        #1F1F1F;
@@ -1029,5 +1032,177 @@ select.re-input {
 .re-btn-preview.active {
   color: var(--re-accent);
   background: rgba(0, 120, 212, 0.15);
+}
+
+/* ── Sidebar Resizer ── */
+.re-sidebar-resizer {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background 0.1s;
+}
+
+.re-sidebar-resizer:hover,
+.re-sidebar-resizer:active {
+  background: var(--re-accent);
+}
+
+/* ── Split Panes ── */
+.re-editor-panes-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--re-bg-editor);
+}
+
+.re-editor-pane-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--re-border);
+}
+
+.re-editor-pane-group:last-child {
+  border-right: none;
+}
+
+/* ── Menu Bar ── */
+.re-menubar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.re-menubar-item {
+  padding: 0 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--re-fg);
+  font-size: 13px;
+}
+
+.re-menubar-item:hover,
+.re-menubar-item.active {
+  background: var(--re-bg-hover);
+  color: var(--re-fg-bright);
+}
+
+/* ── Settings Modal ── */
+.re-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: re-fadeIn 0.2s ease;
+}
+
+.re-modal-content {
+  width: 500px;
+  max-height: 80vh;
+  background: var(--re-bg-editor);
+  border: 1px solid var(--re-border-strong);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.re-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--re-border);
+}
+
+.re-modal-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--re-fg-bright);
+}
+
+.re-modal-tabs {
+  display: flex;
+  background: var(--re-bg-sidebar);
+  border-bottom: 1px solid var(--re-border);
+  padding: 0 16px;
+}
+
+.re-modal-tabs .re-tab {
+  padding: 8px 16px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--re-fg-muted);
+}
+
+.re-modal-tabs .re-tab.active {
+  color: var(--re-fg-bright);
+  border-bottom-color: var(--re-accent);
+}
+
+.re-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.re-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.re-setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.re-setting-item label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--re-fg);
+}
+
+.re-setting-hint {
+  font-size: 11px;
+  color: var(--re-fg-dim);
+}
+
+.re-custom-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.re-setting-color-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.re-setting-color-item label {
+  font-size: 11px;
+  color: var(--re-fg-muted);
+}
+
+.re-setting-color-item input[type="color"] {
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--re-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
 }
 

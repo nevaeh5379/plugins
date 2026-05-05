@@ -1,0 +1,89 @@
+import React, { useState, useRef, useEffect } from 'react'
+import { ContextMenu, type MenuItem } from './ContextMenu'
+
+interface MenuBarProps {
+  onSave: () => void
+  onReload: () => void
+  onSplitPane: () => void
+  onCloseAll: () => void
+  onCloseEditor: () => void
+}
+
+export const MenuBar: React.FC<MenuBarProps> = ({
+  onSave,
+  onReload,
+  onSplitPane,
+  onCloseAll,
+  onCloseEditor,
+}) => {
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+
+  const menuRefs = {
+    File: useRef<HTMLDivElement>(null),
+    View: useRef<HTMLDivElement>(null),
+  }
+
+  const handleMenuClick = (menuName: string, ref: React.RefObject<HTMLDivElement>) => {
+    if (activeMenu === menuName) {
+      setActiveMenu(null)
+      setMenuPos(null)
+      return
+    }
+    setActiveMenu(menuName)
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      setMenuPos({ x: rect.left, y: rect.bottom })
+    }
+  }
+
+  const getMenuItems = (menuName: string): MenuItem[] => {
+    switch (menuName) {
+      case 'File':
+        return [
+          { label: 'Save (저장)', shortcut: 'Ctrl+S', onClick: onSave },
+          { label: 'Reload (새로고침)', onClick: onReload },
+          { label: '', divider: true },
+          { label: 'Close All Tabs (모두 닫기)', onClick: onCloseAll },
+          { label: 'Close Editor (에디터 닫기)', onClick: onCloseEditor },
+        ]
+      case 'View':
+        return [
+          { label: 'Split Pane (에디터 분할)', onClick: onSplitPane },
+        ]
+      default:
+        return []
+    }
+  }
+
+  return (
+    <div className="re-menubar">
+      <div
+        ref={menuRefs.File}
+        className={`re-menubar-item ${activeMenu === 'File' ? 'active' : ''}`}
+        onClick={() => handleMenuClick('File', menuRefs.File)}
+      >
+        File
+      </div>
+      <div
+        ref={menuRefs.View}
+        className={`re-menubar-item ${activeMenu === 'View' ? 'active' : ''}`}
+        onClick={() => handleMenuClick('View', menuRefs.View)}
+      >
+        View
+      </div>
+
+      {activeMenu && menuPos && (
+        <ContextMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          items={getMenuItems(activeMenu)}
+          onClose={() => {
+            setActiveMenu(null)
+            setMenuPos(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}

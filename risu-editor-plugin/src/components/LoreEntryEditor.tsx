@@ -16,8 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Editor, { OnMount } from '@monaco-editor/react'
-import type { editor } from 'monaco-editor'
+import { UniversalEditor } from './editors/UniversalEditor'
 import type { LoreBook } from '../types/risuai.d.ts'
 import { PreviewPane } from './PreviewPane'
 
@@ -280,33 +279,16 @@ const Toggle: React.FC<{
   </label>
 )
 
-// ── Monaco editors (markdown for content, json for raw) ─────────────────────
-
 const ContentEditor: React.FC<{ value: string; onChange: (v: string) => void }> = ({
   value,
   onChange,
 }) => {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-  const handleMount: OnMount = useCallback((ed) => {
-    editorRef.current = ed
-  }, [])
-  // Sync external value changes (e.g. when meta side mutates the JSON, which
-  // re-flows back through the parent and into us).
-  useEffect(() => {
-    const ed = editorRef.current
-    if (!ed) return
-    const cur = ed.getValue()
-    if (cur !== value) ed.setValue(value)
-  }, [value])
-
   return (
-    <Editor
-      defaultValue={value}
+    <UniversalEditor
+      content={value}
       language="markdown"
-      theme="risu-dark"
-      onMount={handleMount}
+      filePath="content.md"
       onChange={(v) => onChange(v ?? '')}
-      options={monacoOptions}
     />
   )
 }
@@ -317,33 +299,12 @@ const RawJsonEditor: React.FC<{
   onChange: (v: string) => void
 }> = ({ content, filePath, onChange }) => {
   return (
-    <Editor
-      key={filePath}
-      defaultValue={content}
+    <UniversalEditor
+      content={content}
       language="json"
-      theme="risu-dark"
+      filePath={filePath || 'raw.json'}
       onChange={(v) => onChange(v ?? '')}
-      options={monacoOptions}
     />
   )
 }
 
-const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
-  fontSize: 14,
-  lineHeight: 22,
-  fontFamily: "'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace",
-  minimap: { enabled: false },
-  scrollBeyondLastLine: false,
-  wordWrap: 'on',
-  wrappingStrategy: 'advanced',
-  padding: { top: 12, bottom: 12 },
-  renderLineHighlight: 'line',
-  smoothScrolling: true,
-  cursorBlinking: 'smooth',
-  cursorSmoothCaretAnimation: 'on',
-  bracketPairColorization: { enabled: true },
-  automaticLayout: true,
-  tabSize: 2,
-  formatOnPaste: true,
-  suggest: { showWords: false },
-}

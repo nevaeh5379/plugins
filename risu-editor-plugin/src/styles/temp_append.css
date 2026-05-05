@@ -1,0 +1,35 @@
+
+/* ── Sidebar Resizer ── */
+.re-sidebar-resizer {
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background 0.1s;
+}
+
+.re-sidebar-resizer:hover,
+.re-sidebar-resizer:active {
+  background: var(--re-accent);
+}
+
+/* ── Split Panes ── */
+.re-editor-panes-container {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--re-bg-editor);
+}
+
+.re-editor-pane-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--re-border);
+}
+
+.re-editor-pane-group:last-child {
+  border-right: none;
+}

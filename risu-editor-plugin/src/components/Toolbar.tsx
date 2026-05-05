@@ -16,7 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 import React from 'react'
-import { FaRedo } from "react-icons/fa";
+import { FaRedo, FaColumns, FaCog } from "react-icons/fa"
+import { MenuBar } from './MenuBar'
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
 interface ToolbarProps {
@@ -27,6 +28,10 @@ interface ToolbarProps {
   onTogglePreview: () => void
   onClose: () => void
   onReload: () => void
+  onSplitPane?: () => void
+  onSave?: () => void
+  onCloseAll?: () => void
+  onOpenSettings?: () => void
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -37,6 +42,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onTogglePreview,
   onClose,
   onReload,
+  onSplitPane,
+  onSave,
+  onCloseAll,
+  onOpenSettings,
 }) => {
   // Build breadcrumb from active file path
   const breadcrumbs = activeFilePath
@@ -73,6 +82,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     <div className="re-toolbar">
       <div className="re-toolbar-left">
         <span className="re-toolbar-title">Risu Editor</span>
+        <MenuBar 
+          onSave={onSave || (() => {})} 
+          onReload={onReload} 
+          onSplitPane={onSplitPane || (() => {})} 
+          onCloseAll={onCloseAll || (() => {})} 
+          onCloseEditor={onClose} 
+        />
         <span style={{ color: 'var(--re-border-light)', margin: '0 4px' }}>│</span>
         <span className="re-toolbar-charname">{characterName || 'No Character'}</span>
         {autoSaveStatus !== 'idle' && (
@@ -104,6 +120,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           👁 Preview
         </button> */}
+        <button
+          className="re-btn"
+          onClick={onSplitPane}
+          title="에디터 분할 (Split Pane)"
+        >
+          <FaColumns />
+        </button>
+        <button
+          className="re-btn"
+          onClick={onOpenSettings}
+          title="설정 (Settings)"
+        >
+          <FaCog />
+        </button>
         <button
           className="re-btn"
           onClick={onReload}
