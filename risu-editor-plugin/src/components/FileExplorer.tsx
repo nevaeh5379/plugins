@@ -133,130 +133,7 @@ const TreeItem: React.FC<TreeItemProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-
-    const items: MenuItem[] = []
-
-    // Lorebook directory (root or folder)
-    const isLorebookRoot = node.name === 'lorebook'
-    const isLorebookFolder = isDir && node.mapping?.field === 'globalLore'
-    const isLorebookFile = node.type === 'file' && node.mapping?.field === 'globalLore'
-    const isGreetingsDir = node.name === 'alternate_greetings'
-    const isGreetingFile = node.type === 'file' && node.mapping?.field === 'alternateGreetings'
-
-    if (isLorebookRoot) {
-      items.push({
-        label: '새 로어북 추가',
-        icon: <VscAdd />,
-        onClick: () => callbacks.onAddLoreEntry?.(node.path),
-      })
-      items.push({
-        label: '새 폴더 추가',
-        icon: <VscNewFolder />,
-        onClick: () => callbacks.onAddLoreFolder?.(node.path),
-      })
-    }
-
-    if (isLorebookFolder) {
-      items.push({
-        label: '새 로어북 추가',
-        icon: <VscAdd />,
-        onClick: () => callbacks.onAddLoreEntry?.(node.path),
-      })
-    }
-
-    if (isDir && isGreetingsDir) {
-      items.push({
-        label: '새 인사말 추가',
-        icon: <VscAdd />,
-        onClick: () => callbacks.onAddGreeting?.(),
-      })
-    }
-
-    if (isGreetingFile) {
-      items.push({
-        label: '이 인사말 제거',
-        icon: <VscTrash />,
-        danger: true,
-        onClick: () => callbacks.onDeleteGreeting?.(node.path),
-      })
-    }
-
-    if (isLorebookFile) {
-      items.push({
-        label: '제목 바꾸기',
-        icon: <VscEdit />,
-        shortcut: 'F2',
-        onClick: () => setRenamingPath(node.path),
-      })
-      items.push({
-        label: '삭제하기',
-        icon: <VscTrash />,
-        shortcut: 'Delete',
-        danger: true,
-        onClick: () => callbacks.onDeleteNode?.(node.path, node.name),
-      })
-
-      // Move-to submenu
-      const folders = collectLoreFolders(root)
-      const moveItems: MenuItem[] = folders
-        .filter((f) => {
-          // Don't show current parent
-          const currentParentPath = node.path.substring(0, node.path.lastIndexOf('/'))
-          return f.path !== currentParentPath
-        })
-        .map((f) => ({
-          label: f.name,
-          onClick: () => callbacks.onMoveNode?.(node.path, f.path),
-        }))
-
-      if (moveItems.length > 0) {
-        items.push({ label: '', divider: true })
-        items.push({
-          label: '이동',
-          icon: <VscArrowSwap />,
-          submenu: moveItems,
-        })
-      }
-    }
-
-    if (isDir && node.mapping?.field === 'globalLore') {
-      // Lorebook folder — rename/delete/move
-      items.push({ label: '', divider: true })
-      items.push({
-        label: '폴더 이름 바꾸기',
-        icon: <VscEdit />,
-        shortcut: 'F2',
-        onClick: () => setRenamingPath(node.path),
-      })
-      items.push({
-        label: '폴더 삭제하기',
-        icon: <VscTrash />,
-        shortcut: 'Delete',
-        danger: true,
-        onClick: () => callbacks.onDeleteNode?.(node.path, node.name),
-      })
-
-      // Move-to submenu for folders (only to lorebook root — RisuAI no nested folders)
-      const folders = collectLoreFolders(root)
-      const moveItems: MenuItem[] = folders
-        .filter((f) => {
-          // Only allow moving to lorebook root (not into other folders)
-          return f.path !== node.path && f.name === 'lorebook (root)'
-        })
-        .map((f) => ({
-          label: f.name,
-          onClick: () => callbacks.onMoveNode?.(node.path, f.path),
-        }))
-
-      if (moveItems.length > 0) {
-        items.push({
-          label: '이동',
-          icon: <VscArrowSwap />,
-          submenu: moveItems,
-        })
-      }
-    }
-
+    const items = buildContextMenuItems(node, root, callbacks, setRenamingPath)
     if (items.length > 0) {
       setCtxMenu({ x: e.clientX, y: e.clientY, items })
     }
@@ -376,7 +253,7 @@ const TreeItem: React.FC<TreeItemProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOverPath(null)
-    
+
     if (isGlobalLore) {
       const el = e.currentTarget as HTMLElement
       el.style.borderTop = '';
@@ -385,41 +262,162 @@ const TreeItem: React.FC<TreeItemProps> = ({
     }
 
     const sourcePath = e.dataTransfer.getData('text/plain')
-    if (sourcePath && sourcePath !== node.path) {
-      if (isGlobalLore) {
-        const el = e.currentTarget as HTMLElement
-        const rect = el.getBoundingClientRect()
-        
-        if (node.type === 'directory') {
-          const y = e.clientY - rect.top
-          const height = rect.height
-          
-          if (y < height * 0.25) {
-            callbacks.onReorderNode?.(sourcePath, node.path, 'before')
-          } else if (y > height * 0.75) {
-            callbacks.onReorderNode?.(sourcePath, node.path, 'after')
-          } else {
-            // Drop inside — move into this folder (files only; folders cannot nest)
-            // Check if source is a folder — if so, reorder instead of nesting
-            const sourceNode = findNodeByPath(root, sourcePath)
-            if (sourceNode?.type === 'directory') {
-              // Folders cannot be nested — reorder after instead
-              callbacks.onReorderNode?.(sourcePath, node.path, 'after')
-            } else {
-              callbacks.onMoveNode?.(sourcePath, node.path)
-            }
-          }
-        } else {
-          const midY = rect.top + rect.height / 2
-          const position = e.clientY < midY ? 'before' : 'after'
-          callbacks.onReorderNode?.(sourcePath, node.path, position)
+    applyDropAction(sourcePath, node, e.currentTarget as HTMLElement, e.clientY, root, callbacks)
+  }
+
+  // ─── Touch drag-drop + long-press context menu ───────────────────────────
+  // HTML5 drag/drop doesn't fire on touch devices. We replicate it manually
+  // and share the drop logic via applyDropAction / buildContextMenuItems.
+
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const touchDragModeRef = useRef(false)
+
+  const cancelTouchTimer = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current)
+      touchTimerRef.current = null
+    }
+  }
+
+  const clearDropVisuals = (path: string | null) => {
+    if (!path) return
+    const el = document.querySelector(`[data-vfs-path="${CSS.escape(path)}"]`) as HTMLElement | null
+    if (el) {
+      el.style.borderTop = ''
+      el.style.borderBottom = ''
+      el.style.backgroundColor = ''
+    }
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1 || isRenaming) return
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+    touchDragModeRef.current = false
+
+    cancelTouchTimer()
+    touchTimerRef.current = setTimeout(() => {
+      // Long-press fired without drag → open context menu
+      if (touchStartRef.current && !touchDragModeRef.current) {
+        const items = buildContextMenuItems(node, root, callbacks, setRenamingPath)
+        if (items.length > 0) {
+          setCtxMenu({ x: touchStartRef.current.x, y: touchStartRef.current.y, items })
         }
-      } 
-      else if (isDir) {
-        // Dropping on the lorebook root dir
-        callbacks.onMoveNode?.(sourcePath, node.path)
+      }
+      touchTimerRef.current = null
+    }, 500)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const t = e.touches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    const dist = Math.hypot(dx, dy)
+
+    if (!touchDragModeRef.current && dist > 10) {
+      // Movement before long-press fires → cancel menu, attempt drag
+      cancelTouchTimer()
+      if (canDrag) {
+        touchDragModeRef.current = true
+        setDragSourcePath(node.path)
+      } else {
+        // Not draggable — let the browser scroll
+        touchStartRef.current = null
+        return
       }
     }
+
+    if (touchDragModeRef.current) {
+      // Prevent scroll while dragging
+      e.preventDefault()
+
+      const targetEl = document
+        .elementFromPoint(t.clientX, t.clientY)
+        ?.closest('.re-tree-item') as HTMLElement | null
+      const targetPath = targetEl?.dataset.vfsPath || null
+
+      if (targetPath !== dragOverPath) {
+        clearDropVisuals(dragOverPath)
+        setDragOverPath(targetPath)
+      }
+
+      if (targetEl && targetPath && targetPath !== node.path) {
+        // Mirror the visual logic in handleDragOver
+        const rect = targetEl.getBoundingClientRect()
+        const targetNode = findNodeByPath(root, targetPath)
+        const targetIsGlobalLore = targetNode?.mapping?.field === 'globalLore'
+        if (targetIsGlobalLore) {
+          if (targetNode!.type === 'directory') {
+            const y = t.clientY - rect.top
+            const h = rect.height
+            const sourceIsFolder = node.type === 'directory'
+            if (y < h * 0.25) {
+              targetEl.style.borderTop = '2px solid var(--re-accent)'
+              targetEl.style.borderBottom = ''
+              targetEl.style.backgroundColor = ''
+            } else if (y > h * 0.75) {
+              targetEl.style.borderBottom = '2px solid var(--re-accent)'
+              targetEl.style.borderTop = ''
+              targetEl.style.backgroundColor = ''
+            } else if (!sourceIsFolder) {
+              targetEl.style.borderTop = ''
+              targetEl.style.borderBottom = ''
+              targetEl.style.backgroundColor = 'var(--re-bg-hover)'
+            } else {
+              targetEl.style.borderBottom = '2px solid var(--re-accent)'
+              targetEl.style.borderTop = ''
+              targetEl.style.backgroundColor = ''
+            }
+          } else {
+            const midY = rect.top + rect.height / 2
+            if (t.clientY < midY) {
+              targetEl.style.borderTop = '2px solid var(--re-accent)'
+              targetEl.style.borderBottom = ''
+            } else {
+              targetEl.style.borderBottom = '2px solid var(--re-accent)'
+              targetEl.style.borderTop = ''
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    cancelTouchTimer()
+
+    if (touchDragModeRef.current) {
+      const t = e.changedTouches[0]
+      const targetEl = document
+        .elementFromPoint(t.clientX, t.clientY)
+        ?.closest('.re-tree-item') as HTMLElement | null
+      const targetPath = targetEl?.dataset.vfsPath
+      if (targetEl && targetPath && targetPath !== node.path) {
+        const targetNode = findNodeByPath(root, targetPath)
+        if (targetNode) {
+          applyDropAction(node.path, targetNode, targetEl, t.clientY, root, callbacks)
+        }
+      }
+      clearDropVisuals(dragOverPath)
+      setDragSourcePath(null)
+      setDragOverPath(null)
+    }
+
+    touchStartRef.current = null
+    touchDragModeRef.current = false
+  }
+
+  const handleTouchCancel = () => {
+    cancelTouchTimer()
+    if (touchDragModeRef.current) {
+      clearDropVisuals(dragOverPath)
+      setDragSourcePath(null)
+      setDragOverPath(null)
+    }
+    touchStartRef.current = null
+    touchDragModeRef.current = false
   }
 
   // ─── Icon ──────────────────────────────────────────────────────────────
@@ -452,6 +450,7 @@ const TreeItem: React.FC<TreeItemProps> = ({
       <div
         className={className}
         style={{ '--depth': depth } as React.CSSProperties}
+        data-vfs-path={node.path}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         title={node.path}
@@ -461,6 +460,10 @@ const TreeItem: React.FC<TreeItemProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         {isDir && (
           <span className={`re-tree-chevron${isExpanded ? ' open' : ''}`}><VscChevronRight /></span>
@@ -624,4 +627,168 @@ function findNodeByPath(root: VFSNode, path: string): VFSNode | null {
     }
   }
   return null
+}
+
+// ─── Shared drop logic (used by both mouse drag-drop and touch drag-drop) ──
+function applyDropAction(
+  sourcePath: string | null | undefined,
+  targetNode: VFSNode,
+  targetEl: HTMLElement,
+  clientY: number,
+  root: VFSNode,
+  callbacks: FileExplorerCallbacks
+) {
+  if (!sourcePath || sourcePath === targetNode.path) return
+  const targetIsGlobalLore = targetNode.mapping?.field === 'globalLore'
+  const targetIsLorebookRoot = targetNode.name === 'lorebook'
+  const targetIsDir = targetNode.type === 'directory'
+
+  if (targetIsGlobalLore) {
+    const rect = targetEl.getBoundingClientRect()
+    if (targetIsDir) {
+      const y = clientY - rect.top
+      const h = rect.height
+      if (y < h * 0.25) {
+        callbacks.onReorderNode?.(sourcePath, targetNode.path, 'before')
+      } else if (y > h * 0.75) {
+        callbacks.onReorderNode?.(sourcePath, targetNode.path, 'after')
+      } else {
+        const sourceNode = findNodeByPath(root, sourcePath)
+        if (sourceNode?.type === 'directory') {
+          callbacks.onReorderNode?.(sourcePath, targetNode.path, 'after')
+        } else {
+          callbacks.onMoveNode?.(sourcePath, targetNode.path)
+        }
+      }
+    } else {
+      const midY = rect.top + rect.height / 2
+      const position: 'before' | 'after' = clientY < midY ? 'before' : 'after'
+      callbacks.onReorderNode?.(sourcePath, targetNode.path, position)
+    }
+  } else if (targetIsLorebookRoot && targetIsDir) {
+    callbacks.onMoveNode?.(sourcePath, targetNode.path)
+  }
+}
+
+// ─── Shared context-menu builder (mouse right-click + touch long-press) ────
+function buildContextMenuItems(
+  node: VFSNode,
+  root: VFSNode,
+  callbacks: FileExplorerCallbacks,
+  setRenamingPath: (path: string | null) => void
+): MenuItem[] {
+  const items: MenuItem[] = []
+  const isDir = node.type === 'directory'
+  const isLorebookRoot = node.name === 'lorebook'
+  const isLorebookFolder = isDir && node.mapping?.field === 'globalLore'
+  const isLorebookFile = node.type === 'file' && node.mapping?.field === 'globalLore'
+  const isGreetingsDir = node.name === 'alternate_greetings'
+  const isGreetingFile = node.type === 'file' && node.mapping?.field === 'alternateGreetings'
+
+  if (isLorebookRoot) {
+    items.push({
+      label: '새 로어북 추가',
+      icon: <VscAdd />,
+      onClick: () => callbacks.onAddLoreEntry?.(node.path),
+    })
+    items.push({
+      label: '새 폴더 추가',
+      icon: <VscNewFolder />,
+      onClick: () => callbacks.onAddLoreFolder?.(node.path),
+    })
+  }
+
+  if (isLorebookFolder) {
+    items.push({
+      label: '새 로어북 추가',
+      icon: <VscAdd />,
+      onClick: () => callbacks.onAddLoreEntry?.(node.path),
+    })
+  }
+
+  if (isDir && isGreetingsDir) {
+    items.push({
+      label: '새 인사말 추가',
+      icon: <VscAdd />,
+      onClick: () => callbacks.onAddGreeting?.(),
+    })
+  }
+
+  if (isGreetingFile) {
+    items.push({
+      label: '이 인사말 제거',
+      icon: <VscTrash />,
+      danger: true,
+      onClick: () => callbacks.onDeleteGreeting?.(node.path),
+    })
+  }
+
+  if (isLorebookFile) {
+    items.push({
+      label: '제목 바꾸기',
+      icon: <VscEdit />,
+      shortcut: 'F2',
+      onClick: () => setRenamingPath(node.path),
+    })
+    items.push({
+      label: '삭제하기',
+      icon: <VscTrash />,
+      shortcut: 'Delete',
+      danger: true,
+      onClick: () => callbacks.onDeleteNode?.(node.path, node.name),
+    })
+
+    const folders = collectLoreFolders(root)
+    const currentParentPath = node.path.substring(0, node.path.lastIndexOf('/'))
+    const moveItems: MenuItem[] = folders
+      .filter((f) => f.path !== currentParentPath)
+      .map((f) => ({
+        label: f.name,
+        onClick: () => callbacks.onMoveNode?.(node.path, f.path),
+      }))
+
+    if (moveItems.length > 0) {
+      items.push({ label: '', divider: true })
+      items.push({
+        label: '이동',
+        icon: <VscArrowSwap />,
+        submenu: moveItems,
+      })
+    }
+  }
+
+  if (isDir && node.mapping?.field === 'globalLore') {
+    items.push({ label: '', divider: true })
+    items.push({
+      label: '폴더 이름 바꾸기',
+      icon: <VscEdit />,
+      shortcut: 'F2',
+      onClick: () => setRenamingPath(node.path),
+    })
+    items.push({
+      label: '폴더 삭제하기',
+      icon: <VscTrash />,
+      shortcut: 'Delete',
+      danger: true,
+      onClick: () => callbacks.onDeleteNode?.(node.path, node.name),
+    })
+
+    const folders = collectLoreFolders(root)
+    const moveItems: MenuItem[] = folders
+      .filter((f) => f.path !== node.path && f.name === 'lorebook (root)')
+      .map((f) => ({
+        label: f.name,
+        onClick: () => callbacks.onMoveNode?.(node.path, f.path),
+      }))
+
+    if (moveItems.length > 0) {
+      items.push({
+        label: '이동',
+        icon: <VscArrowSwap />,
+        submenu: moveItems,
+      })
+    }
+  }
+
+  return items
 }

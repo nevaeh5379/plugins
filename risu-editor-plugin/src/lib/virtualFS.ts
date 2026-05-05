@@ -22,7 +22,7 @@
  * in the Monaco editor.
  */
 
-import type { RisuCharacter, LoreBook, CustomScript, LoreSettings } from '../types/risuai.d.ts'
+import type { RisuCharacter, LoreBook, CustomScript, LoreSettings, TriggerScript } from '../types/risuai.d.ts'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -300,6 +300,47 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
   }
   root.children!.push(lorebookDir)
 
+  // ── Trigger scripts (Lua + V1/V2) ──
+  if (char.triggerscript && char.triggerscript.length > 0) {
+    const triggersDir: VFSNode = {
+      name: 'triggers',
+      path: `${rootPath}/triggers`,
+      type: 'directory',
+      children: [],
+      icon: 'wrench',
+    }
+    for (let i = 0; i < char.triggerscript.length; i++) {
+      const trig = char.triggerscript[i]
+      const firstEffect = trig?.effect?.[0]
+      const isLua = firstEffect?.type === 'triggerlua'
+      const baseName = sanitizeFileName(trig?.comment || `trigger_${i}`)
+      if (isLua) {
+        triggersDir.children!.push({
+          name: `${baseName}.lua`,
+          path: `${rootPath}/triggers/${baseName}.lua`,
+          type: 'file',
+          content: typeof firstEffect.code === 'string' ? firstEffect.code : '',
+          language: 'lua',
+          dirty: false,
+          mapping: { field: 'triggerscript', index: i, subfield: 'lua' },
+          icon: 'lua',
+        })
+      } else {
+        triggersDir.children!.push({
+          name: `${baseName}.json`,
+          path: `${rootPath}/triggers/${baseName}.json`,
+          type: 'file',
+          content: JSON.stringify(trig, null, 2),
+          language: 'json',
+          dirty: false,
+          mapping: { field: 'triggerscript', index: i },
+          icon: 'json',
+        })
+      }
+    }
+    root.children!.push(triggersDir)
+  }
+
   // ── Regex scripts ──
   if (char.customscript && char.customscript.length > 0) {
     const regexDir: VFSNode = {
@@ -376,7 +417,7 @@ export function vfsToCharacter(
 
   for (const file of allFiles) {
     if (!file.mapping || !file.dirty) continue
-    const { field, index } = file.mapping
+    const { field, index, subfield } = file.mapping
     const content = file.content ?? ''
 
     switch (field) {
@@ -425,6 +466,24 @@ export function vfsToCharacter(
           char.loreSettings = JSON.parse(content) as LoreSettings
         } catch {
           // Invalid JSON, skip
+        }
+        break
+
+      // Trigger scripts (Lua: edits effect[0].code only; JSON: replaces whole entry)
+      case 'triggerscript':
+        if (index !== undefined && char.triggerscript && char.triggerscript[index]) {
+          if (subfield === 'lua') {
+            const trig = char.triggerscript[index] as TriggerScript
+            if (trig.effect && trig.effect[0] && trig.effect[0].type === 'triggerlua') {
+              ;(trig.effect[0] as any).code = content
+            }
+          } else {
+            try {
+              char.triggerscript[index] = JSON.parse(content) as TriggerScript
+            } catch {
+              // Invalid JSON, skip
+            }
+          }
         }
         break
 

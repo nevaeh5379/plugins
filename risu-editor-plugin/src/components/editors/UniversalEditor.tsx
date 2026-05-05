@@ -25,20 +25,22 @@ export const UniversalEditor: React.FC<UniversalEditorProps> = (props) => {
   }, [])
 
   const currentEditorType = isMobile ? settings.mobileEditor : settings.desktopEditor
+  // Mobile readability bump: ~10% larger editor text on small screens.
+  const fontSize = isMobile ? Math.round(settings.fontSize * 1.1) : settings.fontSize
 
   const renderEditor = () => {
     switch (currentEditorType) {
       case 'monaco':
-        return <MonacoEditorWrapper {...props} fontSize={settings.fontSize} />
+        return <MonacoEditorWrapper {...props} fontSize={fontSize} />
       case 'codemirror':
-        return <CodeMirrorWrapper {...props} fontSize={settings.fontSize} />
+        return <CodeMirrorWrapper {...props} fontSize={fontSize} />
       case 'ace':
-        return <AceEditorWrapper {...props} fontSize={settings.fontSize} />
+        return <AceEditorWrapper {...props} fontSize={fontSize} />
       case 'simple':
-        return <SimpleEditorWrapper {...props} fontSize={settings.fontSize} />
+        return <SimpleEditorWrapper {...props} fontSize={fontSize} />
       default:
         // fallback
-        return <CodeMirrorWrapper {...props} fontSize={settings.fontSize} />
+        return <CodeMirrorWrapper {...props} fontSize={fontSize} />
     }
   }
 

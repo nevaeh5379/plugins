@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
+import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { useSettings } from '../../lib/settingsContext'
 
 interface EditorWrapperProps {
@@ -28,6 +28,7 @@ export const CodeMirrorWrapper: React.FC<EditorWrapperProps> = ({
         height="100%"
         theme={settings.theme === 'risu-light' ? 'light' : 'dark'}
         onChange={handleChange}
+        extensions={[EditorView.lineWrapping]}
         basicSetup={{
           lineNumbers: true,
           foldGutter: true,

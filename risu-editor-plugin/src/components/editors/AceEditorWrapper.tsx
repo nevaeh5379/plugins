@@ -6,6 +6,7 @@ import { useSettings } from '../../lib/settingsContext'
 import 'ace-builds/src-noconflict/mode-json'
 import 'ace-builds/src-noconflict/mode-markdown'
 import 'ace-builds/src-noconflict/mode-javascript'
+import 'ace-builds/src-noconflict/mode-lua'
 import 'ace-builds/src-noconflict/mode-text'
 import 'ace-builds/src-noconflict/theme-twilight'
 import 'ace-builds/src-noconflict/theme-github'
@@ -34,6 +35,7 @@ export const AceEditorWrapper: React.FC<EditorWrapperProps> = ({
   if (language === 'json') mode = 'json'
   else if (language === 'markdown') mode = 'markdown'
   else if (language === 'javascript' || language === 'typescript') mode = 'javascript'
+  else if (language === 'lua') mode = 'lua'
 
   const aceTheme = settings.theme === 'risu-light' ? 'github' : 'twilight'
 
@@ -54,6 +56,7 @@ export const AceEditorWrapper: React.FC<EditorWrapperProps> = ({
           enableLiveAutocompletion: true,
           showLineNumbers: true,
           tabSize: 2,
+          wrap: true,
         }}
       />
     </div>

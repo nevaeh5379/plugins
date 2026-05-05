@@ -60,6 +60,23 @@ const IS_DEV = typeof Risuai === 'undefined' && typeof risuai === 'undefined'
 
 const AUTO_SAVE_DELAY = 1500 // ms
 
+// Keep in sync with editor.css media queries and UniversalEditor.tsx.
+const MOBILE_BREAKPOINT = 768
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false
+  )
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    setIsMobile(mql.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+  return isMobile
+}
+
 const ThemeManager: React.FC = () => {
   const { settings } = useSettings();
 
@@ -148,6 +165,28 @@ const AppContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isMobile = useIsMobile()
+
+  // Close mobile sidebar on orientation change so the layout doesn't get
+  // stranded in a half-open state when the user rotates their device.
+  useEffect(() => {
+    if (!isMobile) return
+    const close = () => setSidebarOpen(false)
+    const orient = window.screen?.orientation
+    if (orient && 'addEventListener' in orient) {
+      orient.addEventListener('change', close)
+    } else {
+      window.addEventListener('orientationchange', close)
+    }
+    return () => {
+      if (orient && 'removeEventListener' in orient) {
+        orient.removeEventListener('change', close)
+      } else {
+        window.removeEventListener('orientationchange', close)
+      }
+    }
+  }, [isMobile])
 
   const vfsRootRef = useRef(vfsRoot)
   vfsRootRef.current = vfsRoot
@@ -224,8 +263,10 @@ const AppContent: React.FC = () => {
         }
         return pane
       }))
+
+      if (isMobile) setSidebarOpen(false)
     },
-    [activePaneId]
+    [activePaneId, isMobile]
   )
 
   // ─── Tab management ──────────────────────────────────────────────────────
@@ -771,26 +812,37 @@ const AppContent: React.FC = () => {
         onSave={performSave}
         onCloseAll={() => handleCloseAll(activePaneId)}
         onOpenSettings={() => setShowSettings(true)}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       <div className="re-main">
-        <FileExplorer
-          root={vfsRoot}
-          selectedPath={selectedPath}
-          width={sidebarWidth}
-          onFileSelect={handleFileSelect}
-          onAddLoreEntry={handleAddLoreEntry}
-          onAddLoreFolder={handleAddLoreFolder}
-          onAddGreeting={handleAddGreeting}
-          onDeleteNode={handleDeleteNode}
-          onRenameNode={handleRenameNode}
-          onMoveNode={handleMoveNode}
-          onReorderNode={handleReorderNode}
-          onDeleteGreeting={handleDeleteGreeting}
-        />
+        <div className={`re-sidebar-wrapper${sidebarOpen ? ' re-sidebar-open' : ''}`}>
+          <FileExplorer
+            root={vfsRoot}
+            selectedPath={selectedPath}
+            width={sidebarWidth}
+            onFileSelect={handleFileSelect}
+            onAddLoreEntry={handleAddLoreEntry}
+            onAddLoreFolder={handleAddLoreFolder}
+            onAddGreeting={handleAddGreeting}
+            onDeleteNode={handleDeleteNode}
+            onRenameNode={handleRenameNode}
+            onMoveNode={handleMoveNode}
+            onReorderNode={handleReorderNode}
+            onDeleteGreeting={handleDeleteGreeting}
+          />
+        </div>
         <div className="re-sidebar-resizer" onMouseDown={handleSidebarMouseDown} />
+        {isMobile && sidebarOpen && (
+          <div className="re-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+        )}
         <div className="re-editor-panes-container">
-          {panes.map(pane => {
+          {(isMobile
+            ? panes.filter(p => p.id === activePaneId).length > 0
+              ? panes.filter(p => p.id === activePaneId)
+              : panes.slice(0, 1)
+            : panes
+          ).map(pane => {
             const activeFile = getActiveFileForPane(pane)
             return (
               <div key={pane.id} className="re-editor-pane-group" onClickCapture={() => setActivePaneId(pane.id)}>
