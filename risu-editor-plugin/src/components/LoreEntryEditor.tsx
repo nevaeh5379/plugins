@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { VscWarning } from 'react-icons/vsc'
 import { UniversalEditor } from './editors/UniversalEditor'
 import type { LoreBook } from '../types/risuai.d.ts'
 import { PreviewPane } from './PreviewPane'
@@ -94,7 +95,7 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
     return (
       <div className="re-lore-editor">
         <div className="re-lore-toolbar re-lore-toolbar-error">
-          <span>⚠ Cannot parse JSON: {parsed.error}</span>
+          <span><VscWarning /> Cannot parse JSON: {parsed.error}</span>
           <button className="re-btn" onClick={() => setRawMode(true)}>
             Fix in raw mode
           </button>
@@ -108,12 +109,14 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
 
   const entry = parsed.entry
   const entryContent = typeof entry.content === 'string' ? entry.content : ''
+  const isFolder = entry.mode === 'folder'
 
   return (
     <div className="re-lore-editor">
       <div className="re-lore-toolbar">
         <span className="re-lore-toolbar-title">
-          {entry.comment || entry.key || 'Lorebook Entry'}
+          {isFolder ? '📁 ' : '📖 '}
+          {entry.comment || entry.key || (isFolder ? 'Folder' : 'Lorebook Entry')}
         </span>
         <button
           className="re-btn re-btn-icon-text"
@@ -125,26 +128,35 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
       </div>
       <div className="re-lore-body">
         <div className="re-lore-main">
-          <div className="re-lore-content-label">Content</div>
-          {showPreview ? (
-            <div className="re-editor-split" style={{ flex: 1, minHeight: 0 }}>
-              <div className="re-lore-content">
-                <ContentEditor
-                  key={filePath}
-                  value={entryContent}
-                  onChange={(v) => update({ content: v })}
-                />
-              </div>
-              <PreviewPane content={entryContent} characterName={characterName} />
+          {isFolder ? (
+            <div className="re-lore-folder-notice">
+              <p>This is a <strong>folder</strong> — it organizes child entries but has no content itself.</p>
+              <p>Child entries are shown nested under this folder in the file explorer.</p>
             </div>
           ) : (
-            <div className="re-lore-content">
-              <ContentEditor
-                key={filePath}
-                value={entryContent}
-                onChange={(v) => update({ content: v })}
-              />
-            </div>
+            <>
+              <div className="re-lore-content-label">Content</div>
+              {showPreview ? (
+                <div className="re-editor-split" style={{ flex: 1, minHeight: 0 }}>
+                  <div className="re-lore-content">
+                    <ContentEditor
+                      key={filePath}
+                      value={entryContent}
+                      onChange={(v) => update({ content: v })}
+                    />
+                  </div>
+                  <PreviewPane content={entryContent} characterName={characterName} />
+                </div>
+              ) : (
+                <div className="re-lore-content">
+                  <ContentEditor
+                    key={filePath}
+                    value={entryContent}
+                    onChange={(v) => update({ content: v })}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
         <aside className="re-lore-meta">
@@ -156,22 +168,27 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
               onChange={(e) => update({ comment: e.target.value })}
             />
           </Field>
-          <Field label="Keys" hint="Comma-separated trigger words">
+          <Field label={isFolder ? 'Folder key (auto-generated)' : 'Keys'} hint={isFolder ? 'Internal identifier for folder reference' : 'Comma-separated trigger words'}>
             <input
-              className="re-input"
+              className={`re-input${isFolder ? ' re-input-readonly' : ''}`}
               type="text"
               value={entry.key ?? ''}
               onChange={(e) => update({ key: e.target.value })}
+              readOnly={isFolder}
             />
           </Field>
-          <Field label="Secondary keys" hint="Required additionally when 'selective' is on">
-            <input
-              className="re-input"
-              type="text"
-              value={entry.secondkey ?? ''}
-              onChange={(e) => update({ secondkey: e.target.value })}
-            />
-          </Field>
+          {!isFolder && (
+            <>
+              <Field label="Secondary keys" hint="Required additionally when 'selective' is on">
+                <input
+                  className="re-input"
+                  type="text"
+                  value={entry.secondkey ?? ''}
+                  onChange={(e) => update({ secondkey: e.target.value })}
+                />
+              </Field>
+            </>
+          )}
           <Field label="Mode">
             <select
               className="re-input"
@@ -193,48 +210,55 @@ export const LoreEntryEditor: React.FC<LoreEntryEditorProps> = ({
               onChange={(e) => update({ insertorder: Number(e.target.value) })}
             />
           </Field>
-          <Field label="Activation %" hint="Probability (0–100). Empty = always trigger when keys match">
-            <input
-              className="re-input"
-              type="number"
-              min={0}
-              max={100}
-              value={entry.activationPercent ?? ''}
-              onChange={(e) =>
-                update({
-                  activationPercent:
-                    e.target.value === '' ? undefined : Number(e.target.value),
-                })
-              }
-            />
-          </Field>
-          <Toggle
-            label="Always active"
-            checked={!!entry.alwaysActive}
-            onChange={(v) => update({ alwaysActive: v })}
-            hint="Activate regardless of keys"
-          />
-          <Toggle
-            label="Selective"
-            checked={!!entry.selective}
-            onChange={(v) => update({ selective: v })}
-            hint="Require both key and secondary key to match"
-          />
-          <Toggle
-            label="Use regex"
-            checked={!!entry.useRegex}
-            onChange={(v) => update({ useRegex: v })}
-            hint="Treat keys as regular expressions"
-          />
-          {entry.folder && (
-            <Field label="Folder reference" hint="Identifies the parent folder; do not edit unless you know what you're doing">
-              <input
-                className="re-input re-input-readonly"
-                type="text"
-                value={entry.folder}
-                onChange={(e) => update({ folder: e.target.value })}
+          {!isFolder && (
+            <>
+              <Field label="Activation %" hint="Probability (0–100). Empty = always trigger when keys match">
+                <input
+                  className="re-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={entry.activationPercent ?? ''}
+                  onChange={(e) =>
+                    update({
+                      activationPercent:
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              </Field>
+              <Toggle
+                label="Always active"
+                checked={!!entry.alwaysActive}
+                onChange={(v) => update({ alwaysActive: v })}
+                hint="Activate regardless of keys"
               />
-            </Field>
+              <Toggle
+                label="Selective"
+                checked={!!entry.selective}
+                onChange={(v) => update({ selective: v })}
+                hint="Require both key and secondary key to match"
+              />
+              <Toggle
+                label="Use regex"
+                checked={!!entry.useRegex}
+                onChange={(v) => update({ useRegex: v })}
+                hint="Treat keys as regular expressions"
+              />
+              <Toggle
+                label="Case sensitive"
+                checked={!!entry.extentions?.risu_case_sensitive}
+                onChange={(v) =>
+                  update({
+                    extentions: {
+                      ...entry.extentions,
+                      risu_case_sensitive: v || undefined,
+                    } as any,
+                  })
+                }
+                hint="Keys must match exact letter case"
+              />
+            </>
           )}
           {entry.id !== undefined && (
             <Field label="Entry ID" hint="Internal identifier">

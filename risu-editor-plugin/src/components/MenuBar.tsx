@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { VscSave, VscRefresh, VscCloseAll, VscChromeClose, VscSettingsGear, VscSplitHorizontal } from 'react-icons/vsc'
 
 interface MenuBarProps {
   onSave: () => void
@@ -7,6 +8,7 @@ interface MenuBarProps {
   onSplitPane: () => void
   onCloseAll: () => void
   onCloseEditor: () => void
+  onSettings: () => void
 }
 
 export const MenuBar: React.FC<MenuBarProps> = ({
@@ -15,6 +17,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   onSplitPane,
   onCloseAll,
   onCloseEditor,
+  onSettings
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
@@ -41,15 +44,17 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     switch (menuName) {
       case 'File':
         return [
-          { label: 'Save (저장)', shortcut: 'Ctrl+S', onClick: onSave },
-          { label: 'Reload (새로고침)', onClick: onReload },
+          { label: 'Save (저장)', icon: <VscSave />, shortcut: 'Ctrl+S', onClick: onSave },
+          { label: 'Reload (새로고침)', icon: <VscRefresh />, onClick: onReload },
           { label: '', divider: true },
-          { label: 'Close All Tabs (모두 닫기)', onClick: onCloseAll },
-          { label: 'Close Editor (에디터 닫기)', onClick: onCloseEditor },
+          { label: 'Close All Tabs (모두 닫기)', icon: <VscCloseAll />, onClick: onCloseAll },
+          { label: 'Close Editor (에디터 닫기)', icon: <VscChromeClose />, onClick: onCloseEditor },
+          { label: '', divider: true },
+          { label: 'Settings', icon: <VscSettingsGear />, onClick: onSettings },
         ]
       case 'View':
         return [
-          { label: 'Split Pane (에디터 분할)', onClick: onSplitPane },
+          { label: 'Split Pane (에디터 분할)', icon: <VscSplitHorizontal />, onClick: onSplitPane },
         ]
       default:
         return []

@@ -26,7 +26,7 @@ export const CodeMirrorWrapper: React.FC<EditorWrapperProps> = ({
       <CodeMirror
         value={content}
         height="100%"
-        theme="dark"
+        theme={settings.theme === 'risu-light' ? 'light' : 'dark'}
         onChange={handleChange}
         basicSetup={{
           lineNumbers: true,

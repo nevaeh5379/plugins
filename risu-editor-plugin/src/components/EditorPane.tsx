@@ -16,6 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 import React from 'react'
+import { VscEdit } from 'react-icons/vsc'
 import { PreviewPane } from './PreviewPane'
 import { UniversalEditor } from './editors/UniversalEditor'
 
@@ -40,7 +41,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
     return (
       <div className="re-editor-pane">
         <div className="re-editor-empty">
-          <div className="re-editor-empty-icon">📝</div>
+          <div className="re-editor-empty-icon"><VscEdit /></div>
           <div className="re-editor-empty-text">Risu Editor</div>
           <div className="re-editor-empty-hint">
             Select a file from the explorer to start editing

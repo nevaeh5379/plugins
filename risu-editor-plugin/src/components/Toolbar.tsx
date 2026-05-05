@@ -18,6 +18,7 @@
 import React from 'react'
 import { FaRedo, FaColumns, FaCog } from "react-icons/fa"
 import { MenuBar } from './MenuBar'
+import { FaX } from 'react-icons/fa6'
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
 interface ToolbarProps {
@@ -88,6 +89,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onSplitPane={onSplitPane || (() => {})} 
           onCloseAll={onCloseAll || (() => {})} 
           onCloseEditor={onClose} 
+          onSettings={onOpenSettings || (() => {})}
         />
         <span style={{ color: 'var(--re-border-light)', margin: '0 4px' }}>│</span>
         <span className="re-toolbar-charname">{characterName || 'No Character'}</span>
@@ -120,7 +122,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           👁 Preview
         </button> */}
-        <button
+        {/* <button
           className="re-btn"
           onClick={onSplitPane}
           title="에디터 분할 (Split Pane)"
@@ -140,9 +142,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           title="데이터 새로고침 (Reload)"
         >
           <FaRedo />
-        </button>
+        </button> */}
         <button className="re-btn re-btn-icon" onClick={onClose} title="Close editor">
-          ✕
+          <FaX />
         </button>
       </div>
     </div>

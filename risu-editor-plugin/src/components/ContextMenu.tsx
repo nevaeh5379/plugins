@@ -19,6 +19,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 export interface MenuItem {
   label: string
+  icon?: React.ReactNode
   onClick?: () => void
   disabled?: boolean
   danger?: boolean
@@ -108,6 +109,7 @@ const MenuRow: React.FC<{ item: MenuItem; onAction: () => void }> = ({ item, onA
       onMouseLeave={() => setSubmenuOpen(false)}
       onClick={onAction}
     >
+      {item.icon && <span className="re-ctxmenu-icon">{item.icon}</span>}
       <span className="re-ctxmenu-label">{item.label}</span>
       {item.shortcut && <span className="re-ctxmenu-shortcut">{item.shortcut}</span>}
       {hasSubmenu && <span className="re-ctxmenu-arrow">▸</span>}

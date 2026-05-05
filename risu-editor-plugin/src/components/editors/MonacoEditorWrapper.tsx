@@ -2,6 +2,8 @@ import React, { useRef, useCallback, useEffect } from 'react'
 import Editor, { OnMount, OnChange } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 
+import { useSettings } from '../../lib/settingsContext'
+
 interface EditorWrapperProps {
   content: string
   language: string
@@ -17,6 +19,8 @@ export const MonacoEditorWrapper: React.FC<EditorWrapperProps> = ({
   fontSize,
   onChange,
 }) => {
+  const { settings } = useSettings()
+
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
   const handleMount: OnMount = useCallback((editor) => {
@@ -50,7 +54,7 @@ export const MonacoEditorWrapper: React.FC<EditorWrapperProps> = ({
       key={filePath}
       defaultValue={content}
       language={language}
-      theme="risu-dark"
+      theme={settings.theme === 'risu-light' ? 'light' : 'risu-dark'}
       onChange={handleChange}
       onMount={handleMount}
       options={{

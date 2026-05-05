@@ -1,7 +1,10 @@
 /* ── Risu Editor Plugin Styles — VSCode Dark Modern ── */
 .cm-theme-dark {
   height: 100%;
+}
 
+.cm-theme-light {
+  height: 100%;
 }
 :root {
   /* Backgrounds */
@@ -593,6 +596,24 @@ button {
   position: relative;
 }
 
+.re-lore-folder-notice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+  color: var(--re-fg-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  gap: 8px;
+}
+
+.re-lore-folder-notice strong {
+  color: var(--re-fg);
+}
+
 .re-lore-meta {
   width: 320px;
   min-width: 320px;
@@ -703,8 +724,8 @@ select.re-input {
 /* ── Context Menu ── */
 .re-ctxmenu {
   position: fixed;
-  background: #2d2d30;
-  border: 1px solid #454545;
+  background: var(--re-bg-input);
+  border: 1px solid var(--re-border-strong);
   border-radius: 5px;
   padding: 4px 0;
   min-width: 180px;
@@ -756,6 +777,14 @@ select.re-input {
 
 .re-ctxmenu-label {
   flex: 1;
+  white-space: nowrap;
+}
+
+.re-ctxmenu-icon {
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
 }
 
 .re-ctxmenu-shortcut {
@@ -765,7 +794,7 @@ select.re-input {
 }
 
 .re-ctxmenu-item:hover .re-ctxmenu-shortcut {
-  color: var(--re-fg-muted);
+  color: var(--re-fg-bright);
 }
 
 .re-ctxmenu-arrow {
@@ -775,7 +804,7 @@ select.re-input {
 
 .re-ctxmenu-divider {
   height: 1px;
-  background: #454545;
+  background: var(--re-border-strong);
   margin: 4px 0;
 }
 

@@ -18,6 +18,7 @@
 import React, { useState, useCallback } from 'react'
 import type { VFSNode } from '../lib/virtualFS'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { VscClose, VscSplitHorizontal, VscCloseAll, VscArrowLeft, VscArrowRight } from 'react-icons/vsc'
 
 interface TabBarProps {
   paneId: string
@@ -63,33 +64,39 @@ export const TabBar: React.FC<TabBarProps> = ({
       const items: MenuItem[] = [
         {
           label: '오른쪽으로 분할',
+          icon: <VscSplitHorizontal />,
           onClick: () => onSplitPane?.(paneId, openTabs[tabIndex]),
         },
         { label: '', divider: true },
         {
           label: '닫기',
+          icon: <VscClose />,
           shortcut: 'Ctrl+W',
           onClick: () => onTabClose(paneId, tabPath),
         },
         {
           label: '이것 제외 닫기',
+          icon: <VscClose />,
           onClick: () => onCloseOthers?.(paneId, tabPath),
           disabled: openTabs.length <= 1,
         },
         { label: '', divider: true },
         {
           label: '왼쪽에 모두 닫기',
+          icon: <VscArrowLeft />,
           onClick: () => onCloseToLeft?.(paneId, tabPath),
           disabled: tabIndex <= 0,
         },
         {
           label: '오른쪽 모두 닫기',
+          icon: <VscArrowRight />,
           onClick: () => onCloseToRight?.(paneId, tabPath),
           disabled: tabIndex >= openTabs.length - 1,
         },
         { label: '', divider: true },
         {
           label: '모두 닫기',
+          icon: <VscCloseAll />,
           onClick: () => onCloseAll?.(paneId),
         },
       ]
@@ -144,7 +151,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                 onTabClose(paneId, tab.path)
               }}
             >
-              ×
+              <VscClose />
             </span>
           </div>
         ))}

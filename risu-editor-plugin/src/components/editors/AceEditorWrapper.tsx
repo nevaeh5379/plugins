@@ -8,6 +8,7 @@ import 'ace-builds/src-noconflict/mode-markdown'
 import 'ace-builds/src-noconflict/mode-javascript'
 import 'ace-builds/src-noconflict/mode-text'
 import 'ace-builds/src-noconflict/theme-twilight'
+import 'ace-builds/src-noconflict/theme-github'
 
 interface EditorWrapperProps {
   content: string
@@ -23,6 +24,8 @@ export const AceEditorWrapper: React.FC<EditorWrapperProps> = ({
   fontSize,
   onChange,
 }) => {
+  const { settings } = useSettings()
+
   const handleChange = useCallback((val: string) => {
     onChange(val)
   }, [onChange])
@@ -32,11 +35,13 @@ export const AceEditorWrapper: React.FC<EditorWrapperProps> = ({
   else if (language === 'markdown') mode = 'markdown'
   else if (language === 'javascript' || language === 'typescript') mode = 'javascript'
 
+  const aceTheme = settings.theme === 'risu-light' ? 'github' : 'twilight'
+
   return (
     <div style={{ height: '100%', width: '100%' }}>
       <AceEditor
         mode={mode}
-        theme="twilight"
+        theme={aceTheme}
         onChange={handleChange}
         value={content}
         name="ace-editor"

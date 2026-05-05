@@ -58,6 +58,8 @@ export interface VFSMapping {
   loreId?: string
   /** For nested fields */
   subfield?: string
+  /** For lorebook folders, the internal folder key (e.g. '\uF000folder:uuid') */
+  folderKey?: string
 }
 
 // ─── Character → VFS ─────────────────────────────────────────────────────────
@@ -68,7 +70,6 @@ function sanitizeFileName(name: string): string {
   return name
     .replace(/[-]/g, '')
     .replace(/[<>:"/\\|?*]/g, '_')
-    .replace(/\s+/g, '_')
     .substring(0, 50) || 'unnamed'
 }
 
@@ -123,7 +124,7 @@ function createTextFile(
     language,
     dirty: false,
     mapping: { field, index },
-    icon: language === 'json' ? '{ }' : '📄',
+    icon: language === 'json' ? 'json' : 'file',
   }
 }
 
@@ -148,10 +149,15 @@ function buildLoreBookTree(loreEntries: LoreBook[], parentPath: string): VFSNode
     return name
   }
 
+  // ── Pass 1: collect all folders first ──
+  // This ensures folderMap is fully populated before we try to place
+  // child entries, so entries that appear before their parent folder
+  // in the array are still correctly nested.
   for (let i = 0; i < loreEntries.length; i++) {
-    const folder = loreEntries[i]
-    if (folder.mode !== 'folder') continue
-    const baseName = sanitizeFileName(folder.comment || `folder_${i}`)
+    const entry = loreEntries[i]
+    if (entry.mode !== 'folder') continue
+
+    const baseName = sanitizeFileName(entry.comment || `folder_${i}`)
     const folderName = uniqueName(baseName)
     const folderPath = `${parentPath}/${folderName}`
     const folderNode: VFSNode = {
@@ -159,17 +165,21 @@ function buildLoreBookTree(loreEntries: LoreBook[], parentPath: string): VFSNode
       path: folderPath,
       type: 'directory',
       children: [],
-      icon: '📂',
-      mapping: { field: 'globalLore', index: i },
+      icon: 'folder',
+      mapping: { field: 'globalLore', index: i, folderKey: entry.key },
     }
-    if (folder.key) folderMap.set(folder.key, folderNode)
+    if (entry.key) folderMap.set(entry.key, folderNode)
     children.push(folderNode)
   }
 
-  // Non-folder entries: write each as a markdown file with frontmatter.
+  // ── Pass 2: process all entries (folders already added, files get placed) ──
   for (let i = 0; i < loreEntries.length; i++) {
     const entry = loreEntries[i]
-    if (entry.mode === 'folder') continue
+
+    if (entry.mode === 'folder') {
+      // Already handled in pass 1 — skip
+      continue
+    }
 
     const entryBase = sanitizeFileName(entry.comment || entry.key || `entry_${i}`) + '.json'
     const entryName = uniqueName(entryBase)
@@ -187,7 +197,7 @@ function buildLoreBookTree(loreEntries: LoreBook[], parentPath: string): VFSNode
       language: 'json',
       dirty: false,
       mapping: { field: 'globalLore', index: i, loreId: entry.id },
-      icon: '📖',
+      icon: 'book',
     }
 
     if (targetFolder) {
@@ -209,7 +219,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
     path: rootPath,
     type: 'directory',
     children: [],
-    icon: '👤',
+    icon: 'character',
   }
 
   // ── Text fields as markdown files ──
@@ -246,7 +256,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
       path: `${rootPath}/alternate_greetings`,
       type: 'directory',
       children: [],
-      icon: '💬',
+      icon: 'message',
     }
     for (let i = 0; i < char.alternateGreetings.length; i++) {
       greetingsDir.children!.push(
@@ -268,7 +278,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
     path: `${rootPath}/lorebook`,
     type: 'directory',
     children: [],
-    icon: '📚',
+    icon: 'lorebook',
   }
 
   // Lore settings
@@ -281,7 +291,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
       language: 'json',
       dirty: false,
       mapping: { field: 'loreSettings' },
-      icon: '⚙️',
+      icon: 'gear',
     })
   }
 
@@ -297,7 +307,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
       path: `${rootPath}/regex`,
       type: 'directory',
       children: [],
-      icon: '🔧',
+      icon: 'wrench',
     }
     for (let i = 0; i < char.customscript.length; i++) {
       const script = char.customscript[i]
@@ -310,7 +320,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
         language: 'json',
         dirty: false,
         mapping: { field: 'customscript', index: i },
-        icon: '{ }',
+        icon: 'json',
       })
     }
     root.children!.push(regexDir)
@@ -340,7 +350,7 @@ export function characterToVFS(char: RisuCharacter): VFSNode {
     language: 'json',
     dirty: false,
     mapping: { field: '_settings' },
-    icon: '⚙️',
+    icon: 'gear',
   })
 
   return root
@@ -531,10 +541,9 @@ export function addLoreEntryNode(
     insertorder: 100,
     comment: `New Entry ${entryIndex}`,
     content: '',
-    mode: folderKey ? 'child' : 'normal',
+    mode: 'normal',
     alwaysActive: false,
     selective: false,
-    id,
     ...(folderKey ? { folder: folderKey } : {}),
   }
 
@@ -575,9 +584,9 @@ export function addLoreFolderNode(
     path: folderPath,
     type: 'directory',
     children: [],
-    icon: '📂',
+    icon: 'folder',
     dirty: true,
-    mapping: { field: 'globalLore', index: folderIndex },
+    mapping: { field: 'globalLore', index: folderIndex, folderKey: '\uF000folder:' + id },
   }
 
   parent.children = parent.children || []
@@ -692,6 +701,13 @@ export function moveNode(root: VFSNode, sourcePath: string, targetDirPath: strin
   // Don't move into self or descendant
   if (targetDirPath.startsWith(sourcePath)) return false
 
+  // RisuAI does NOT support nested folders.
+  // If the source is a directory (folder) and the target is also a lorebook folder
+  // (not the lorebook root), reject the move.
+  if (node.type === 'directory' && targetDir.mapping?.field === 'globalLore' && targetDir.name !== 'lorebook') {
+    return false
+  }
+
   // Remove from old parent
   const oldParent = findParentNode(root, sourcePath)
   if (!oldParent || !oldParent.children) return false
@@ -717,30 +733,26 @@ export function moveNode(root: VFSNode, sourcePath: string, targetDirPath: strin
     updateChildPaths(node, oldPath, node.path)
   }
 
-  // Update folder reference for lorebook entries
+  // Update folder reference for lorebook entries.
+  // NOTE: RisuAI does NOT support nested folders — a folder cannot be moved
+  // into another folder. Only files can be moved into/out of folders.
   if (node.mapping?.field === 'globalLore' && targetDir.mapping?.field === 'globalLore') {
-    // Moving into a lorebook folder — update the folder reference in the JSON
     if (node.type === 'file' && node.content) {
+      // Moving a file into a lorebook folder — update the folder reference
       try {
         const parsed = JSON.parse(node.content) as Partial<LoreBook>
-        // The folder key is typically the folder entry's `key` field or its `id`
-        // We look at the target folder's mapping to find the right key
-        const targetFolderNode = targetDir
-        const folderLoreIndex = targetFolderNode.mapping?.index
-        if (folderLoreIndex !== undefined) {
-          // We'll set a placeholder; vfsToCharacter rebuild will handle it
-          parsed.folder = targetDir.mapping?.loreId || targetDir.name
-          parsed.mode = 'child'
-          node.content = JSON.stringify(parsed, null, 2)
-        }
+        parsed.folder = targetDir.mapping?.folderKey || targetDir.name
+        node.content = JSON.stringify(parsed, null, 2)
+        node.dirty = true
       } catch { /* skip */ }
     }
+    // If node is a directory (folder), do NOT allow moving into another folder.
+    // Folders are always root-level in RisuAI.
   } else if (node.mapping?.field === 'globalLore' && node.type === 'file') {
-    // Moving to lorebook root — remove folder reference
+    // Moving a file to lorebook root — remove folder reference
     try {
       const parsed = JSON.parse(node.content!) as Partial<LoreBook>
       delete parsed.folder
-      if (parsed.mode === 'child') parsed.mode = 'normal'
       node.content = JSON.stringify(parsed, null, 2)
       node.dirty = true
     } catch { /* skip */ }
@@ -768,7 +780,7 @@ export function collectLoreFolders(root: VFSNode): { name: string; path: string 
     if (node.type === 'directory' && node.name === 'lorebook') {
       // Only add if not already included via mapping
       if (!folders.some((f) => f.path === node.path)) {
-        folders.push({ name: '📚 lorebook (root)', path: node.path })
+        folders.push({ name: 'lorebook (root)', path: node.path })
       }
     }
     if (node.children) {
@@ -801,87 +813,61 @@ export function countLoreEntries(root: VFSNode): number {
 
 /**
  * Rebuild the globalLore array from the VFS tree structure.
- * This handles additions, deletions, and reorderings.
+ * This handles additions, deletions, reorderings, and nested folders.
+ * Pure VFS-tree-based — does NOT depend on originalChar or mapping.index.
  */
-export function rebuildGlobalLoreFromVFS(root: VFSNode, originalChar: RisuCharacter): LoreBook[] {
+export function rebuildGlobalLoreFromVFS(root: VFSNode): LoreBook[] {
   const lorebookDir = root.children?.find((c) => c.name === 'lorebook')
-  if (!lorebookDir || !lorebookDir.children) return originalChar.globalLore
+  if (!lorebookDir || !lorebookDir.children) return []
 
   const loreEntries: LoreBook[] = []
-  const folderKeyMap = new Map<string, string>() // folderPath -> folderKey
 
-  // First pass: collect folder entries
-  const processFolders = (children: VFSNode[]) => {
-    for (const child of children) {
-      if (child.type === 'directory' && child.mapping?.field === 'globalLore') {
-        const originalIndex = child.mapping.index
-        let folderEntry: LoreBook
-        if (originalIndex !== undefined && originalChar.globalLore[originalIndex]) {
-          folderEntry = { ...originalChar.globalLore[originalIndex] }
-          // Override comment if renamed
-          if (child.dirty) {
-            folderEntry.comment = child.name
+  // Recursively flatten VFS tree into RisuAI's flat loreBook[] format.
+  // parentFolderKey is the `key` of the parent folder (or undefined for root).
+  const flattenNode = (node: VFSNode, parentFolderKey?: string) => {
+    if (node.type === 'directory' && node.mapping?.field === 'globalLore') {
+      // Build folder entry from VFS node (RisuAI: no id, key = '\uf000folder:' + uuid)
+      const folderKey = node.mapping.folderKey || '\uf000folder:' + generateId()
+      const folderEntry: LoreBook = {
+        key: folderKey,
+        secondkey: '',
+        insertorder: 100,
+        comment: node.name,
+        content: '',
+        mode: 'folder',
+        alwaysActive: false,
+        selective: false,
+      }
+      // NOTE: RisuAI does NOT support nested folders.
+      // A folder is always at root level — never inside another folder.
+      loreEntries.push(folderEntry)
+
+      // Process children of this folder (files only — nested folders are not supported)
+      if (node.children) {
+        for (const child of node.children) {
+          if (child.type === 'file') {
+            flattenNode(child, folderKey)
           }
+          // Skip nested directories — RisuAI doesn't support folder-in-folder
+        }
+      }
+    } else if (node.type === 'file' && node.mapping?.field === 'globalLore' && node.content) {
+      try {
+        const parsed = JSON.parse(node.content) as LoreBook
+        if (parentFolderKey) {
+          parsed.folder = parentFolderKey
         } else {
-          // New folder
-          folderEntry = {
-            key: 'folder:' + generateId(),
-            secondkey: '',
-            insertorder: 100,
-            comment: child.name,
-            content: '',
-            mode: 'folder',
-            alwaysActive: false,
-            selective: false,
-            id: generateId(),
-          }
+          delete parsed.folder
         }
-        folderKeyMap.set(child.path, folderEntry.key)
-        loreEntries.push(folderEntry)
-
-        // Process children of this folder
-        if (child.children) {
-          for (const fc of child.children) {
-            if (fc.type === 'file' && fc.mapping?.field === 'globalLore') {
-              processLoreFile(fc, folderEntry.key)
-            }
-          }
-        }
+        loreEntries.push(parsed)
+      } catch {
+        // Skip invalid JSON — will be fixed by user in editor
       }
     }
   }
 
-  const processLoreFile = (node: VFSNode, folderKey?: string) => {
-    if (!node.content) return
-    try {
-      const parsed = JSON.parse(node.content) as LoreBook
-      if (folderKey) {
-        parsed.folder = folderKey
-        if (parsed.mode !== 'child') parsed.mode = 'child'
-      } else {
-        delete parsed.folder
-      }
-      loreEntries.push(parsed)
-    } catch {
-      // If JSON is invalid, try to preserve the original
-      const originalIndex = node.mapping?.index
-      if (originalIndex !== undefined && originalChar.globalLore[originalIndex]) {
-        loreEntries.push(originalChar.globalLore[originalIndex])
-      }
-    }
-  }
-
-  // Process lorebook children: folders first, then root-level files
-  const folders = lorebookDir.children.filter(
-    (c) => c.type === 'directory' && c.mapping?.field === 'globalLore'
-  )
-  const rootFiles = lorebookDir.children.filter(
-    (c) => c.type === 'file' && c.mapping?.field === 'globalLore'
-  )
-
-  processFolders(folders)
-  for (const file of rootFiles) {
-    processLoreFile(file)
+  for (const child of lorebookDir.children) {
+    flattenNode(child)
   }
 
   return loreEntries

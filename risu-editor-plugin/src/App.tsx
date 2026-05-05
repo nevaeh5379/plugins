@@ -22,10 +22,12 @@ import { EditorPane } from './components/EditorPane'
 import { LoreEntryEditor } from './components/LoreEntryEditor'
 import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
+import { VscWarning } from 'react-icons/vsc'
 import {
   characterToVFS,
   vfsToCharacter,
   findNode,
+  findParentNode,
   getModifiedFiles,
   countFiles,
   updateFileContent,
@@ -150,6 +152,9 @@ const AppContent: React.FC = () => {
   const vfsRootRef = useRef(vfsRoot)
   vfsRootRef.current = vfsRoot
 
+  const originalCharRef = useRef(originalChar)
+  originalCharRef.current = originalChar
+
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isSavingRef = useRef(false)
 
@@ -189,12 +194,17 @@ const AppContent: React.FC = () => {
     loadData()
   }, [loadData])
 
-  // Re-load when the user re-opens the editor (e.g. after switching character)
   useEffect(() => {
     const handler = () => { loadData() }
     window.addEventListener('risu-editor:reload', handler)
     return () => window.removeEventListener('risu-editor:reload', handler)
   }, [loadData])
+
+  useEffect(() => {
+    if (panes.length > 0 && !panes.some(p => p.id === activePaneId)) {
+      setActivePaneId(panes[0].id)
+    }
+  }, [panes, activePaneId])
 
   // ─── File selection ──────────────────────────────────────────────────────
 
@@ -228,17 +238,20 @@ const AppContent: React.FC = () => {
 
   const handleTabClose = useCallback(
     (paneId: string, path: string) => {
-      setPanes(prev => prev.map(pane => {
-        if (pane.id !== paneId) return pane
-        const nextTabs = pane.openTabs.filter((t) => t.path !== path)
-        let newActive = pane.activeTabPath
-        if (pane.activeTabPath === path) {
-          const closedIndex = pane.openTabs.findIndex((t) => t.path === path)
-          const nextActiveTab = nextTabs[Math.min(closedIndex, nextTabs.length - 1)]
-          newActive = nextActiveTab?.path ?? null
-        }
-        return { ...pane, openTabs: nextTabs, activeTabPath: newActive }
-      }))
+      setPanes(prev => {
+        const nextPanes = prev.map(pane => {
+          if (pane.id !== paneId) return pane
+          const nextTabs = pane.openTabs.filter((t) => t.path !== path)
+          let newActive = pane.activeTabPath
+          if (pane.activeTabPath === path) {
+            const closedIndex = pane.openTabs.findIndex((t) => t.path === path)
+            const nextActiveTab = nextTabs[Math.min(closedIndex, nextTabs.length - 1)]
+            newActive = nextActiveTab?.path ?? null
+          }
+          return { ...pane, openTabs: nextTabs, activeTabPath: newActive }
+        })
+        return nextPanes.filter(p => p.openTabs.length > 0 || nextPanes.length === 1)
+      })
     },
     []
   )
@@ -285,7 +298,10 @@ const AppContent: React.FC = () => {
   }, [])
 
   const handleCloseAll = useCallback((paneId: string) => {
-    setPanes(prev => prev.map(pane => pane.id === paneId ? { ...pane, openTabs: [], activeTabPath: null } : pane))
+    setPanes(prev => {
+      const nextPanes = prev.map(pane => pane.id === paneId ? { ...pane, openTabs: [], activeTabPath: null } : pane)
+      return nextPanes.filter(p => p.openTabs.length > 0 || nextPanes.length === 1)
+    })
   }, [])
 
   const handleCloseOthers = useCallback(
@@ -300,28 +316,34 @@ const AppContent: React.FC = () => {
 
   const handleCloseToLeft = useCallback(
     (paneId: string, path: string) => {
-      setPanes(prev => prev.map(pane => {
-        if (pane.id !== paneId) return pane
-        const idx = pane.openTabs.findIndex((t) => t.path === path)
-        const next = pane.openTabs.slice(idx)
-        let newActive = pane.activeTabPath
-        if (!next.some((t) => t.path === newActive)) newActive = path
-        return { ...pane, openTabs: next, activeTabPath: newActive }
-      }))
+      setPanes(prev => {
+        const nextPanes = prev.map(pane => {
+          if (pane.id !== paneId) return pane
+          const idx = pane.openTabs.findIndex((t) => t.path === path)
+          const next = pane.openTabs.slice(idx)
+          let newActive = pane.activeTabPath
+          if (!next.some((t) => t.path === newActive)) newActive = path
+          return { ...pane, openTabs: next, activeTabPath: newActive }
+        })
+        return nextPanes.filter(p => p.openTabs.length > 0 || nextPanes.length === 1)
+      })
     },
     []
   )
 
   const handleCloseToRight = useCallback(
     (paneId: string, path: string) => {
-      setPanes(prev => prev.map(pane => {
-        if (pane.id !== paneId) return pane
-        const idx = pane.openTabs.findIndex((t) => t.path === path)
-        const next = pane.openTabs.slice(0, idx + 1)
-        let newActive = pane.activeTabPath
-        if (!next.some((t) => t.path === newActive)) newActive = path
-        return { ...pane, openTabs: next, activeTabPath: newActive }
-      }))
+      setPanes(prev => {
+        const nextPanes = prev.map(pane => {
+          if (pane.id !== paneId) return pane
+          const idx = pane.openTabs.findIndex((t) => t.path === path)
+          const next = pane.openTabs.slice(0, idx + 1)
+          let newActive = pane.activeTabPath
+          if (!next.some((t) => t.path === newActive)) newActive = path
+          return { ...pane, openTabs: next, activeTabPath: newActive }
+        })
+        return nextPanes.filter(p => p.openTabs.length > 0 || nextPanes.length === 1)
+      })
     },
     []
   )
@@ -329,16 +351,16 @@ const AppContent: React.FC = () => {
   // ─── Auto-save ──────────────────────────────────────────────────────────
 
   const performSave = useCallback(async () => {
-    if (!vfsRootRef.current || !originalChar || isSavingRef.current) return
+    const currentRoot = vfsRootRef.current
+    const currentOriginalChar = originalCharRef.current
+    if (!currentRoot || !currentOriginalChar || isSavingRef.current) return
     isSavingRef.current = true
     setAutoSaveStatus('saving')
 
     try {
-      const currentRoot = vfsRootRef.current
-
       // Rebuild globalLore and alternateGreetings from VFS tree
-      const updatedChar = vfsToCharacter(currentRoot, originalChar)
-      updatedChar.globalLore = rebuildGlobalLoreFromVFS(currentRoot, originalChar)
+      const updatedChar = vfsToCharacter(currentRoot, currentOriginalChar)
+      updatedChar.globalLore = rebuildGlobalLoreFromVFS(currentRoot)
       updatedChar.alternateGreetings = rebuildGreetingsFromVFS(currentRoot)
 
       if (IS_DEV) {
@@ -376,7 +398,7 @@ const AppContent: React.FC = () => {
     }
 
     isSavingRef.current = false
-  }, [originalChar])
+  }, [])
 
   const scheduleAutoSave = useCallback(() => {
     if (autoSaveTimerRef.current) {
@@ -427,7 +449,15 @@ const AppContent: React.FC = () => {
       if (!vfsRoot) return
       const newRoot = structuredClone(vfsRoot)
       const count = countLoreEntries(newRoot)
-      const newNode = addLoreEntryNode(newRoot, parentPath, count)
+
+      // If parent is a lorebook folder, extract its folderKey for the child reference
+      const parentNode = findNode(newRoot, parentPath)
+      const folderKey =
+        parentNode?.mapping?.field === 'globalLore' && parentNode.type === 'directory'
+          ? parentNode.mapping.folderKey
+          : undefined
+
+      const newNode = addLoreEntryNode(newRoot, parentPath, count, folderKey)
       if (newNode) {
         setVfsRoot(newRoot)
         scheduleAutoSave()
@@ -536,7 +566,53 @@ const AppContent: React.FC = () => {
     },
     [vfsRoot, scheduleAutoSave]
   )
+  // ─── Reorder operations ──────────────────────────────────────────────────
+  const handleReorderNode = useCallback(
+    (sourcePath: string, targetPath: string, position: 'before' | 'after') => {
+      if (!vfsRoot) return
 
+      const newRoot = structuredClone(vfsRoot)
+      const sourceNode = findNode(newRoot, sourcePath)
+      const targetNode = findNode(newRoot, targetPath)
+
+      if (!sourceNode || !targetNode) return
+      if (sourceNode.mapping?.field !== 'globalLore' || targetNode.mapping?.field !== 'globalLore') return
+
+      // Find the common parent (both must be siblings in the same directory)
+      const sourceParent = findParentNode(newRoot, sourcePath)
+      const targetParent = findParentNode(newRoot, targetPath)
+      if (!sourceParent || !targetParent || sourceParent.path !== targetParent.path) return
+      if (!sourceParent.children) return
+
+      const siblings = sourceParent.children
+      const sourceIdx = siblings.findIndex((c: VFSNode) => c.path === sourcePath)
+      const targetIdx = siblings.findIndex((c: VFSNode) => c.path === targetPath)
+      if (sourceIdx === -1 || targetIdx === -1) return
+
+      // Remove source from its current position
+      const [moved] = siblings.splice(sourceIdx, 1)
+
+      // Calculate insertion index after removal
+      let insertIdx = targetIdx
+      if (sourceIdx < targetIdx) insertIdx -= 1
+      if (position === 'after') insertIdx += 1
+
+      siblings.splice(insertIdx, 0, moved)
+
+      setVfsRoot(newRoot)
+
+      // Update tab references
+      setPanes(prev => prev.map(pane => {
+        const newTabs = pane.openTabs.map(tab => {
+          return findNode(newRoot, tab.path) || tab
+        })
+        return { ...pane, openTabs: newTabs }
+      }))
+
+      scheduleAutoSave()
+    },
+    [vfsRoot, scheduleAutoSave]
+  )
   // ─── Greeting operations ──────────────────────────────────────────────────
 
   const handleAddGreeting = useCallback(() => {
@@ -664,7 +740,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="re-app">
         <div className="re-error-box">
-          <span style={{ fontSize: '32px' }}>⚠️</span>
+          <span style={{ fontSize: '32px' }}><VscWarning /></span>
           <span>{error}</span>
           <button className="re-btn re-btn-primary" onClick={loadData}>
             Retry
@@ -709,6 +785,7 @@ const AppContent: React.FC = () => {
           onDeleteNode={handleDeleteNode}
           onRenameNode={handleRenameNode}
           onMoveNode={handleMoveNode}
+          onReorderNode={handleReorderNode}
           onDeleteGreeting={handleDeleteGreeting}
         />
         <div className="re-sidebar-resizer" onMouseDown={handleSidebarMouseDown} />
@@ -766,7 +843,7 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <SettingsProvider>
-      {/* <ThemeManager /> */}
+      <ThemeManager />
       <AppContent />
     </SettingsProvider>
   )
