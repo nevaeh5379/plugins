@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: risu-editor-plugin/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: risu-editor-plugin
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: risu-editor-plugin
+        run: pnpm build
+
+      - name: Generate version tag
+        id: version
+        run: |
+          DATE=$(date -u +"%Y.%m.%d")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TAG="v${DATE}-dev+${SHORT_SHA}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Generated tag: ${TAG}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+          files: risu-editor-plugin/dist/plugin.js
+          make_latest: true

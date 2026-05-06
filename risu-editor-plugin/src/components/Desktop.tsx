@@ -19,6 +19,7 @@ import React, { useRef, useState, useCallback, useEffect } from 'react'
 import { Window } from './Window'
 import { Taskbar } from './Taskbar'
 import type { WindowState, WindowRect } from '../lib/windowManager'
+import type { ExplorerMode } from '../lib/settingsContext'
 import {
   computeTileLayout,
   nextZIndex,
@@ -31,6 +32,10 @@ interface DesktopProps {
   onWindowsChange: (windows: WindowState[]) => void
   onWindowClose: (windowId: string) => void
   renderWindowContent: (paneId: string) => React.ReactNode
+  explorerMode: ExplorerMode
+  explorerContent: React.ReactNode
+  explorerWindowOpen?: boolean
+  onToggleExplorerWindow?: () => void
 }
 
 export const Desktop: React.FC<DesktopProps> = ({
@@ -38,6 +43,10 @@ export const Desktop: React.FC<DesktopProps> = ({
   onWindowsChange,
   onWindowClose,
   renderWindowContent,
+  explorerMode,
+  explorerContent,
+  explorerWindowOpen = false,
+  onToggleExplorerWindow,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
@@ -155,28 +164,64 @@ export const Desktop: React.FC<DesktopProps> = ({
 
   // ── Render ──────────────────────────────────────────────────────────────
 
+  const editorWindows = windows.filter((w) => w.id !== 'win-explorer')
+  const explorerWin = windows.find((w) => w.id === 'win-explorer')
+
   return (
-    <div className="re-desktop" ref={containerRef}>
-      {windows.map((win) => (
-        <Window
-          key={win.id}
-          window={win}
-          containerRect={containerSize}
-          onFocus={handleFocus}
-          onMove={handleMove}
-          onResize={handleResize}
-          onMinimize={handleMinimize}
-          onMaximize={handleMaximize}
-          onRestore={handleRestore}
-          onClose={handleClose}
-        >
-          {renderWindowContent(win.paneId)}
-        </Window>
-      ))}
+    <div className={`re-desktop${explorerMode === 'sidebar' ? ' re-desktop--sidebar' : ''}`} ref={containerRef}>
+      {explorerMode === 'sidebar' && (
+        <div className="re-desktop-sidebar">
+          {explorerContent}
+        </div>
+      )}
+      <div className="re-desktop-window-area">
+        {editorWindows.map((win) => (
+          <Window
+            key={win.id}
+            window={win}
+            containerRect={containerSize}
+            onFocus={handleFocus}
+            onMove={handleMove}
+            onResize={handleResize}
+            onMinimize={handleMinimize}
+            onMaximize={handleMaximize}
+            onRestore={handleRestore}
+            onClose={handleClose}
+          >
+            {renderWindowContent(win.paneId)}
+          </Window>
+        ))}
+        {explorerMode === 'window' && explorerWindowOpen && explorerWin && (
+          <Window
+            key={explorerWin.id}
+            window={explorerWin}
+            containerRect={containerSize}
+            onFocus={handleFocus}
+            onMove={handleMove}
+            onResize={handleResize}
+            onMinimize={handleMinimize}
+            onMaximize={handleMaximize}
+            onRestore={handleRestore}
+            onClose={() => onToggleExplorerWindow?.()}
+            closable={false}
+          >
+            {explorerContent}
+          </Window>
+        )}
+      </div>
       <Taskbar
         windows={windows}
         onActivate={handleTaskbarActivate}
       />
+      {explorerMode === 'window' && (
+        <button
+          className={`re-explorer-toggle${explorerWindowOpen ? ' active' : ''}`}
+          onClick={onToggleExplorerWindow}
+          title={explorerWindowOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기'}
+        >
+          📁
+        </button>
+      )}
     </div>
   )
 }

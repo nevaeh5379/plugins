@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type EditorType = 'monaco' | 'codemirror' | 'ace' | 'simple';
 export type ThemeType = 'risu-dark' | 'risu-light' | 'custom';
+export type ExplorerMode = 'sidebar' | 'window';
 
 export interface CustomThemeColors {
   bgEditor: string;
@@ -49,6 +50,7 @@ export interface EditorSettings {
   fontSize: number;
   theme: ThemeType;
   customTheme: CustomThemeColors;
+  explorerMode: ExplorerMode;
 }
 
 const defaultSettings: EditorSettings = {
@@ -57,6 +59,7 @@ const defaultSettings: EditorSettings = {
   fontSize: 14,
   theme: 'risu-dark',
   customTheme: defaultCustomTheme,
+  explorerMode: 'sidebar',
 };
 
 interface SettingsContextType {

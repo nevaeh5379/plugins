@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSettings, ThemeType, EditorType, CustomThemeColors } from '../lib/settingsContext';
+import { useSettings, ThemeType, EditorType, ExplorerMode, CustomThemeColors } from '../lib/settingsContext';
 import { VscClose } from 'react-icons/vsc';
 
 interface SettingsModalProps {
@@ -112,6 +112,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   min={8}
                   max={36}
                 />
+              </div>
+              <div className="re-setting-item">
+                <label>Explorer Mode (창 모드)</label>
+                <select
+                  className="re-input"
+                  value={settings.explorerMode}
+                  onChange={(e) => updateSettings({ explorerMode: e.target.value as ExplorerMode })}
+                >
+                  <option value="sidebar">사이드바 고정</option>
+                  <option value="window">버튼으로 열기/닫기</option>
+                </select>
+                <div className="re-setting-hint">창 모드에서 파일 탐색기 표시 방식을 선택합니다.</div>
               </div>
             </div>
           )}

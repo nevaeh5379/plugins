@@ -39,6 +39,7 @@ interface WindowProps {
   onMaximize: (id: string) => void
   onRestore: (id: string) => void
   onClose: (id: string) => void
+  closable?: boolean
   children: React.ReactNode
 }
 
@@ -52,6 +53,7 @@ export const Window: React.FC<WindowProps> = ({
   onMaximize,
   onRestore,
   onClose,
+  closable = true,
   children,
 }) => {
   const headerRef = useRef<HTMLDivElement>(null)
@@ -198,13 +200,15 @@ export const Window: React.FC<WindowProps> = ({
           >
             {maximized ? <VscChromeRestore /> : <VscChromeMaximize />}
           </button>
-          <button
-            className="re-window-action-btn re-window-close-btn"
-            onClick={(e) => { e.stopPropagation(); onClose(win.id) }}
-            title="Close"
-          >
-            <VscChromeClose />
-          </button>
+          {closable && (
+            <button
+              className="re-window-action-btn re-window-close-btn"
+              onClick={(e) => { e.stopPropagation(); onClose(win.id) }}
+              title="Close"
+            >
+              <VscChromeClose />
+            </button>
+          )}
         </div>
       </div>
 

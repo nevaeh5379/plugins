@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { FileExplorer } from './components/FileExplorer'
 import { TabBar } from './components/TabBar'
 import { EditorPane } from './components/EditorPane'
@@ -171,6 +171,8 @@ const AppContent: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('fullscreen')
   const [windows, setWindows] = useState<WindowState[]>([])
+  const [explorerWindowOpen, setExplorerWindowOpen] = useState(false)
+  const { settings } = useSettings()
   const isMobile = useIsMobile()
 
   // Close mobile sidebar on orientation change so the layout doesn't get
@@ -733,12 +735,29 @@ const AppContent: React.FC = () => {
 
   const syncPanesToWindows = useCallback((currentPanes: EditorPaneData[]) => {
     resetZIndex()
-    const newWindows: WindowState[] = currentPanes.map((pane, i) => {
+    const newWindows: WindowState[] = []
+
+    // File explorer window (only in 'window' explorer mode)
+    if (settings.explorerMode === 'window') {
+      newWindows.push({
+        id: 'win-explorer',
+        paneId: '__explorer__',
+        title: 'File Explorer',
+        rect: { x: 0, y: 0, width: 280, height: 500 },
+        minimized: false,
+        maximized: false,
+        zIndex: nextZIndex(),
+        restoreRect: null,
+      })
+    }
+
+    // Editor windows
+    for (const pane of currentPanes) {
       const activeFile = pane.activeTabPath && vfsRootRef.current
         ? findNode(vfsRootRef.current, pane.activeTabPath)
         : null
       const title = activeFile?.name ?? 'Risu Editor'
-      return {
+      newWindows.push({
         id: `win-${pane.id}`,
         paneId: pane.id,
         title,
@@ -747,10 +766,10 @@ const AppContent: React.FC = () => {
         maximized: false,
         zIndex: nextZIndex(),
         restoreRect: null,
-      }
-    })
+      })
+    }
     setWindows(newWindows)
-  }, [])
+  }, [settings.explorerMode])
 
   const handleToggleLayoutMode = useCallback(() => {
     setLayoutMode((prev) => {
@@ -897,13 +916,14 @@ const AppContent: React.FC = () => {
 
   const handleWindowClose = useCallback(
     (windowId: string) => {
+      // Don't allow closing the file explorer window
+      if (windowId === 'win-explorer') return
+
       const win = windows.find((w) => w.id === windowId)
       if (!win) return
 
-      // Remove the corresponding pane
       setPanes((prev) => {
         const nextPanes = prev.filter((p) => p.id !== win.paneId)
-        // If all panes are gone, switch back to fullscreen
         if (nextPanes.length === 0) {
           setLayoutMode('fullscreen')
           setWindows([])
@@ -971,6 +991,7 @@ const AppContent: React.FC = () => {
       handleTabClose,
       handleTabReorder,
       handleSplitPane,
+      handleMoveToNewWindow,
       handleCloseAll,
       handleCloseOthers,
       handleCloseToLeft,
@@ -979,6 +1000,38 @@ const AppContent: React.FC = () => {
       getActiveFileForPane,
     ],
   )
+
+  // Explorer content (shared between sidebar and window modes)
+  const explorerContent = useMemo(() => (
+    <FileExplorer
+      root={vfsRoot}
+      selectedPath={selectedPath}
+      width={260}
+      onFileSelect={handleFileSelect}
+      onOpenInNewWindow={handleOpenInNewWindow}
+      onAddLoreEntry={handleAddLoreEntry}
+      onAddLoreFolder={handleAddLoreFolder}
+      onAddGreeting={handleAddGreeting}
+      onDeleteNode={handleDeleteNode}
+      onRenameNode={handleRenameNode}
+      onMoveNode={handleMoveNode}
+      onReorderNode={handleReorderNode}
+      onDeleteGreeting={handleDeleteGreeting}
+    />
+  ), [
+    vfsRoot,
+    selectedPath,
+    handleFileSelect,
+    handleOpenInNewWindow,
+    handleAddLoreEntry,
+    handleAddLoreFolder,
+    handleAddGreeting,
+    handleDeleteNode,
+    handleRenameNode,
+    handleMoveNode,
+    handleReorderNode,
+    handleDeleteGreeting,
+  ])
 
   // Resizer mouse handlers
   const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1064,6 +1117,10 @@ const AppContent: React.FC = () => {
           onWindowsChange={setWindows}
           onWindowClose={handleWindowClose}
           renderWindowContent={renderWindowContent}
+          explorerMode={settings.explorerMode}
+          explorerContent={explorerContent}
+          explorerWindowOpen={explorerWindowOpen}
+          onToggleExplorerWindow={() => setExplorerWindowOpen((o) => !o)}
         />
       ) : (
         <>
