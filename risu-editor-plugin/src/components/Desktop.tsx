@@ -36,6 +36,9 @@ interface DesktopProps {
   explorerContent: React.ReactNode
   explorerWindowOpen?: boolean
   onToggleExplorerWindow?: () => void
+  onTabDropOnDesktop?: (paneId: string, path: string, clientX: number, clientY: number) => void
+  /** 탭을 다른 창에 드롭하여 합칠 때 호출 */
+  onTabDropOnWindow?: (sourcePaneId: string, targetPaneId: string, path: string) => void
 }
 
 export const Desktop: React.FC<DesktopProps> = ({
@@ -47,9 +50,12 @@ export const Desktop: React.FC<DesktopProps> = ({
   explorerContent,
   explorerWindowOpen = false,
   onToggleExplorerWindow,
+  onTabDropOnDesktop,
+  onTabDropOnWindow,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+  const [desktopDragOver, setDesktopDragOver] = useState(false)
 
   // ── Measure container ───────────────────────────────────────────────────
 
@@ -164,18 +170,43 @@ export const Desktop: React.FC<DesktopProps> = ({
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  const editorWindows = windows.filter((w) => w.id !== 'win-explorer')
-  const explorerWin = windows.find((w) => w.id === 'win-explorer')
-
   return (
-    <div className={`re-desktop${explorerMode === 'sidebar' ? ' re-desktop--sidebar' : ''}`} ref={containerRef}>
+    <div className={`re-desktop${explorerMode === 'sidebar' ? ' re-desktop--sidebar' : ''}${explorerMode === 'window' && explorerWindowOpen ? ' re-desktop--explorer-open' : ''}`} ref={containerRef}>
       {explorerMode === 'sidebar' && (
         <div className="re-desktop-sidebar">
           {explorerContent}
         </div>
       )}
-      <div className="re-desktop-window-area">
-        {editorWindows.map((win) => (
+      {explorerMode === 'window' && explorerWindowOpen && (
+        <div className="re-desktop-sidebar re-desktop-sidebar--fixed">
+          {explorerContent}
+        </div>
+      )}
+      <div
+        className={`re-desktop-window-area${desktopDragOver ? ' drag-over' : ''}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('application/x-risu-pane')) {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setDesktopDragOver(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          // Only set false if leaving the window area itself (not entering a child)
+          if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+            setDesktopDragOver(false)
+          }
+        }}
+        onDrop={(e) => {
+          setDesktopDragOver(false)
+          const paneId = e.dataTransfer.getData('application/x-risu-pane')
+          const path = e.dataTransfer.getData('text/plain')
+          if (paneId && path) {
+            onTabDropOnDesktop?.(paneId, path, e.clientX, e.clientY)
+          }
+        }}
+      >
+        {windows.map((win) => (
           <Window
             key={win.id}
             window={win}
@@ -187,41 +218,24 @@ export const Desktop: React.FC<DesktopProps> = ({
             onMaximize={handleMaximize}
             onRestore={handleRestore}
             onClose={handleClose}
+            onTabDrop={(sourcePaneId, path) => {
+              if (sourcePaneId !== win.paneId) {
+                onTabDropOnWindow?.(sourcePaneId, win.paneId, path)
+              }
+            }}
           >
             {renderWindowContent(win.paneId)}
           </Window>
         ))}
-        {explorerMode === 'window' && explorerWindowOpen && explorerWin && (
-          <Window
-            key={explorerWin.id}
-            window={explorerWin}
-            containerRect={containerSize}
-            onFocus={handleFocus}
-            onMove={handleMove}
-            onResize={handleResize}
-            onMinimize={handleMinimize}
-            onMaximize={handleMaximize}
-            onRestore={handleRestore}
-            onClose={() => onToggleExplorerWindow?.()}
-            closable={false}
-          >
-            {explorerContent}
-          </Window>
-        )}
       </div>
       <Taskbar
+      explorerMode={explorerMode}
         windows={windows}
+        explorerWindowOpen={explorerWindowOpen}
+        onToggleExplorerWindow={onToggleExplorerWindow}
         onActivate={handleTaskbarActivate}
       />
-      {explorerMode === 'window' && (
-        <button
-          className={`re-explorer-toggle${explorerWindowOpen ? ' active' : ''}`}
-          onClick={onToggleExplorerWindow}
-          title={explorerWindowOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기'}
-        >
-          📁
-        </button>
-      )}
+      
     </div>
   )
 }

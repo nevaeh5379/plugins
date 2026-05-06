@@ -273,9 +273,28 @@ const AppContent: React.FC = () => {
         return pane
       }))
 
+      // In windowed mode, ensure a window exists for the active pane
+      if (layoutMode === 'windowed') {
+        setWindows(prev => {
+          const winExists = prev.some(w => w.paneId === activePaneId)
+          if (winExists) return prev
+          const newWin: WindowState = {
+            id: `win-${activePaneId}`,
+            paneId: activePaneId,
+            title: node.name,
+            rect: { x: 0, y: 0, width: 600, height: 400 },
+            minimized: false,
+            maximized: false,
+            zIndex: nextZIndex(),
+            restoreRect: null,
+          }
+          return [...prev, newWin]
+        })
+      }
+
       if (isMobile) setSidebarOpen(false)
     },
-    [activePaneId, isMobile]
+    [activePaneId, isMobile, layoutMode]
   )
 
   // ─── Tab management ──────────────────────────────────────────────────────
@@ -737,20 +756,6 @@ const AppContent: React.FC = () => {
     resetZIndex()
     const newWindows: WindowState[] = []
 
-    // File explorer window (only in 'window' explorer mode)
-    if (settings.explorerMode === 'window') {
-      newWindows.push({
-        id: 'win-explorer',
-        paneId: '__explorer__',
-        title: 'File Explorer',
-        rect: { x: 0, y: 0, width: 280, height: 500 },
-        minimized: false,
-        maximized: false,
-        zIndex: nextZIndex(),
-        restoreRect: null,
-      })
-    }
-
     // Editor windows
     for (const pane of currentPanes) {
       const activeFile = pane.activeTabPath && vfsRootRef.current
@@ -769,7 +774,7 @@ const AppContent: React.FC = () => {
       })
     }
     setWindows(newWindows)
-  }, [settings.explorerMode])
+  }, [])
 
   const handleToggleLayoutMode = useCallback(() => {
     setLayoutMode((prev) => {
@@ -808,19 +813,22 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [performSave, handleToggleLayoutMode])
 
-  // Keep window titles in sync with pane state
+  // Keep windows in sync with panes (titles + remove orphaned windows)
   useEffect(() => {
     if (layoutMode !== 'windowed') return
-    setWindows((prev) =>
-      prev.map((w) => {
+    setWindows((prev) => {
+      // Remove windows whose pane no longer exists
+      const filtered = prev.filter((w) => panes.some((p) => p.id === w.paneId))
+      // Update titles
+      return filtered.map((w) => {
         const pane = panes.find((p) => p.id === w.paneId)
         if (!pane) return w
         const activeFile =
           pane.activeTabPath && vfsRoot ? findNode(vfsRoot, pane.activeTabPath) : null
         const title = activeFile?.name ?? 'Risu Editor'
         return title !== w.title ? { ...w, title } : w
-      }),
-    )
+      })
+    })
   }, [panes, vfsRoot, layoutMode])
 
   // ─── Open in new window (from FileExplorer) ─────────────────────────────
@@ -912,21 +920,140 @@ const AppContent: React.FC = () => {
     [panes, layoutMode],
   )
 
+  // ─── Tab drop on desktop (drag tab out of window to create new window) ──
+
+  const handleTabDropOnDesktop = useCallback(
+    (paneId: string, path: string, clientX: number, clientY: number) => {
+      const sourcePane = panes.find((p) => p.id === paneId)
+      if (!sourcePane) return
+
+      const tabNode = sourcePane.openTabs.find((t) => t.path === path)
+      if (!tabNode) return
+
+      // Only create new window if source pane has more than 1 tab
+      if (sourcePane.openTabs.length <= 1) return
+
+      const newPaneId = `pane-${Date.now()}`
+      const newPane: EditorPaneData = {
+        id: newPaneId,
+        openTabs: [tabNode],
+        activeTabPath: path,
+      }
+
+      // Remove tab from source pane
+      setPanes((prev) => {
+        const nextPanes = prev.map((p) => {
+          if (p.id !== paneId) return p
+          const nextTabs = p.openTabs.filter((t) => t.path !== path)
+          let newActive = p.activeTabPath
+          if (p.activeTabPath === path) {
+            const closedIndex = p.openTabs.findIndex((t) => t.path === path)
+            const nextActiveTab = nextTabs[Math.min(closedIndex, nextTabs.length - 1)]
+            newActive = nextActiveTab?.path ?? null
+          }
+          return { ...p, openTabs: nextTabs, activeTabPath: newActive }
+        })
+        return [...nextPanes, newPane]
+      })
+
+      setActivePaneId(newPaneId)
+      setSelectedPath(path)
+
+      // Create a new window at the drop position
+      const newWin: WindowState = {
+        id: `win-${newPaneId}`,
+        paneId: newPaneId,
+        title: tabNode.name,
+        rect: { x: Math.max(0, clientX - 300), y: Math.max(0, clientY - 20), width: 600, height: 400 },
+        minimized: false,
+        maximized: false,
+        zIndex: nextZIndex(),
+        restoreRect: null,
+      }
+      setWindows((prev) => [...prev, newWin])
+    },
+    [panes],
+  )
+
+  // ─── Tab drop on another window (merge tab into target window) ──────────
+
+  const handleTabMoveToPane = useCallback(
+    (sourcePaneId: string, targetPaneId: string, path: string) => {
+      if (sourcePaneId === targetPaneId) return
+
+      const sourcePane = panes.find((p) => p.id === sourcePaneId)
+      if (!sourcePane) return
+
+      const tabNode = sourcePane.openTabs.find((t) => t.path === path)
+      if (!tabNode) return
+
+      setPanes((prev) => {
+        // Remove tab from source pane
+        let sourceBecameEmpty = false
+        const nextPanes = prev.map((p) => {
+          if (p.id !== sourcePaneId) return p
+          const nextTabs = p.openTabs.filter((t) => t.path !== path)
+          let newActive = p.activeTabPath
+          if (p.activeTabPath === path) {
+            const closedIndex = p.openTabs.findIndex((t) => t.path === path)
+            const nextActiveTab = nextTabs[Math.min(closedIndex, nextTabs.length - 1)]
+            newActive = nextActiveTab?.path ?? null
+          }
+          if (nextTabs.length === 0) sourceBecameEmpty = true
+          return { ...p, openTabs: nextTabs, activeTabPath: newActive }
+        })
+
+        // Add tab to target pane (if not already open)
+        const result = nextPanes.map((p) => {
+          if (p.id !== targetPaneId) return p
+          const alreadyOpen = p.openTabs.some((t) => t.path === path)
+          if (alreadyOpen) {
+            return { ...p, activeTabPath: path }
+          }
+          return {
+            ...p,
+            openTabs: [...p.openTabs, tabNode],
+            activeTabPath: path,
+          }
+        })
+
+        // Remove source pane if it became empty and there are other panes
+        if (sourceBecameEmpty && result.length > 1) {
+          return result.filter((p) => p.id !== sourcePaneId)
+        }
+        return result
+      })
+
+      setActivePaneId(targetPaneId)
+      setSelectedPath(path)
+
+      // Remove orphaned window in windowed mode
+      setWindows((prev) => {
+        // Check if source pane still exists in panes
+        const sourcePaneStillExists = panes.some(
+          (p) => p.id === sourcePaneId && p.openTabs.length > 1
+        )
+        if (!sourcePaneStillExists) {
+          return prev.filter((w) => w.paneId !== sourcePaneId)
+        }
+        return prev
+      })
+    },
+    [panes],
+  )
+
   // ─── Window close handler ────────────────────────────────────────────────
 
   const handleWindowClose = useCallback(
     (windowId: string) => {
-      // Don't allow closing the file explorer window
-      if (windowId === 'win-explorer') return
-
       const win = windows.find((w) => w.id === windowId)
       if (!win) return
 
       setPanes((prev) => {
         const nextPanes = prev.filter((p) => p.id !== win.paneId)
         if (nextPanes.length === 0) {
-          setLayoutMode('fullscreen')
-          setWindows([])
+          // setLayoutMode('fullscreen')
+          // setWindows([])
           return [{ id: 'pane-1', openTabs: [], activeTabPath: null }]
         }
         return nextPanes
@@ -1121,6 +1248,8 @@ const AppContent: React.FC = () => {
           explorerContent={explorerContent}
           explorerWindowOpen={explorerWindowOpen}
           onToggleExplorerWindow={() => setExplorerWindowOpen((o) => !o)}
+          onTabDropOnDesktop={handleTabDropOnDesktop}
+          onTabDropOnWindow={handleTabMoveToPane}
         />
       ) : (
         <>
@@ -1193,14 +1322,15 @@ const AppContent: React.FC = () => {
               })}
             </div>
           </div>
-          <StatusBar
+          
+        </>
+      )}
+      <StatusBar
             filePath={panes.find(p => p.id === activePaneId)?.activeTabPath || null}
             language={getActiveFileForPane(panes.find(p => p.id === activePaneId) || panes[0])?.language ?? null}
             totalFiles={totalFiles}
             autoSaveStatus={autoSaveStatus}
           />
-        </>
-      )}
     </div>
   )
 }

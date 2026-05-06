@@ -119,6 +119,7 @@ export const TabBar: React.FC<TabBarProps> = ({
 
   const handleDragStart = (e: React.DragEvent, tabPath: string) => {
     e.dataTransfer.setData('text/plain', tabPath)
+    e.dataTransfer.setData('application/x-risu-pane', paneId)
     e.dataTransfer.effectAllowed = 'move'
   }
 

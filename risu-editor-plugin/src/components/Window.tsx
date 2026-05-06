@@ -41,6 +41,8 @@ interface WindowProps {
   onClose: (id: string) => void
   closable?: boolean
   children: React.ReactNode
+  /** 탭이 이 창에 드롭될 때 호출 */
+  onTabDrop?: (sourcePaneId: string, path: string) => void
 }
 
 export const Window: React.FC<WindowProps> = ({
@@ -55,10 +57,12 @@ export const Window: React.FC<WindowProps> = ({
   onClose,
   closable = true,
   children,
+  onTabDrop,
 }) => {
   const headerRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState<ResizeDir | null>(null)
+  const [tabDragOver, setTabDragOver] = useState(false)
   const dragRef = useRef<{ startX: number; startY: number; startRect: WindowRect } | null>(null)
 
   // ── Focus on mousedown ──────────────────────────────────────────────────
@@ -173,9 +177,33 @@ export const Window: React.FC<WindowProps> = ({
 
   return (
     <div
-      className={`re-window${maximized ? ' maximized' : ''}${dragging ? ' dragging' : ''}${resizing ? ' resizing' : ''}`}
+      className={`re-window${maximized ? ' maximized' : ''}${dragging ? ' dragging' : ''}${resizing ? ' resizing' : ''}${tabDragOver ? ' tab-drag-over' : ''}`}
       style={style}
       onMouseDown={handleFocus}
+      onDragOver={(e) => {
+        if (onTabDrop && e.dataTransfer.types.includes('application/x-risu-pane')) {
+          e.preventDefault()
+          e.stopPropagation()
+          e.dataTransfer.dropEffect = 'move'
+          setTabDragOver(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+          setTabDragOver(false)
+        }
+      }}
+      onDrop={(e) => {
+        setTabDragOver(false)
+        if (onTabDrop) {
+          const sourcePaneId = e.dataTransfer.getData('application/x-risu-pane')
+          const path = e.dataTransfer.getData('text/plain')
+          if (sourcePaneId && path) {
+            e.stopPropagation()
+            onTabDrop(sourcePaneId, path)
+          }
+        }
+      }}
     >
       {/* Header */}
       <div

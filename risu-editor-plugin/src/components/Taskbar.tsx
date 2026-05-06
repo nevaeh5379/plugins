@@ -18,17 +18,31 @@
 import React from 'react'
 import { VscFileCode } from 'react-icons/vsc'
 import type { WindowState } from '../lib/windowManager'
+import { FaFolder } from 'react-icons/fa'
 
 interface TaskbarProps {
   windows: WindowState[]
+  explorerMode: 'window' | 'sidebar' | 'none'
+  explorerWindowOpen?: boolean
+  onToggleExplorerWindow?: () => void
   onActivate: (id: string) => void
 }
 
-export const Taskbar: React.FC<TaskbarProps> = ({ windows, onActivate }) => {
-  if (windows.length === 0) return null
+export const Taskbar: React.FC<TaskbarProps> = ({ windows, explorerMode, explorerWindowOpen, onToggleExplorerWindow, onActivate }) => {
+  // Show taskbar if there are windows OR if explorer toggle button is needed
+  if (windows.length === 0 && explorerMode !== 'window') return null
 
   return (
     <div className="re-taskbar">
+      {explorerMode === 'window' && (
+        <button
+          className={`re-explorer-toggle${explorerWindowOpen ? ' active' : ''}`}
+          onClick={onToggleExplorerWindow}
+          title={explorerWindowOpen ? '파일 탐색기 닫기' : '파일 탐색기 열기'}
+        >
+          <FaFolder/>
+        </button>
+      )}
       {windows.map((win) => {
         const isActive = !win.minimized
         return (
