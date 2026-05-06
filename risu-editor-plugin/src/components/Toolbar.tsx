@@ -19,6 +19,8 @@ import React from 'react'
 import { FaRedo, FaColumns, FaCog } from "react-icons/fa"
 import { MenuBar } from './MenuBar'
 import { FaX, FaBars } from 'react-icons/fa6'
+import { VscScreenFull, VscScreenNormal } from 'react-icons/vsc'
+import type { LayoutMode } from '../lib/windowManager'
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
 interface ToolbarProps {
@@ -34,6 +36,8 @@ interface ToolbarProps {
   onCloseAll?: () => void
   onOpenSettings?: () => void
   onToggleSidebar?: () => void
+  layoutMode?: LayoutMode
+  onToggleLayoutMode?: () => void
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -49,6 +53,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onCloseAll,
   onOpenSettings,
   onToggleSidebar,
+  layoutMode,
+  onToggleLayoutMode,
 }) => {
   // Build breadcrumb from active file path
   const breadcrumbs = activeFilePath
@@ -99,6 +105,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onCloseAll={onCloseAll || (() => {})} 
           onCloseEditor={onClose} 
           onSettings={onOpenSettings || (() => {})}
+          layoutMode={layoutMode}
+          onToggleLayoutMode={onToggleLayoutMode}
         />
         <span style={{ color: 'var(--re-border-light)', margin: '0 4px' }}>│</span>
         <span className="re-toolbar-charname">{characterName || 'No Character'}</span>
@@ -123,35 +131,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       )}
 
       <div className="re-toolbar-right">
-        {/* RisuAI 내에 있는 렌더링 함수를 가져온 뒤 구현해야할 듯 */}
-        {/* <button
-          className={`re-btn re-btn-preview${showPreview ? ' active' : ''}`}
-          onClick={onTogglePreview}
-          title="미리보기 토글 (Preview)"
-        >
-          👁 Preview
-        </button> */}
-        {/* <button
-          className="re-btn"
-          onClick={onSplitPane}
-          title="에디터 분할 (Split Pane)"
-        >
-          <FaColumns />
-        </button>
-        <button
-          className="re-btn"
-          onClick={onOpenSettings}
-          title="설정 (Settings)"
-        >
-          <FaCog />
-        </button>
-        <button
-          className="re-btn"
-          onClick={onReload}
-          title="데이터 새로고침 (Reload)"
-        >
-          <FaRedo />
-        </button> */}
+        {onToggleLayoutMode && (
+          <button
+            className="re-btn re-btn-icon"
+            onClick={onToggleLayoutMode}
+            title={layoutMode === 'windowed' ? '전체화면 모드로 전환' : '창 모드로 전환'}
+          >
+            {layoutMode === 'windowed' ? <VscScreenFull /> : <VscScreenNormal />}
+          </button>
+        )}
         <button className="re-btn re-btn-icon" onClick={onClose} title="Close editor">
           <FaX />
         </button>

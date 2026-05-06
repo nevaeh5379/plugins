@@ -1314,3 +1314,244 @@ select.re-input {
   .re-lore-meta-toggle { display: none; }
   .re-sidebar-backdrop { display: none; }
 }
+
+/* ── Desktop (Window Manager) ─────────────────────────────────────────────── */
+
+.re-desktop {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--re-bg-sidebar);
+  /* Subtle grid pattern for empty desktop feel */
+  background-image:
+    linear-gradient(var(--re-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--re-border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
+}
+
+/* ── Window ── */
+
+.re-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--re-bg-editor);
+  border: 1px solid var(--re-border-strong);
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  min-width: 300px;
+  min-height: 200px;
+  animation: re-windowOpen 0.15s ease;
+}
+
+@keyframes re-windowOpen {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.re-window.maximized {
+  border-radius: 0;
+  border: none;
+  animation: none;
+}
+
+.re-window.dragging {
+  opacity: 0.92;
+  transition: none;
+}
+
+.re-window.resizing {
+  transition: none;
+}
+
+/* ── Window Header ── */
+
+.re-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 8px 0 12px;
+  background: var(--re-bg-titlebar);
+  border-bottom: 1px solid var(--re-border);
+  cursor: default;
+  user-select: none;
+}
+
+.re-window.maximized .re-window-header {
+  cursor: default;
+}
+
+.re-window-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--re-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.re-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.re-window-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--re-fg-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.re-window-action-btn:hover {
+  background: var(--re-bg-hover);
+  color: var(--re-fg-bright);
+}
+
+.re-window-close-btn:hover {
+  background: #C42B1C;
+  color: #FFFFFF;
+}
+
+/* ── Window Body ── */
+
+.re-window-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.re-window-pane-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.re-window-pane-group .re-tabbar {
+  flex-shrink: 0;
+}
+
+/* ── Resize Handles ── */
+
+.re-window-resize-handle {
+  position: absolute;
+  z-index: 10;
+}
+
+/* Edges */
+.re-window-resize-handle.resize-n {
+  top: 0; left: 4px; right: 4px;
+  height: 4px;
+  cursor: n-resize;
+}
+.re-window-resize-handle.resize-s {
+  bottom: 0; left: 4px; right: 4px;
+  height: 4px;
+  cursor: s-resize;
+}
+.re-window-resize-handle.resize-e {
+  right: 0; top: 4px; bottom: 4px;
+  width: 4px;
+  cursor: e-resize;
+}
+.re-window-resize-handle.resize-w {
+  left: 0; top: 4px; bottom: 4px;
+  width: 4px;
+  cursor: w-resize;
+}
+
+/* Corners */
+.re-window-resize-handle.resize-ne {
+  top: 0; right: 0;
+  width: 8px; height: 8px;
+  cursor: ne-resize;
+}
+.re-window-resize-handle.resize-nw {
+  top: 0; left: 0;
+  width: 8px; height: 8px;
+  cursor: nw-resize;
+}
+.re-window-resize-handle.resize-se {
+  bottom: 0; right: 0;
+  width: 8px; height: 8px;
+  cursor: se-resize;
+}
+.re-window-resize-handle.resize-sw {
+  bottom: 0; left: 0;
+  width: 8px; height: 8px;
+  cursor: sw-resize;
+}
+
+/* ── Taskbar ── */
+
+.re-taskbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  background: var(--re-bg-titlebar);
+  border-top: 1px solid var(--re-border);
+  z-index: 1000;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.re-taskbar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--re-fg-muted);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.re-taskbar-item:hover {
+  background: var(--re-bg-hover);
+  color: var(--re-fg);
+}
+
+.re-taskbar-item.active {
+  background: var(--re-bg-selected);
+  color: var(--re-fg-bright);
+}
+
+.re-taskbar-item-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.re-taskbar-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

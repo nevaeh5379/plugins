@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ContextMenu, type MenuItem } from './ContextMenu'
-import { VscSave, VscRefresh, VscCloseAll, VscChromeClose, VscSettingsGear, VscSplitHorizontal } from 'react-icons/vsc'
+import { VscSave, VscRefresh, VscCloseAll, VscChromeClose, VscSettingsGear, VscSplitHorizontal, VscScreenFull, VscScreenNormal } from 'react-icons/vsc'
+import type { LayoutMode } from '../lib/windowManager'
 
 interface MenuBarProps {
   onSave: () => void
@@ -9,6 +10,8 @@ interface MenuBarProps {
   onCloseAll: () => void
   onCloseEditor: () => void
   onSettings: () => void
+  layoutMode?: LayoutMode
+  onToggleLayoutMode?: () => void
 }
 
 export const MenuBar: React.FC<MenuBarProps> = ({
@@ -17,7 +20,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   onSplitPane,
   onCloseAll,
   onCloseEditor,
-  onSettings
+  onSettings,
+  layoutMode,
+  onToggleLayoutMode,
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
@@ -55,6 +60,18 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       case 'View':
         return [
           { label: 'Split Pane (에디터 분할)', icon: <VscSplitHorizontal />, onClick: onSplitPane },
+          ...(onToggleLayoutMode
+            ? [
+                {
+                  label: layoutMode === 'windowed'
+                    ? '전체화면 모드 (Fullscreen)'
+                    : '창 모드 (Windowed)',
+                  icon: layoutMode === 'windowed' ? <VscScreenFull /> : <VscScreenNormal />,
+                  shortcut: 'Ctrl+Shift+W',
+                  onClick: onToggleLayoutMode,
+                },
+              ]
+            : []),
         ]
       default:
         return []

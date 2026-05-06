@@ -18,7 +18,7 @@
 import React, { useState, useCallback } from 'react'
 import type { VFSNode } from '../lib/virtualFS'
 import { ContextMenu, type MenuItem } from './ContextMenu'
-import { VscClose, VscSplitHorizontal, VscCloseAll, VscArrowLeft, VscArrowRight } from 'react-icons/vsc'
+import { VscClose, VscSplitHorizontal, VscCloseAll, VscArrowLeft, VscArrowRight, VscFileCode } from 'react-icons/vsc'
 
 interface TabBarProps {
   paneId: string
@@ -28,6 +28,7 @@ interface TabBarProps {
   onTabClose: (paneId: string, path: string) => void
   onTabReorder: (paneId: string, dragPath: string, dropPath: string) => void
   onSplitPane?: (paneId: string, node?: VFSNode) => void
+  onMoveToNewWindow?: (paneId: string, path: string) => void
   onCloseAll?: (paneId: string) => void
   onCloseOthers?: (paneId: string, path: string) => void
   onCloseToLeft?: (paneId: string, path: string) => void
@@ -48,6 +49,7 @@ export const TabBar: React.FC<TabBarProps> = ({
   onTabClose,
   onTabReorder,
   onSplitPane,
+  onMoveToNewWindow,
   onCloseAll,
   onCloseOthers,
   onCloseToLeft,
@@ -67,6 +69,15 @@ export const TabBar: React.FC<TabBarProps> = ({
           icon: <VscSplitHorizontal />,
           onClick: () => onSplitPane?.(paneId, openTabs[tabIndex]),
         },
+        ...(onMoveToNewWindow
+          ? [
+              {
+                label: '새 창으로 이동',
+                icon: <VscFileCode />,
+                onClick: () => onMoveToNewWindow(paneId, tabPath),
+              },
+            ]
+          : []),
         { label: '', divider: true },
         {
           label: '닫기',
@@ -103,7 +114,7 @@ export const TabBar: React.FC<TabBarProps> = ({
 
       setCtxMenu({ x: e.clientX, y: e.clientY, items })
     },
-    [paneId, openTabs, onTabClose, onCloseAll, onCloseOthers, onCloseToLeft, onCloseToRight, onSplitPane]
+    [paneId, openTabs, onTabClose, onCloseAll, onCloseOthers, onCloseToLeft, onCloseToRight, onSplitPane, onMoveToNewWindow]
   )
 
   const handleDragStart = (e: React.DragEvent, tabPath: string) => {

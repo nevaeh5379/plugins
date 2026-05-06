@@ -37,13 +37,15 @@ import {
   VscEdit,
   VscArrowSwap,
   VscChevronRight,
-  VscChevronDown
+  VscChevronDown,
+  VscFileCode,
 } from 'react-icons/vsc'
 
 // ─── Event callbacks ─────────────────────────────────────────────────────────
 
 export interface FileExplorerCallbacks {
   onFileSelect: (node: VFSNode) => void
+  onOpenInNewWindow?: (node: VFSNode) => void
   onAddLoreEntry?: (parentPath: string) => void
   onAddLoreFolder?: (parentPath: string) => void
   onAddGreeting?: () => void
@@ -695,6 +697,16 @@ function buildContextMenuItems(
       label: '새 폴더 추가',
       icon: <VscNewFolder />,
       onClick: () => callbacks.onAddLoreFolder?.(node.path),
+    })
+  }
+
+  // "Open in New Window" for any file
+  if (!isDir && callbacks.onOpenInNewWindow) {
+    items.push({
+      label: '새 창에서 열기',
+      icon: <VscFileCode />,
+      shortcut: 'Ctrl+Click',
+      onClick: () => callbacks.onOpenInNewWindow?.(node),
     })
   }
 

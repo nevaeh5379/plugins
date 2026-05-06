@@ -22,7 +22,10 @@ import { EditorPane } from './components/EditorPane'
 import { LoreEntryEditor } from './components/LoreEntryEditor'
 import { Toolbar } from './components/Toolbar'
 import { StatusBar } from './components/StatusBar'
+import { Desktop } from './components/Desktop'
 import { VscWarning } from 'react-icons/vsc'
+import type { LayoutMode, WindowState } from './lib/windowManager'
+import { nextZIndex, resetZIndex } from './lib/windowManager'
 import {
   characterToVFS,
   vfsToCharacter,
@@ -166,6 +169,8 @@ const AppContent: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('fullscreen')
+  const [windows, setWindows] = useState<WindowState[]>([])
   const isMobile = useIsMobile()
 
   // Close mobile sidebar on orientation change so the layout doesn't get
@@ -223,6 +228,8 @@ const AppContent: React.FC = () => {
       setActivePaneId('pane-1')
       setSelectedPath(null)
       setAutoSaveStatus('idle')
+      setWindows([])
+      resetZIndex()
     } catch (err) {
       setError(`Failed to load character: ${err}`)
     }
@@ -698,24 +705,6 @@ const AppContent: React.FC = () => {
     [vfsRoot, scheduleAutoSave]
   )
 
-  // ─── Keyboard shortcuts ──────────────────────────────────────────────────
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        // Immediate save (cancel pending auto-save)
-        if (autoSaveTimerRef.current) {
-          clearTimeout(autoSaveTimerRef.current)
-          autoSaveTimerRef.current = null
-        }
-        performSave()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [performSave])
-
   // ─── Close ───────────────────────────────────────────────────────────────
 
   const handleClose = useCallback(async () => {
@@ -734,6 +723,262 @@ const AppContent: React.FC = () => {
   // ─── Computed values ─────────────────────────────────────────────────────
 
   const totalFiles = vfsRoot ? countFiles(vfsRoot) : 0
+
+  const getActiveFileForPane = useCallback((pane: EditorPaneData) => {
+    const root = vfsRootRef.current
+    return pane.activeTabPath && root ? findNode(root, pane.activeTabPath) : null
+  }, [])
+
+  // ─── Layout mode toggle ─────────────────────────────────────────────────
+
+  const syncPanesToWindows = useCallback((currentPanes: EditorPaneData[]) => {
+    resetZIndex()
+    const newWindows: WindowState[] = currentPanes.map((pane, i) => {
+      const activeFile = pane.activeTabPath && vfsRootRef.current
+        ? findNode(vfsRootRef.current, pane.activeTabPath)
+        : null
+      const title = activeFile?.name ?? 'Risu Editor'
+      return {
+        id: `win-${pane.id}`,
+        paneId: pane.id,
+        title,
+        rect: { x: 0, y: 0, width: 600, height: 400 },
+        minimized: false,
+        maximized: false,
+        zIndex: nextZIndex(),
+        restoreRect: null,
+      }
+    })
+    setWindows(newWindows)
+  }, [])
+
+  const handleToggleLayoutMode = useCallback(() => {
+    setLayoutMode((prev) => {
+      const next: LayoutMode = prev === 'fullscreen' ? 'windowed' : 'fullscreen'
+      return next
+    })
+  }, [])
+
+  // Sync panes ↔ windows when layout mode changes
+  useEffect(() => {
+    if (layoutMode === 'windowed') {
+      syncPanesToWindows(panes)
+    } else {
+      setWindows([])
+    }
+  }, [layoutMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Keyboard shortcuts ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current)
+          autoSaveTimerRef.current = null
+        }
+        performSave()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'W') {
+        e.preventDefault()
+        handleToggleLayoutMode()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [performSave, handleToggleLayoutMode])
+
+  // Keep window titles in sync with pane state
+  useEffect(() => {
+    if (layoutMode !== 'windowed') return
+    setWindows((prev) =>
+      prev.map((w) => {
+        const pane = panes.find((p) => p.id === w.paneId)
+        if (!pane) return w
+        const activeFile =
+          pane.activeTabPath && vfsRoot ? findNode(vfsRoot, pane.activeTabPath) : null
+        const title = activeFile?.name ?? 'Risu Editor'
+        return title !== w.title ? { ...w, title } : w
+      }),
+    )
+  }, [panes, vfsRoot, layoutMode])
+
+  // ─── Open in new window (from FileExplorer) ─────────────────────────────
+
+  const handleOpenInNewWindow = useCallback(
+    (node: VFSNode) => {
+      if (node.type !== 'file') return
+      // Create a new pane for this file
+      const newPaneId = `pane-${Date.now()}`
+      const newPane: EditorPaneData = {
+        id: newPaneId,
+        openTabs: [node],
+        activeTabPath: node.path,
+      }
+      setPanes((prev) => [...prev, newPane])
+      setActivePaneId(newPaneId)
+      setSelectedPath(node.path)
+
+      // If in windowed mode, also create a window
+      if (layoutMode === 'windowed') {
+        const newWin: WindowState = {
+          id: `win-${newPaneId}`,
+          paneId: newPaneId,
+          title: node.name,
+          rect: { x: 0, y: 0, width: 600, height: 400 },
+          minimized: false,
+          maximized: false,
+          zIndex: nextZIndex(),
+          restoreRect: null,
+        }
+        setWindows((prev) => [...prev, newWin])
+      }
+    },
+    [layoutMode],
+  )
+
+  // ─── Move tab to new window ─────────────────────────────────────────────
+
+  const handleMoveToNewWindow = useCallback(
+    (paneId: string, path: string) => {
+      // Create a new pane with just this tab
+      const newPaneId = `pane-${Date.now()}`
+      const sourcePane = panes.find((p) => p.id === paneId)
+      if (!sourcePane) return
+
+      const tabNode = sourcePane.openTabs.find((t) => t.path === path)
+      if (!tabNode) return
+
+      const newPane: EditorPaneData = {
+        id: newPaneId,
+        openTabs: [tabNode],
+        activeTabPath: path,
+      }
+
+      // Remove tab from source pane
+      setPanes((prev) => {
+        const nextPanes = prev.map((p) => {
+          if (p.id !== paneId) return p
+          const nextTabs = p.openTabs.filter((t) => t.path !== path)
+          let newActive = p.activeTabPath
+          if (p.activeTabPath === path) {
+            const closedIndex = p.openTabs.findIndex((t) => t.path === path)
+            const nextActiveTab = nextTabs[Math.min(closedIndex, nextTabs.length - 1)]
+            newActive = nextActiveTab?.path ?? null
+          }
+          return { ...p, openTabs: nextTabs, activeTabPath: newActive }
+        })
+        return [...nextPanes, newPane]
+      })
+
+      setActivePaneId(newPaneId)
+      setSelectedPath(path)
+
+      // If in windowed mode, create a new window
+      if (layoutMode === 'windowed') {
+        const newWin: WindowState = {
+          id: `win-${newPaneId}`,
+          paneId: newPaneId,
+          title: tabNode.name,
+          rect: { x: 0, y: 0, width: 600, height: 400 },
+          minimized: false,
+          maximized: false,
+          zIndex: nextZIndex(),
+          restoreRect: null,
+        }
+        setWindows((prev) => [...prev, newWin])
+      }
+    },
+    [panes, layoutMode],
+  )
+
+  // ─── Window close handler ────────────────────────────────────────────────
+
+  const handleWindowClose = useCallback(
+    (windowId: string) => {
+      const win = windows.find((w) => w.id === windowId)
+      if (!win) return
+
+      // Remove the corresponding pane
+      setPanes((prev) => {
+        const nextPanes = prev.filter((p) => p.id !== win.paneId)
+        // If all panes are gone, switch back to fullscreen
+        if (nextPanes.length === 0) {
+          setLayoutMode('fullscreen')
+          setWindows([])
+          return [{ id: 'pane-1', openTabs: [], activeTabPath: null }]
+        }
+        return nextPanes
+      })
+
+      setWindows((prev) => prev.filter((w) => w.id !== windowId))
+    },
+    [windows],
+  )
+
+  // ─── Render window content ───────────────────────────────────────────────
+
+  const renderWindowContent = useCallback(
+    (paneId: string) => {
+      const pane = panes.find((p) => p.id === paneId)
+      if (!pane) return null
+      const activeFile = getActiveFileForPane(pane)
+      return (
+        <div className="re-editor-pane-group re-window-pane-group">
+          <TabBar
+            paneId={pane.id}
+            openTabs={pane.openTabs}
+            activeTabPath={pane.activeTabPath}
+            onTabSelect={handleTabSelect}
+            onTabClose={handleTabClose}
+            onTabReorder={handleTabReorder}
+            onSplitPane={handleSplitPane}
+            onMoveToNewWindow={handleMoveToNewWindow}
+            onCloseAll={handleCloseAll}
+            onCloseOthers={handleCloseOthers}
+            onCloseToLeft={handleCloseToLeft}
+            onCloseToRight={handleCloseToRight}
+          />
+          {activeFile &&
+          activeFile.mapping?.field === 'globalLore' &&
+          activeFile.mapping?.index !== undefined ? (
+            <LoreEntryEditor
+              content={activeFile.content ?? ''}
+              filePath={pane.activeTabPath!}
+              onChange={(val) => handleEditorChange(pane.activeTabPath!, val)}
+              showPreview={showPreview}
+              characterName={originalChar?.name}
+            />
+          ) : (
+            <EditorPane
+              content={activeFile?.content ?? null}
+              language={activeFile?.language ?? 'plaintext'}
+              filePath={pane.activeTabPath}
+              onChange={(val) => pane.activeTabPath && handleEditorChange(pane.activeTabPath, val)}
+              showPreview={showPreview}
+              characterName={originalChar?.name}
+            />
+          )}
+        </div>
+      )
+    },
+    [
+      panes,
+      showPreview,
+      originalChar,
+      handleTabSelect,
+      handleTabClose,
+      handleTabReorder,
+      handleSplitPane,
+      handleCloseAll,
+      handleCloseOthers,
+      handleCloseToLeft,
+      handleCloseToRight,
+      handleEditorChange,
+      getActiveFileForPane,
+    ],
+  )
 
   // Resizer mouse handlers
   const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -759,10 +1004,6 @@ const AppContent: React.FC = () => {
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
   }, [])
-
-  const getActiveFileForPane = (pane: EditorPaneData) => {
-    return pane.activeTabPath && vfsRoot ? findNode(vfsRoot, pane.activeTabPath) : null
-  }
 
   // ─── Loading state ───────────────────────────────────────────────────────
 
@@ -813,81 +1054,96 @@ const AppContent: React.FC = () => {
         onCloseAll={() => handleCloseAll(activePaneId)}
         onOpenSettings={() => setShowSettings(true)}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        layoutMode={layoutMode}
+        onToggleLayoutMode={handleToggleLayoutMode}
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      <div className="re-main">
-        <div className={`re-sidebar-wrapper${sidebarOpen ? ' re-sidebar-open' : ''}`}>
-          <FileExplorer
-            root={vfsRoot}
-            selectedPath={selectedPath}
-            width={sidebarWidth}
-            onFileSelect={handleFileSelect}
-            onAddLoreEntry={handleAddLoreEntry}
-            onAddLoreFolder={handleAddLoreFolder}
-            onAddGreeting={handleAddGreeting}
-            onDeleteNode={handleDeleteNode}
-            onRenameNode={handleRenameNode}
-            onMoveNode={handleMoveNode}
-            onReorderNode={handleReorderNode}
-            onDeleteGreeting={handleDeleteGreeting}
+      {layoutMode === 'windowed' ? (
+        <Desktop
+          windows={windows}
+          onWindowsChange={setWindows}
+          onWindowClose={handleWindowClose}
+          renderWindowContent={renderWindowContent}
+        />
+      ) : (
+        <>
+          <div className="re-main">
+            <div className={`re-sidebar-wrapper${sidebarOpen ? ' re-sidebar-open' : ''}`}>
+              <FileExplorer
+                root={vfsRoot}
+                selectedPath={selectedPath}
+                width={sidebarWidth}
+                onFileSelect={handleFileSelect}
+                onOpenInNewWindow={handleOpenInNewWindow}
+                onAddLoreEntry={handleAddLoreEntry}
+                onAddLoreFolder={handleAddLoreFolder}
+                onAddGreeting={handleAddGreeting}
+                onDeleteNode={handleDeleteNode}
+                onRenameNode={handleRenameNode}
+                onMoveNode={handleMoveNode}
+                onReorderNode={handleReorderNode}
+                onDeleteGreeting={handleDeleteGreeting}
+              />
+            </div>
+            <div className="re-sidebar-resizer" onMouseDown={handleSidebarMouseDown} />
+            {isMobile && sidebarOpen && (
+              <div className="re-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
+            )}
+            <div className="re-editor-panes-container">
+              {(isMobile
+                ? panes.filter(p => p.id === activePaneId).length > 0
+                  ? panes.filter(p => p.id === activePaneId)
+                  : panes.slice(0, 1)
+                : panes
+              ).map(pane => {
+                const activeFile = getActiveFileForPane(pane)
+                return (
+                  <div key={pane.id} className="re-editor-pane-group" onClickCapture={() => setActivePaneId(pane.id)}>
+                    <TabBar
+                      paneId={pane.id}
+                      openTabs={pane.openTabs}
+                      activeTabPath={pane.activeTabPath}
+                      onTabSelect={handleTabSelect}
+                      onTabClose={handleTabClose}
+                      onTabReorder={handleTabReorder}
+                      onSplitPane={handleSplitPane}
+                      onMoveToNewWindow={handleMoveToNewWindow}
+                      onCloseAll={handleCloseAll}
+                      onCloseOthers={handleCloseOthers}
+                      onCloseToLeft={handleCloseToLeft}
+                      onCloseToRight={handleCloseToRight}
+                    />
+                    {activeFile && activeFile.mapping?.field === 'globalLore' && activeFile.mapping?.index !== undefined ? (
+                      <LoreEntryEditor
+                        content={activeFile.content ?? ''}
+                        filePath={pane.activeTabPath!}
+                        onChange={(val) => handleEditorChange(pane.activeTabPath!, val)}
+                        showPreview={showPreview}
+                        characterName={originalChar?.name}
+                      />
+                    ) : (
+                      <EditorPane
+                        content={activeFile?.content ?? null}
+                        language={activeFile?.language ?? 'plaintext'}
+                        filePath={pane.activeTabPath}
+                        onChange={(val) => pane.activeTabPath && handleEditorChange(pane.activeTabPath, val)}
+                        showPreview={showPreview}
+                        characterName={originalChar?.name}
+                      />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <StatusBar
+            filePath={panes.find(p => p.id === activePaneId)?.activeTabPath || null}
+            language={getActiveFileForPane(panes.find(p => p.id === activePaneId) || panes[0])?.language ?? null}
+            totalFiles={totalFiles}
+            autoSaveStatus={autoSaveStatus}
           />
-        </div>
-        <div className="re-sidebar-resizer" onMouseDown={handleSidebarMouseDown} />
-        {isMobile && sidebarOpen && (
-          <div className="re-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
-        )}
-        <div className="re-editor-panes-container">
-          {(isMobile
-            ? panes.filter(p => p.id === activePaneId).length > 0
-              ? panes.filter(p => p.id === activePaneId)
-              : panes.slice(0, 1)
-            : panes
-          ).map(pane => {
-            const activeFile = getActiveFileForPane(pane)
-            return (
-              <div key={pane.id} className="re-editor-pane-group" onClickCapture={() => setActivePaneId(pane.id)}>
-                <TabBar
-                  paneId={pane.id}
-                  openTabs={pane.openTabs}
-                  activeTabPath={pane.activeTabPath}
-                  onTabSelect={handleTabSelect}
-                  onTabClose={handleTabClose}
-                  onTabReorder={handleTabReorder}
-                  onSplitPane={handleSplitPane}
-                  onCloseAll={handleCloseAll}
-                  onCloseOthers={handleCloseOthers}
-                  onCloseToLeft={handleCloseToLeft}
-                  onCloseToRight={handleCloseToRight}
-                />
-                {activeFile && activeFile.mapping?.field === 'globalLore' && activeFile.mapping?.index !== undefined ? (
-                  <LoreEntryEditor
-                    content={activeFile.content ?? ''}
-                    filePath={pane.activeTabPath!}
-                    onChange={(val) => handleEditorChange(pane.activeTabPath!, val)}
-                    showPreview={showPreview}
-                    characterName={originalChar?.name}
-                  />
-                ) : (
-                  <EditorPane
-                    content={activeFile?.content ?? null}
-                    language={activeFile?.language ?? 'plaintext'}
-                    filePath={pane.activeTabPath}
-                    onChange={(val) => pane.activeTabPath && handleEditorChange(pane.activeTabPath, val)}
-                    showPreview={showPreview}
-                    characterName={originalChar?.name}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-      <StatusBar
-        filePath={panes.find(p => p.id === activePaneId)?.activeTabPath || null}
-        language={getActiveFileForPane(panes.find(p => p.id === activePaneId) || panes[0])?.language ?? null}
-        totalFiles={totalFiles}
-        autoSaveStatus={autoSaveStatus}
-      />
+        </>
+      )}
     </div>
   )
 }
