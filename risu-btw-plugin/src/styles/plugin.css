@@ -1,0 +1,430 @@
+/* Minimalist Flat Monochrome CSS for BTW Plugin */
+/* Inspired by nevaeh5379.github.io/translate/styles.css */
+
+:root {
+  --btw-bg-body: #ffffff;
+  --btw-bg-input: #ffffff;
+  --btw-bg-msg-user: #f3f3f3;
+  --btw-bg-msg-ai: #ffffff;
+  --btw-fg: #111111;
+  --btw-fg-muted: #666666;
+  --btw-fg-dim: #999999;
+  --btw-border: 1px solid #ccccca;
+  --btw-border-strong: 2px solid #111111;
+  --btw-accent: #111111;
+  --btw-accent-hover: #111111;
+  --btw-accent-fg: #ffffff;
+  --btw-overlay-bg: rgba(0, 0, 0, 0.4);
+}
+
+/* Force dark theme when parent class .dark is applied or system prefers dark */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --btw-bg-body: #1a1a1a;
+    --btw-bg-input: #252525;
+    --btw-bg-msg-user: #2d2d2d;
+    --btw-bg-msg-ai: #1a1a1a;
+    --btw-fg: #dddddd;
+    --btw-fg-muted: #888888;
+    --btw-fg-dim: #666666;
+    --btw-border: 1px solid #444444;
+    --btw-border-strong: 2px solid #dddddd;
+    --btw-accent: #dddddd;
+    --btw-accent-hover: #dddddd;
+    --btw-accent-fg: #1a1a1a;
+    --btw-overlay-bg: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.dark-theme {
+  --btw-bg-body: #1a1a1a;
+  --btw-bg-input: #252525;
+  --btw-bg-msg-user: #2d2d2d;
+  --btw-bg-msg-ai: #1a1a1a;
+  --btw-fg: #dddddd;
+  --btw-fg-muted: #888888;
+  --btw-fg-dim: #666666;
+  --btw-border: 1px solid #444444;
+  --btw-border-strong: 2px solid #dddddd;
+  --btw-accent: #dddddd;
+  --btw-accent-hover: #dddddd;
+  --btw-accent-fg: #1a1a1a;
+  --btw-overlay-bg: rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  color: var(--btw-fg);
+}
+
+/* Backdrop Overlay */
+.btw-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--btw-overlay-bg);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Slide-out Sidebar Drawer */
+.btw-sidebar {
+  width: 100%;
+  max-width: 420px;
+  height: 100%;
+  background: var(--btw-bg-body);
+  border-left: var(--btw-border-strong);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.25);
+  animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Header */
+.btw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: var(--btw-border-strong);
+}
+
+.btw-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+}
+
+.btw-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Main Chat Log Area */
+.btw-chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--btw-bg-body);
+}
+
+/* Scrollbar styling */
+.btw-chat-log::-webkit-scrollbar {
+  width: 6px;
+}
+.btw-chat-log::-webkit-scrollbar-thumb {
+  background: var(--btw-fg-dim);
+  border-radius: 3px;
+}
+.btw-chat-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Chat Messages */
+.btw-msg-row {
+  display: flex;
+  flex-direction: column;
+  max-width: 88%;
+}
+
+.btw-msg-row.user {
+  align-self: flex-end;
+}
+
+.btw-msg-row.ai {
+  align-self: flex-start;
+}
+
+.btw-msg-meta {
+  font-size: 0.75rem;
+  color: var(--btw-fg-muted);
+  margin-bottom: 0.15rem;
+  font-family: inherit;
+}
+
+.btw-msg-row.user .btw-msg-meta {
+  text-align: right;
+}
+
+.btw-msg-content {
+  padding: 0.6rem 0.8rem;
+  border: var(--btw-border);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-radius: 4px;
+}
+
+.btw-msg-row.user .btw-msg-content {
+  background: var(--btw-bg-msg-user);
+  color: var(--btw-fg);
+  border-color: var(--btw-border);
+  border-top-right-radius: 0px;
+}
+
+.btw-msg-row.ai .btw-msg-content {
+  background: var(--btw-bg-msg-ai);
+  color: var(--btw-fg);
+  border-color: var(--btw-border);
+  border-top-left-radius: 0px;
+}
+
+.btw-msg-row.system {
+  align-self: center;
+  max-width: 95%;
+  text-align: center;
+}
+
+.btw-msg-row.system .btw-msg-content {
+  background: transparent;
+  border: none;
+  color: var(--btw-fg-muted);
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+}
+
+/* Empty State */
+.btw-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--btw-fg-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem;
+  line-height: 1.7;
+}
+
+/* Typing Indicator */
+.btw-typing {
+  align-self: flex-start;
+  padding: 0.5rem 0.75rem;
+  background: var(--btw-bg-msg-ai);
+  border: var(--btw-border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--btw-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btw-typing-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--btw-fg-muted);
+  border-radius: 50%;
+  animation: btwBlink 1.4s infinite both;
+}
+
+.btw-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.btw-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes btwBlink {
+  0%, 100% { opacity: 0.2; }
+  20% { opacity: 1; }
+}
+
+/* Control Panel (Context select & Settings) */
+.btw-controls {
+  padding: 0.75rem 1rem;
+  border-top: var(--btw-border);
+  border-bottom: var(--btw-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btw-control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btw-control-row label {
+  font-size: 0.82rem;
+  font-weight: bold;
+}
+
+/* Settings Form (Toggleable Panel) */
+.btw-settings-panel {
+  padding: 1rem;
+  border-top: var(--btw-border);
+  border-bottom: var(--btw-border);
+  background: var(--btw-bg-msg-user);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 60%;
+  overflow-y: auto;
+}
+
+.btw-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.btw-form-group label {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.btw-form-group .hint {
+  font-size: 0.72rem;
+  color: var(--btw-fg-muted);
+}
+
+/* Simple Elements (Inputs, Selects, Buttons) */
+select, input[type="text"], input[type="password"], textarea {
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 0.4rem 0.5rem;
+  background: var(--btw-bg-input);
+  color: var(--btw-fg);
+  border: var(--btw-border);
+  border-radius: 2px;
+  width: 100%;
+}
+
+select:focus, input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--btw-fg);
+}
+
+textarea {
+  resize: none;
+  line-height: 1.5;
+}
+
+/* Flat Retro Buttons */
+button {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.85rem;
+  background: var(--btw-bg-body);
+  color: var(--btw-fg);
+  border: 1px solid var(--btw-fg);
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+button:hover {
+  background: var(--btw-fg);
+  color: var(--btw-bg-body);
+}
+
+button:active {
+  opacity: 0.8;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--btw-fg);
+  color: var(--btw-bg-body);
+}
+
+button.primary:hover {
+  background: var(--btw-bg-body);
+  color: var(--btw-fg);
+}
+
+button.icon-only {
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+/* Footer / Input Area */
+.btw-footer {
+  padding: 0.75rem 1rem;
+  border-top: var(--btw-border-strong);
+  background: var(--btw-bg-body);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btw-input-wrap {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btw-input-wrap textarea {
+  flex: 1;
+  height: 2.2rem;
+  min-height: 2.2rem;
+  max-height: 5rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-family: inherit;
+}
+
+.btw-input-wrap button {
+  height: 2.2rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Toast */
+.btw-toast {
+  position: absolute;
+  bottom: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--btw-fg);
+  color: var(--btw-bg-body);
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1100;
+  text-align: center;
+  width: max-content;
+  max-width: 80%;
+}
+
+.btw-toast.show {
+  opacity: 1;
+}

@@ -1,2 +1,4 @@
 risu-editor-plugin/dist/
+dist/
 node_modules/
+.antigravitycli
