@@ -123,6 +123,21 @@ body, html {
   gap: 0.5rem;
 }
 
+/* Thread Session Bar styling */
+.btw-thread-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: var(--btw-bg-msg-user);
+  border-bottom: var(--btw-border);
+}
+
+.btw-thread-select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Main Chat Log Area */
 .btw-chat-log {
   flex: 1;
@@ -365,6 +380,27 @@ button.primary {
 button.primary:hover {
   background: var(--btw-bg-body);
   color: var(--btw-fg);
+}
+
+button.danger {
+  color: #c00000;
+  border-color: #c00000;
+}
+
+button.danger:hover {
+  background: #c00000;
+  color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  button.danger {
+    color: #f87171;
+    border-color: #f87171;
+  }
+  button.danger:hover {
+    background: #f87171;
+    color: #1a1a1a;
+  }
 }
 
 button.icon-only {

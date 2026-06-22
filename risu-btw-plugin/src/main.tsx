@@ -5,6 +5,9 @@ import { App } from './App'
 const api = typeof Risuai !== 'undefined' ? Risuai : (typeof risuai !== 'undefined' ? risuai : null);
 const isPlugin = api !== null;
 
+// Lucide icon style SVG string for RisuAI native buttons
+const LUCIDE_MESSAGE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square" style="width: 100%; height: 100%; display: block;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+
 function mountApp() {
   let rootEl = document.getElementById('root')
   if (!rootEl) {
@@ -13,7 +16,6 @@ function mountApp() {
     document.body.appendChild(rootEl)
   }
 
-  // Reset body and html styles for full page transparent overlay
   document.body.style.margin = '0'
   document.body.style.padding = '0'
   document.body.style.overflow = 'hidden'
@@ -31,22 +33,19 @@ function mountApp() {
 if (isPlugin) {
   (async () => {
     try {
-      // Pre-mount React into the hidden iframe
       let appRoot: ReturnType<typeof createRoot> | null = mountApp()
 
-      // Function to open the OOC side panel
       const openBtwPanel = async () => {
         if (!appRoot) appRoot = mountApp()
-        // Reload settings and messages (user might have switched characters)
         window.dispatchEvent(new CustomEvent('risu-editor:reload'))
         await api.showContainer('fullscreen')
       }
 
       // 1. Register Setting menu item
       await api.registerSetting(
-        'BTW OOC 질문방',
+        'BTW',
         openBtwPanel,
-        '💬',
+        LUCIDE_MESSAGE_SVG,
         'html',
         'risu-btw-settings'
       )
@@ -54,8 +53,8 @@ if (isPlugin) {
       // 2. Register Chat Float Action Button
       await api.registerButton(
         {
-          name: 'BTW (OOC)',
-          icon: '💬',
+          name: 'BTW',
+          icon: LUCIDE_MESSAGE_SVG,
           iconType: 'html',
           location: 'chat',
           id: 'risu-btw-action',
@@ -67,32 +66,25 @@ if (isPlugin) {
       const handleInputScript = async (content: string) => {
         const trimmed = content.trim()
         if (trimmed.startsWith('/btw')) {
-          // Extract the query following "/btw"
           const query = trimmed.replace(/^\/btw\s*/, '')
 
-          // Open the panel
           if (!appRoot) appRoot = mountApp()
           window.dispatchEvent(new CustomEvent('risu-editor:reload'))
           await api.showContainer('fullscreen')
 
-          // Dispatch query if text is present
-          if (query) {
-            window.dispatchEvent(new CustomEvent('btw-plugin:open-with-query', {
-              detail: { query }
-            }))
-          }
+          // Dispatch query to open a new OOC thread
+          window.dispatchEvent(new CustomEvent('btw-plugin:new-thread-with-query', {
+            detail: { query: query || '새 대화' }
+          }))
 
-          // Throwing a custom message stops RisuAI from pushing this to the chat log 
-          // and stops the character from generating a response.
-          // RisuAI catches this and displays the text inside a toast notification.
-          throw new Error('OOC 질문이 BTW 패널로 전송되었습니다.')
+          // '{}' error message is ignored by RisuAI alert system, aborting the roleplay send silently
+          throw new Error('{}')
         }
         return content
       }
 
       await api.addRisuScriptHandler('input', handleInputScript)
 
-      // Cleanup on unload
       await api.onUnload(async () => {
         if (appRoot) {
           appRoot.unmount()
@@ -101,12 +93,11 @@ if (isPlugin) {
         await api.removeRisuScriptHandler('input', handleInputScript)
       })
 
-      console.log('[BTW Plugin] Initialized successfully')
+      console.log('[BTW Plugin] Initialized with Lucide SVG buttons and BTW labels')
     } catch (error) {
       console.error('[BTW Plugin] Init error:', error)
     }
   })()
 } else {
-  // Standalone dev mode (useful for local styles preview)
   mountApp()
 }
