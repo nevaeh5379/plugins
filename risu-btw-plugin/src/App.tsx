@@ -1631,58 +1631,60 @@ ${loreText}`
               <span className="hint">LLM이 역할극 외(OOC) 답변을 하도록 유도하는 지침입니다.</span>
             </div>
 
+            <hr style={{ border: 'none', borderTop: 'var(--btw-border)', margin: '0.5rem 0' }} />
+
+            <div className="btw-control-row">
+              <label htmlFor="context-depth">메인 대화 깊이</label>
+              <select
+                id="context-depth"
+                value={config.contextDepth}
+                style={{ width: 'auto' }}
+                onChange={(e) => saveConfig({ ...config, contextDepth: e.target.value as any })}
+              >
+                <option value="none">역할극 기록 미포함</option>
+                <option value="1">직전 1개 대화 포함</option>
+                <option value="5">최근 5개 대화 포함</option>
+                <option value="10">최근 10개 대화 포함</option>
+                <option value="full">전체 대화 역사 포함</option>
+              </select>
+            </div>
+
+            <div className="btw-control-row">
+              <label htmlFor="include-lore" style={{ cursor: 'pointer' }}>로어북 및 캐릭터 정보 포함</label>
+              <input 
+                type="checkbox"
+                id="include-lore"
+                style={{ width: 'auto', cursor: 'pointer' }}
+                checked={config.includeLore}
+                onChange={(e) => saveConfig({ ...config, includeLore: e.target.checked })}
+              />
+            </div>
+
+            <div className="btw-control-row">
+              <label htmlFor="render-markdown" style={{ cursor: 'pointer' }}>마크다운 렌더링 활성화</label>
+              <input 
+                type="checkbox"
+                id="render-markdown"
+                style={{ width: 'auto', cursor: 'pointer' }}
+                checked={config.renderMarkdown}
+                onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
+              />
+            </div>
+
+            <div className="btw-control-row">
+              <label htmlFor="stream-response" style={{ cursor: 'pointer' }}>실시간 스트리밍 활성화</label>
+              <input 
+                type="checkbox"
+                id="stream-response"
+                style={{ width: 'auto', cursor: 'pointer' }}
+                checked={config.streamResponse ?? true}
+                onChange={(e) => saveConfig({ ...config, streamResponse: e.target.checked })}
+              />
+            </div>
+
             <button onClick={() => setShowSettings(false)} className="primary">확인</button>
           </div>
         )}
-
-        {/* Global Controls */}
-        <div className="btw-controls">
-          <div className="btw-control-row">
-            <label htmlFor="context-depth">메인 대화 깊이</label>
-            <select
-              id="context-depth"
-              value={config.contextDepth}
-              style={{ width: 'auto' }}
-              onChange={(e) => saveConfig({ ...config, contextDepth: e.target.value as any })}
-            >
-              <option value="none">역할극 기록 미포함</option>
-              <option value="1">직전 1개 대화 포함</option>
-              <option value="5">최근 5개 대화 포함</option>
-              <option value="10">최근 10개 대화 포함</option>
-              <option value="full">전체 대화 역사 포함</option>
-            </select>
-          </div>
-          <div className="btw-control-row">
-            <label htmlFor="include-lore" style={{ cursor: 'pointer' }}>로어북 및 캐릭터 정보 포함</label>
-            <input 
-              type="checkbox"
-              id="include-lore"
-              style={{ width: 'auto', cursor: 'pointer' }}
-              checked={config.includeLore}
-              onChange={(e) => saveConfig({ ...config, includeLore: e.target.checked })}
-            />
-          </div>
-          <div className="btw-control-row">
-            <label htmlFor="render-markdown" style={{ cursor: 'pointer' }}>마크다운 렌더링 활성화</label>
-            <input 
-              type="checkbox"
-              id="render-markdown"
-              style={{ width: 'auto', cursor: 'pointer' }}
-              checked={config.renderMarkdown}
-              onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
-            />
-          </div>
-          <div className="btw-control-row">
-            <label htmlFor="stream-response" style={{ cursor: 'pointer' }}>실시간 스트리밍 활성화</label>
-            <input 
-              type="checkbox"
-              id="stream-response"
-              style={{ width: 'auto', cursor: 'pointer' }}
-              checked={config.streamResponse ?? true}
-              onChange={(e) => saveConfig({ ...config, streamResponse: e.target.checked })}
-            />
-          </div>
-        </div>
 
         {/* Message Log */}
         <div className="btw-chat-log" ref={chatLogRef}>
@@ -1698,83 +1700,88 @@ ${loreText}`
               </p>
             </div>
           ) : (
-            messages.map((m, idx) => (
-              <div key={m.id} className={`btw-msg-row ${m.role}`}>
-                <div className="btw-msg-meta">
-                  {m.role === 'user' ? '나' : `${characterName}`}
-                </div>
-                {editingMessageId === m.id ? (
-                  <div className="btw-msg-content">
-                    <textarea
-                      style={{
-                        width: '100%',
-                        background: 'var(--btw-bg-input)',
-                        color: 'var(--btw-fg)',
-                        border: 'var(--btw-border)',
-                        borderRadius: '4px',
-                        padding: '0.4rem',
-                        fontSize: '0.85rem',
-                        fontFamily: 'inherit',
-                        resize: 'vertical',
-                        outline: 'none'
-                      }}
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      rows={Math.max(2, editingText.split('\n').length)}
-                    />
-                    <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
-                      <button 
-                        className="primary" 
-                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
-                        onClick={() => handleSaveEdit(m.id)}
-                        disabled={loading}
-                      >
-                        저장 후 재생성
-                      </button>
-                      <button 
-                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
-                        onClick={handleCancelEdit}
-                      >
-                        취소
-                      </button>
-                    </div>
+            messages.map((m, idx) => {
+              if (m.role === 'ai' && !m.content && loading) {
+                return null
+              }
+              return (
+                <div key={m.id} className={`btw-msg-row ${m.role}`}>
+                  <div className="btw-msg-meta">
+                    {m.role === 'user' ? '나' : `${characterName}`}
                   </div>
-                ) : (
-                  <div className="btw-msg-content">
-                    <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
-                    <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
-                      {m.role === 'user' && !loading && (
+                  {editingMessageId === m.id ? (
+                    <div className="btw-msg-content">
+                      <textarea
+                        style={{
+                          width: '100%',
+                          background: 'var(--btw-bg-input)',
+                          color: 'var(--btw-fg)',
+                          border: 'var(--btw-border)',
+                          borderRadius: '4px',
+                          padding: '0.4rem',
+                          fontSize: '0.85rem',
+                          fontFamily: 'inherit',
+                          resize: 'vertical',
+                          outline: 'none'
+                        }}
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        rows={Math.max(2, editingText.split('\n').length)}
+                      />
+                      <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
                         <button 
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
-                          onClick={() => handleStartEdit(m.id, m.content)}
+                          className="primary" 
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                          onClick={() => handleSaveEdit(m.id)}
+                          disabled={loading}
                         >
-                          <Edit size={12} /> 수정
+                          저장 후 재생성
                         </button>
-                      )}
-                      {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
-                        <>
+                        <button 
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                          onClick={handleCancelEdit}
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="btw-msg-content">
+                      <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                      <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                        {m.role === 'user' && !loading && (
                           <button 
                             style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
-                            onClick={() => copyToClipboard(m.content)}
+                            onClick={() => handleStartEdit(m.id, m.content)}
                           >
-                            <Copy size={12} /> 복사
+                            <Edit size={12} /> 수정
                           </button>
-                          {idx === messages.length - 1 && (
+                        )}
+                        {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
+                          <>
                             <button 
                               style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
-                              onClick={handleReroll}
-                              disabled={loading}
+                              onClick={() => copyToClipboard(m.content)}
                             >
-                              <RotateCw size={12} className={loading ? 'spin' : ''} /> 리롤
+                              <Copy size={12} /> 복사
                             </button>
-                          )}
-                        </>
-                      )}
+                            {idx === messages.length - 1 && (
+                              <button 
+                                style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                                onClick={handleReroll}
+                                disabled={loading}
+                              >
+                                <RotateCw size={12} className={loading ? 'spin' : ''} /> 리롤
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))
+                  )}
+                </div>
+              )
+            })
           )}
 
           {/* Typing Loading Indicator */}
