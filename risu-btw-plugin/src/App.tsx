@@ -200,9 +200,10 @@ export const App: React.FC = () => {
         timestamp: Date.now()
       }
 
-      const updatedThreads = [newThread, ...threads]
-      
       const threadsKey = `btw_threads_${characterId}_${chatIndex}`
+      const currentThreads = await storage.getItem<OocThread[]>(threadsKey) || []
+      const updatedThreads = [newThread, ...currentThreads]
+      
       await storage.setItem(threadsKey, updatedThreads)
       setThreads(updatedThreads)
 
@@ -216,7 +217,11 @@ export const App: React.FC = () => {
       console.error('[BTW Plugin] Create new thread error:', e)
       return ''
     }
-  }, [characterId, chatIndex, threads])
+  }, [characterId, chatIndex])
+
+  // Keep a ref to the latest handleCreateNewThread to avoid re-triggering useEffect
+  const handleCreateNewThreadRef = useRef(handleCreateNewThread)
+  handleCreateNewThreadRef.current = handleCreateNewThread
 
   // Delete current BTW thread
   const handleDeleteThread = async () => {
@@ -1291,7 +1296,7 @@ ${loreText}`
       const customEvent = e as CustomEvent<{ query: string }>
       const query = customEvent.detail?.query || ''
       if (query) {
-        const newId = await handleCreateNewThread(query)
+        const newId = await handleCreateNewThreadRef.current(query)
         if (newId) {
           setTimeout(() => {
             triggerSend(query, newId)
@@ -1308,7 +1313,7 @@ ${loreText}`
       window.removeEventListener('risu-editor:reload', handleReload)
       window.removeEventListener('btw-plugin:new-thread-with-query', handleNewThreadWithQuery)
     }
-  }, [loadData, handleCreateNewThread])
+  }, [loadData])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

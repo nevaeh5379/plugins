@@ -63,14 +63,16 @@ if (isPlugin) {
       )
 
       // 3. Key Interceptor for /btw in main input
-      const handleInputScript = async (content: string) => {
+      const handleInputScript = (content: string) => {
         const trimmed = content.trim()
         if (trimmed.startsWith('/btw')) {
           const query = trimmed.replace(/^\/btw\s*/, '')
 
           if (!appRoot) appRoot = mountApp()
           window.dispatchEvent(new CustomEvent('risu-editor:reload'))
-          await api.showContainer('fullscreen')
+          api.showContainer('fullscreen').catch((err) => {
+            console.error('[BTW Plugin] Failed to show container:', err)
+          })
 
           // Dispatch query to open a new OOC thread
           window.dispatchEvent(new CustomEvent('btw-plugin:new-thread-with-query', {
