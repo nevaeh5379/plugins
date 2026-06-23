@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Settings, Trash2, X, Plus, Send, Copy } from 'lucide-react'
+import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit } from 'lucide-react'
 import './styles/plugin.css'
 
 interface OocThread {
@@ -50,6 +50,8 @@ export const App: React.FC = () => {
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState('')
   
   // Context states
   const [characterId, setCharacterId] = useState<string>('default')
@@ -902,10 +904,10 @@ export const App: React.FC = () => {
 
   // Assemble roleplay context
   const assembleContext = async () => {
-    if (!api) return { systemPromptContent: config.systemPrompt, historyContext: '' }
+    if (!api) return { systemPromptContent: config.systemPrompt, historyContextMsgs: [] as { role: 'user' | 'assistant'; content: string }[] }
 
     let systemPromptContent = config.systemPrompt
-    let historyContext = ''
+    let historyContextMsgs: { role: 'user' | 'assistant'; content: string }[] = []
 
     try {
       const char = await api.getCharacter()
@@ -1066,20 +1068,21 @@ ${loreText}`
             targetMessages = chat.message.slice(-10)
           }
           
-          const formattedHistory = targetMessages.map((m: any) => {
+          historyContextMsgs = targetMessages.map((m: any) => {
             const sender = m.name || (m.role === 'user' ? userName : charName);
-            const renderedData = evaluateCBS(parseCBS(m.data || ''), contextData)
-            return `[${sender}]: ${renderedData}`
-          }).join('\n')
-
-          historyContext = `[Current Main Roleplay Conversation History]\n(Use the following roleplay messages strictly as reference context to answer the user's OOC side questions)\n${formattedHistory}`
+            const renderedData = evaluateCBS(parseCBS(m.data || ''), contextData);
+            return {
+              role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+              content: `[Roleplay] (${sender}): ${renderedData}`
+            }
+          })
         }
       }
     } catch (e) {
       console.error('[BTW Plugin] Context assembly error:', e)
     }
 
-    return { systemPromptContent, historyContext }
+    return { systemPromptContent, historyContextMsgs }
   }
 
   // Trigger Send Message
@@ -1126,7 +1129,6 @@ ${loreText}`
 
     // Placeholder BTW message for AI response
     const aiMsgId = Math.random().toString(36).substring(2)
-    let aiContent = ''
     
     setMessages(prev => [...prev, {
       id: aiMsgId,
@@ -1135,22 +1137,51 @@ ${loreText}`
       timestamp: Date.now()
     }])
 
-    try {
-      const { systemPromptContent, historyContext } = await assembleContext()
+    await executeLLMCall(aiMsgId, currentThreadMsgs, activeId)
+  }
 
-      const messagesToSend = [
+  // Helper to execute LLM API call and update state/storage
+  const executeLLMCall = async (aiMsgId: string, currentThreadMsgs: OocMessage[], activeId: string) => {
+    let aiContent = ''
+    try {
+      const { systemPromptContent, historyContextMsgs } = await assembleContext()
+
+      const rawMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
         { role: 'system', content: systemPromptContent }
       ]
 
-      if (historyContext) {
-        messagesToSend.push({ role: 'system', content: historyContext })
+      if (historyContextMsgs && historyContextMsgs.length > 0) {
+        rawMessages.push({ role: 'system', content: '[Main Roleplay History - For reference context]' })
+        historyContextMsgs.forEach(m => {
+          rawMessages.push({ role: m.role, content: m.content })
+        })
+        rawMessages.push({ role: 'system', content: '[End of Main Roleplay History. The following is the active OOC thread.]' })
       }
 
       currentThreadMsgs.forEach(m => {
-        messagesToSend.push({
+        rawMessages.push({
           role: m.role === 'user' ? 'user' : 'assistant',
-          content: m.content
+          content: `[OOC] ${m.content}`
         })
+      })
+
+      // Merge consecutive user/assistant messages to avoid validation errors on APIs (e.g. Anthropic)
+      const messagesToSend: { role: 'system' | 'user' | 'assistant'; content: string }[] = []
+      let lastActiveRole: 'user' | 'assistant' | null = null
+      let lastActiveIndex = -1
+
+      rawMessages.forEach(m => {
+        if (m.role === 'system') {
+          messagesToSend.push({ role: 'system', content: m.content })
+        } else {
+          if (lastActiveRole === m.role && lastActiveIndex !== -1) {
+            messagesToSend[lastActiveIndex].content += '\n' + m.content
+          } else {
+            messagesToSend.push({ role: m.role, content: m.content })
+            lastActiveRole = m.role
+            lastActiveIndex = messagesToSend.length - 1
+          }
+        }
       })
 
       if (config.provider === 'risu') {
@@ -1267,6 +1298,79 @@ ${loreText}`
     } finally {
       setLoading(false)
     }
+  }
+
+  // Reroll last AI response
+  const handleReroll = async () => {
+    if (loading || !api || !activeThreadId || messages.length === 0) return
+
+    const lastMsg = messages[messages.length - 1]
+    if (lastMsg.role !== 'ai') return
+
+    setLoading(true)
+
+    const currentThreadMsgs = messages.slice(0, -1)
+    setMessages(currentThreadMsgs)
+    await saveThreadMessages(activeThreadId, currentThreadMsgs)
+
+    const aiMsgId = Math.random().toString(36).substring(2)
+    setMessages(prev => [...prev, {
+      id: aiMsgId,
+      role: 'ai',
+      content: '',
+      timestamp: Date.now()
+    }])
+
+    await executeLLMCall(aiMsgId, currentThreadMsgs, activeThreadId)
+  }
+
+  // Start editing a user message
+  const handleStartEdit = (msgId: string, content: string) => {
+    setEditingMessageId(msgId)
+    setEditingText(content)
+  }
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditingText('')
+  }
+
+  // Save the edited user message, truncate subsequent messages, and regenerate response
+  const handleSaveEdit = async (msgId: string) => {
+    if (loading || !api || !activeThreadId || !editingText.trim()) return
+
+    const msgIndex = messages.findIndex(m => m.id === msgId)
+    if (msgIndex === -1) return
+
+    setLoading(true)
+
+    // Truncate messages after the edited message, and update the edited message's content
+    const truncatedMsgs = messages.slice(0, msgIndex + 1).map((m, idx) => {
+      if (idx === msgIndex) {
+        return { ...m, content: editingText }
+      }
+      return m
+    })
+
+    setMessages(truncatedMsgs)
+    await saveThreadMessages(activeThreadId, truncatedMsgs)
+
+    // Reset editing state
+    setEditingMessageId(null)
+    setEditingText('')
+
+    // Insert new placeholder message for the AI response
+    const aiMsgId = Math.random().toString(36).substring(2)
+    setMessages(prev => [...prev, {
+      id: aiMsgId,
+      role: 'ai',
+      content: '',
+      timestamp: Date.now()
+    }])
+
+    // Trigger the LLM call using the truncated message list
+    await executeLLMCall(aiMsgId, truncatedMsgs, activeThreadId)
   }
 
   // Update AI response message state and storage
@@ -1501,24 +1605,81 @@ ${loreText}`
               </p>
             </div>
           ) : (
-            messages.map((m) => (
+            messages.map((m, idx) => (
               <div key={m.id} className={`btw-msg-row ${m.role}`}>
                 <div className="btw-msg-meta">
                   {m.role === 'user' ? '나' : `${characterName}`}
                 </div>
-                <div className="btw-msg-content">
-                  {m.content}
-                  {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
-                    <div style={{ marginTop: '0.35rem', textAlign: 'right' }}>
+                {editingMessageId === m.id ? (
+                  <div className="btw-msg-content">
+                    <textarea
+                      style={{
+                        width: '100%',
+                        background: 'var(--btw-bg-input)',
+                        color: 'var(--btw-fg)',
+                        border: 'var(--btw-border)',
+                        borderRadius: '4px',
+                        padding: '0.4rem',
+                        fontSize: '0.85rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        outline: 'none'
+                      }}
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      rows={Math.max(2, editingText.split('\n').length)}
+                    />
+                    <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
                       <button 
-                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
-                        onClick={() => copyToClipboard(m.content)}
+                        className="primary" 
+                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                        onClick={() => handleSaveEdit(m.id)}
+                        disabled={loading}
                       >
-                        <Copy size={12} /> 복사
+                        저장 후 재생성
+                      </button>
+                      <button 
+                        style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                        onClick={handleCancelEdit}
+                      >
+                        취소
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="btw-msg-content">
+                    {m.content}
+                    <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                      {m.role === 'user' && !loading && (
+                        <button 
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                          onClick={() => handleStartEdit(m.id, m.content)}
+                        >
+                          <Edit size={12} /> 수정
+                        </button>
+                      )}
+                      {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
+                        <>
+                          <button 
+                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                            onClick={() => copyToClipboard(m.content)}
+                          >
+                            <Copy size={12} /> 복사
+                          </button>
+                          {idx === messages.length - 1 && (
+                            <button 
+                              style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                              onClick={handleReroll}
+                              disabled={loading}
+                            >
+                              <RotateCw size={12} className={loading ? 'spin' : ''} /> 리롤
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
