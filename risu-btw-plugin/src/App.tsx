@@ -1492,10 +1492,7 @@ ${loreText}`
     }
   }, [loadData])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    triggerSend(inputText)
-  }
+
 
   const handleClose = async () => {
     if (api) {
@@ -1545,7 +1542,7 @@ ${loreText}`
             disabled={loading}
             title="새 대화방 개설"
           >
-            <Plus size={14} /> 새 대화
+            <Plus size={14} /> 
           </button>
           <button 
             className="danger icon-only"
@@ -1563,7 +1560,7 @@ ${loreText}`
             <h3>설정</h3>
 
             <div className="btw-form-group">
-              <label>모델 제공자</label>
+              <label>모델 프로바이더</label>
               <select 
                 value={config.provider}
                 onChange={(e) => saveConfig({ ...config, provider: e.target.value as any })}
@@ -1620,7 +1617,7 @@ ${loreText}`
             )}
 
             <div className="btw-form-group">
-              <label>BTW 시스템 프롬프트</label>
+              <label>시스템 프롬프트</label>
               <textarea 
                 value={config.systemPrompt}
                 rows={4}
@@ -1628,7 +1625,7 @@ ${loreText}`
                 onBlur={() => saveConfig(config)}
                 placeholder="시스템 지침을 입력하세요..."
               />
-              <span className="hint">LLM이 역할극 외(OOC) 답변을 하도록 유도하는 지침입니다.</span>
+              
             </div>
 
             <hr style={{ border: 'none', borderTop: 'var(--btw-border)', margin: '0.5rem 0' }} />
@@ -1691,12 +1688,9 @@ ${loreText}`
           {messages.length === 0 ? (
             <div className="btw-empty">
               <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>💬</div>
-              <strong>BTW 채널에 오신 것을 환영합니다!</strong>
+              <strong>/btw 플러그인에 오신 걸 환영합니다.</strong>
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
-                여기서 나누는 대화는 캐릭터와의 메인 역할극 대화 기록에 저장되지 않아 토큰이 낭비되거나 캐릭터 페르소나가 망가지는 것을 막아줍니다.
-              </p>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: 'var(--btw-fg-muted)' }}>
-                메인 채팅창에서 <code style={{fontFamily: 'monospace'}}>/btw 질문내용</code>을 입력하면 **자동으로 새 대화방을 열어** 바로 답변해 줍니다.
+                쿰질하다가 문득 적을 인풋이 떠오르지 못해서 물어보거나, 대화 주제를 조언을 구할 때 등등 하는 곳입니다.
               </p>
             </div>
           ) : (
@@ -1730,15 +1724,14 @@ ${loreText}`
                       />
                       <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
                         <button 
-                          className="primary" 
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                          className="btw-btn-sm primary" 
                           onClick={() => handleSaveEdit(m.id)}
                           disabled={loading}
                         >
                           저장 후 재생성
                         </button>
                         <button 
-                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem' }}
+                          className="btw-btn-sm"
                           onClick={handleCancelEdit}
                         >
                           취소
@@ -1751,27 +1744,27 @@ ${loreText}`
                       <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
                         {m.role === 'user' && !loading && (
                           <button 
-                            style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                            className="btw-btn-sm"
                             onClick={() => handleStartEdit(m.id, m.content)}
                           >
-                            <Edit size={12} /> 수정
+                            <Edit size={12} />
                           </button>
                         )}
                         {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
                           <>
                             <button 
-                              style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                              className="btw-btn-sm"
                               onClick={() => copyToClipboard(m.content)}
                             >
-                              <Copy size={12} /> 복사
+                              <Copy size={12} />
                             </button>
                             {idx === messages.length - 1 && (
                               <button 
-                                style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', gap: '0.2rem' }} 
+                                className="btw-btn-sm"
                                 onClick={handleReroll}
                                 disabled={loading}
                               >
-                                <RotateCw size={12} className={loading ? 'spin' : ''} /> 리롤
+                                <RotateCw size={12} className={loading ? 'spin' : ''} />
                               </button>
                             )}
                           </>
@@ -1795,13 +1788,12 @@ ${loreText}`
           )}
         </div>
 
-        {/* Footer Input */}
-        <form onSubmit={handleSubmit} className="btw-footer">
+        <div className="btw-footer">
           <div className="btw-input-wrap">
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="질문을 입력하세요..."
+              placeholder="입력..."
               disabled={loading}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -1811,14 +1803,15 @@ ${loreText}`
               }}
             />
             <button 
-              type="submit" 
+              type="button" 
               className="primary" 
               disabled={loading || !inputText.trim()}
+              onClick={() => triggerSend(inputText)}
             >
               <Send size={14} />
             </button>
           </div>
-        </form>
+        </div>
 
         {/* Toast Notification */}
         <div className={`btw-toast ${showToast ? 'show' : ''}`}>

@@ -1,0 +1,90 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: 'Select plugin to release'
+        required: true
+        type: choice
+        options:
+          - risu-btw-plugin
+          - risu-editor-plugin
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        default: 'beta'
+        options:
+          - stable
+          - beta
+      version_source:
+        description: 'How to determine the version'
+        required: true
+        type: choice
+        default: 'package_json'
+        options:
+          - package_json
+          - custom
+      custom_version:
+        description: 'Custom version string (only if version_source is custom, e.g. 1.0.0-beta.1)'
+        required: false
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: '**/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        working-directory: ${{ github.event.inputs.plugin }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: ${{ github.event.inputs.plugin }}
+        run: pnpm build
+
+      - name: Generate version and tag
+        id: versioning
+        working-directory: ${{ github.event.inputs.plugin }}
+        run: |
+          VERSION="${{ github.event.inputs.custom_version }}"
+          if [ "${{ github.event.inputs.version_source }}" = "package_json" ] || [ -z "$VERSION" ]; then
+            VERSION=$(jq -r .version package.json)
+          fi
+
+          TAG="${{ github.event.inputs.plugin }}@v${VERSION}"
+          
+          # If beta release and version doesn't already contain a prerelease suffix, add beta tag
+          if [ "${{ github.event.inputs.release_type }}" = "beta" ] && [[ ! "$VERSION" =~ - ]]; then
+            TAG="${TAG}-beta"
+          fi
+
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Generated tag: ${TAG}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versioning.outputs.tag }}
+          name: ${{ steps.versioning.outputs.tag }}
+          body: |
+            Manual ${{ github.event.inputs.release_type }} release of `${{ github.event.inputs.plugin }}` v${{ steps.versioning.outputs.version }}
+          files: ${{ github.event.inputs.plugin }}/dist/*
+          prerelease: ${{ github.event.inputs.release_type == 'beta' }}
+          make_latest: ${{ github.event.inputs.release_type == 'stable' }}
