@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit } from 'lucide-react'
 import './styles/plugin.css'
+import { marked } from 'marked'
 
 interface OocThread {
   id: string
@@ -24,6 +25,7 @@ interface PluginConfig {
   systemPrompt: string
   contextDepth: 'none' | '1' | '5' | '10' | 'full'
   includeLore: boolean
+  renderMarkdown: boolean
 }
 
 const DEFAULT_CONFIG: PluginConfig = {
@@ -34,10 +36,30 @@ const DEFAULT_CONFIG: PluginConfig = {
   customModelMode: 'model',
   systemPrompt: 'You are a BTW (Out-of-Character) Assistant. Answer the user\'s questions about the story, character, or world settings. Answer concisely as an assistant, not in roleplay.',
   contextDepth: '5',
-  includeLore: true
+  includeLore: true,
+  renderMarkdown: true
 }
 
 const api = typeof Risuai !== 'undefined' ? Risuai : (typeof risuai !== 'undefined' ? risuai : null);
+
+const RenderedMessage: React.FC<{ content: string; enabled: boolean }> = ({ content, enabled }) => {
+  if (!enabled) {
+    return <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{content}</div>
+  }
+
+  try {
+    const html = marked.parse(content, { async: false }) as string
+    return (
+      <div 
+        className="btw-markdown-content" 
+        dangerouslySetInnerHTML={{ __html: html }} 
+      />
+    )
+  } catch (e) {
+    console.error('Markdown parse error:', e)
+    return <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{content}</div>
+  }
+}
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<PluginConfig>(DEFAULT_CONFIG)
@@ -1589,6 +1611,16 @@ ${loreText}`
               onChange={(e) => saveConfig({ ...config, includeLore: e.target.checked })}
             />
           </div>
+          <div className="btw-control-row">
+            <label htmlFor="render-markdown" style={{ cursor: 'pointer' }}>마크다운 렌더링 활성화</label>
+            <input 
+              type="checkbox"
+              id="render-markdown"
+              style={{ width: 'auto', cursor: 'pointer' }}
+              checked={config.renderMarkdown}
+              onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
+            />
+          </div>
         </div>
 
         {/* Message Log */}
@@ -1648,7 +1680,7 @@ ${loreText}`
                   </div>
                 ) : (
                   <div className="btw-msg-content">
-                    {m.content}
+                    <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
                     <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
                       {m.role === 'user' && !loading && (
                         <button 
