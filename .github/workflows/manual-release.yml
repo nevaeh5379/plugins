@@ -52,7 +52,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ github.event.inputs.plugin }}
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install --no-frozen-lockfile
+          fi
 
       - name: Build
         working-directory: ${{ github.event.inputs.plugin }}
