@@ -26,6 +26,7 @@ interface PluginConfig {
   contextDepth: 'none' | '1' | '5' | '10' | 'full'
   includeLore: boolean
   renderMarkdown: boolean
+  streamResponse: boolean
 }
 
 const DEFAULT_CONFIG: PluginConfig = {
@@ -37,7 +38,8 @@ const DEFAULT_CONFIG: PluginConfig = {
   systemPrompt: 'You are a BTW (Out-of-Character) Assistant. Answer the user\'s questions about the story, character, or world settings. Answer concisely as an assistant, not in roleplay.',
   contextDepth: '5',
   includeLore: true,
-  renderMarkdown: true
+  renderMarkdown: true,
+  streamResponse: true
 }
 
 const api = typeof Risuai !== 'undefined' ? Risuai : (typeof risuai !== 'undefined' ? risuai : null);
@@ -48,7 +50,7 @@ const RenderedMessage: React.FC<{ content: string; enabled: boolean }> = ({ cont
   }
 
   try {
-    const html = marked.parse(content, { async: false }) as string
+    const html = marked.parse(content, { async: false, breaks: true }) as string
     return (
       <div 
         className="btw-markdown-content" 
@@ -71,6 +73,11 @@ export const App: React.FC = () => {
   
   const [inputText, setInputText] = useState('')
   const [loading, setLoading] = useState(false)
+  const isLoadingRef = useRef(false)
+  const updateLoading = (val: boolean) => {
+    setLoading(val)
+    isLoadingRef.current = val
+  }
   const [showSettings, setShowSettings] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
@@ -85,6 +92,9 @@ export const App: React.FC = () => {
 
   const chatLogRef = useRef<HTMLDivElement>(null)
   const isMounted = useRef(true)
+  const activeThreadIdRef = useRef('')
+  const configRef = useRef(config)
+  configRef.current = config
 
   // Trigger toast notifications
   const triggerToast = useCallback((msg: string) => {
@@ -127,9 +137,6 @@ export const App: React.FC = () => {
       
       // 1. Load general configuration
       const savedConfig = await storage.getItem<PluginConfig>('btw_plugin_config')
-      if (savedConfig) {
-        setConfig(prev => ({ ...prev, ...savedConfig }))
-      }
 
       // 2. Load active character details
       const char = await api.getCharacter()
@@ -137,9 +144,6 @@ export const App: React.FC = () => {
 
       if (char) {
         const charId = char.chaId || 'default'
-        setCharacterId(charId)
-        setCharacterName(char.name || 'Character')
-        setChatIndex(activeChatIndex)
 
         // 3. Load thread list for this character/chat
         const threadsKey = `btw_threads_${charId}_${activeChatIndex}`
@@ -156,7 +160,6 @@ export const App: React.FC = () => {
           savedThreads = [defaultThread]
           await storage.setItem(threadsKey, savedThreads)
         }
-        setThreads(savedThreads)
 
         // 5. Load active thread ID selection
         const activeThreadKey = `btw_active_thread_${charId}_${activeChatIndex}`
@@ -167,10 +170,35 @@ export const App: React.FC = () => {
           activeId = savedThreads[0].id
           await storage.setItem(activeThreadKey, activeId)
         }
-        setActiveThreadId(activeId)
 
         // 6. Load messages of the active BTW thread
         const activeMessages = await loadThreadMessages(activeId)
+
+        // --- SAFE GLOBAL STATE UPDATES ---
+        if (savedConfig) {
+          setConfig(prev => ({ ...prev, ...savedConfig }))
+        }
+        setCharacterId(charId)
+        setCharacterName(char.name || 'Character')
+        setChatIndex(activeChatIndex)
+
+        // --- CHECKPOINT: Prevent race conditions & state overwrites during generation/thread actions ---
+        if (isLoadingRef.current) {
+          return
+        }
+        if (activeThreadIdRef.current && activeId !== activeThreadIdRef.current) {
+          return
+        }
+
+        // --- SAFE THREAD-SPECIFIC STATE UPDATES ---
+        setThreads(savedThreads)
+
+        // Initialize activeThreadIdRef if it was empty
+        if (!activeThreadIdRef.current) {
+          activeThreadIdRef.current = activeId
+        }
+
+        setActiveThreadId(activeId)
         setMessages(activeMessages)
       }
     } catch (e) {
@@ -195,12 +223,14 @@ export const App: React.FC = () => {
   const handleSelectThread = async (threadId: string) => {
     if (!api || !threadId) return
     try {
+      activeThreadIdRef.current = threadId
       const storage = await api.getLocalPluginStorage()
       const activeThreadKey = `btw_active_thread_${characterId}_${chatIndex}`
       await storage.setItem(activeThreadKey, threadId)
       setActiveThreadId(threadId)
       
       const threadMsgs = await loadThreadMessages(threadId)
+      if (activeThreadIdRef.current !== threadId) return
       setMessages(threadMsgs)
     } catch (e) {
       console.error('[BTW Plugin] Select thread error:', e)
@@ -213,6 +243,7 @@ export const App: React.FC = () => {
     try {
       const storage = await api.getLocalPluginStorage()
       const newThreadId = `thread_${characterId}_${chatIndex}_${Math.random().toString(36).substring(2)}_${Date.now()}`
+      activeThreadIdRef.current = newThreadId
       
       const title = initialQuery 
         ? (initialQuery.length > 20 ? initialQuery.slice(0, 20) + '...' : initialQuery)
@@ -262,6 +293,7 @@ export const App: React.FC = () => {
 
       const remainingThreads = threads.filter(t => t.id !== activeThreadId)
       const nextActiveId = remainingThreads[0].id
+      activeThreadIdRef.current = nextActiveId
 
       const threadsKey = `btw_threads_${characterId}_${chatIndex}`
       await storage.setItem(threadsKey, remainingThreads)
@@ -272,6 +304,7 @@ export const App: React.FC = () => {
       setActiveThreadId(nextActiveId)
 
       const nextMsgs = await loadThreadMessages(nextActiveId)
+      if (activeThreadIdRef.current !== nextActiveId) return
       setMessages(nextMsgs)
 
       triggerToast('대화방이 삭제되었습니다.')
@@ -926,9 +959,9 @@ export const App: React.FC = () => {
 
   // Assemble roleplay context
   const assembleContext = async () => {
-    if (!api) return { systemPromptContent: config.systemPrompt, historyContextMsgs: [] as { role: 'user' | 'assistant'; content: string }[] }
+    if (!api) return { systemPromptContent: configRef.current.systemPrompt, historyContextMsgs: [] as { role: 'user' | 'assistant'; content: string }[] }
 
-    let systemPromptContent = config.systemPrompt
+    let systemPromptContent = configRef.current.systemPrompt
     let historyContextMsgs: { role: 'user' | 'assistant'; content: string }[] = []
 
     try {
@@ -1045,7 +1078,7 @@ export const App: React.FC = () => {
       // Also render the system prompt itself, in case it contains macros like {{char}} or {{user}}
       systemPromptContent = evaluateCBS(parseCBS(systemPromptContent), contextData)
       
-      if (config.includeLore && char) {
+      if (configRef.current.includeLore && char) {
         // Exclude module lorebooks by fetching globalLore and chat localLore directly
         const charIndex = await api.getCurrentCharacterIndex()
         const activeChatIndex = await api.getCurrentChatIndex()
@@ -1075,18 +1108,18 @@ Personality: ${renderedPers}
 ${loreText}`
       }
 
-      if (config.contextDepth !== 'none') {
+      if (configRef.current.contextDepth !== 'none') {
         const charIndex = await api.getCurrentCharacterIndex()
         const activeChatIndex = await api.getCurrentChatIndex()
         const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
         
         if (chat && chat.message && chat.message.length > 0) {
           let targetMessages = chat.message;
-          if (config.contextDepth === '1') {
+          if (configRef.current.contextDepth === '1') {
             targetMessages = chat.message.slice(-1)
-          } else if (config.contextDepth === '5') {
+          } else if (configRef.current.contextDepth === '5') {
             targetMessages = chat.message.slice(-5)
-          } else if (config.contextDepth === '10') {
+          } else if (configRef.current.contextDepth === '10') {
             targetMessages = chat.message.slice(-10)
           }
           
@@ -1112,7 +1145,7 @@ ${loreText}`
     const activeId = targetThreadId || activeThreadId
     if (!queryText.trim() || loading || !api || !activeId) return
 
-    setLoading(true)
+    updateLoading(true)
 
     // Add user message to state
     const userMsg: OocMessage = {
@@ -1162,6 +1195,9 @@ ${loreText}`
     await executeLLMCall(aiMsgId, currentThreadMsgs, activeId)
   }
 
+  const triggerSendRef = useRef(triggerSend)
+  triggerSendRef.current = triggerSend
+
   // Helper to execute LLM API call and update state/storage
   const executeLLMCall = async (aiMsgId: string, currentThreadMsgs: OocMessage[], activeId: string) => {
     let aiContent = ''
@@ -1206,11 +1242,11 @@ ${loreText}`
         }
       })
 
-      if (config.provider === 'risu') {
+      if (configRef.current.provider === 'risu') {
         // --- Option 1: RisuAI Built-in LLM Model ---
         const response = await api.runLLMModel({
           messages: messagesToSend as any[],
-          mode: config.customModelMode,
+          mode: configRef.current.customModelMode,
           allowPlugins: true
         })
 
@@ -1223,13 +1259,16 @@ ${loreText}`
           updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId)
         } else if (response.type === 'streaming') {
           const reader = response.result.getReader()
+          const streamEnabled = configRef.current.streamResponse ?? true
           try {
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
               if (value && typeof value['0'] === 'string') {
                 aiContent = value['0']
-                updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+                if (streamEnabled) {
+                  updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+                }
               }
             }
             updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
@@ -1242,7 +1281,7 @@ ${loreText}`
 
       } else {
         // --- Option 2: Custom OpenAI Compatible API ---
-        if (!config.customApiUrl) {
+        if (!configRef.current.customApiUrl) {
           throw new Error('외부 API Base URL이 구성되지 않았습니다.')
         }
 
@@ -1250,16 +1289,18 @@ ${loreText}`
           'Content-Type': 'application/json'
         }
 
-        if (config.customApiKey) {
-          await api.saveSecretHeader('btw_custom_auth', 'Bearer ', config.customApiKey)
+        if (configRef.current.customApiKey) {
+          await api.saveSecretHeader('btw_custom_auth', 'Bearer ', configRef.current.customApiKey)
           headers['Authorization'] = { secretHeader: 'btw_custom_auth' }
         }
 
-        const fetchUrl = `${config.customApiUrl.replace(/\/$/, '')}/chat/completions`
+        const fetchUrl = `${configRef.current.customApiUrl.replace(/\/$/, '')}/chat/completions`
+        const streamEnabled = configRef.current.streamResponse ?? true
+
         const body = {
-          model: config.customModel,
+          model: configRef.current.customModel,
           messages: messagesToSend,
-          stream: true
+          stream: streamEnabled
         }
 
         const res = await api.nativeFetch(fetchUrl, {
@@ -1273,43 +1314,53 @@ ${loreText}`
           throw new Error(`API 오류 (${res.status}): ${errText || res.statusText}`)
         }
 
-        const reader = res.body?.getReader()
-        if (!reader) {
-          throw new Error('응답 스트림을 읽을 수 없습니다.')
-        }
+        if (streamEnabled) {
+          const reader = res.body?.getReader()
+          if (!reader) {
+            throw new Error('응답 스트림을 읽을 수 없습니다.')
+          }
 
-        const decoder = new TextDecoder()
-        let buffer = ''
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
+          const decoder = new TextDecoder()
+          let buffer = ''
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
 
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
 
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (trimmed.startsWith('data: ')) {
-                const dataStr = trimmed.slice(6)
-                if (dataStr === '[DONE]') break
-                try {
-                  const json = JSON.parse(dataStr)
-                  const chunkText = json.choices?.[0]?.delta?.content || ''
-                  if (chunkText) {
-                    aiContent += chunkText
-                    updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+              for (const line of lines) {
+                const trimmed = line.trim()
+                if (trimmed.startsWith('data: ')) {
+                  const dataStr = trimmed.slice(6)
+                  if (dataStr === '[DONE]') break
+                  try {
+                    const json = JSON.parse(dataStr)
+                    const chunkText = json.choices?.[0]?.delta?.content || ''
+                    if (chunkText) {
+                      aiContent += chunkText
+                      updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+                    }
+                  } catch (e) {
+                    // ignore JSON parse error
                   }
-                } catch (e) {
-                  // ignore JSON parse error
                 }
               }
             }
+            updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
+          } finally {
+            reader.releaseLock()
           }
+        } else {
+          const json = await res.json()
+          const content = json.choices?.[0]?.message?.content || ''
+          if (!content) {
+            throw new Error('API로부터 응답 내용을 받지 못했습니다.')
+          }
+          aiContent = content
           updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
-        } finally {
-          reader.releaseLock()
         }
       }
 
@@ -1318,7 +1369,7 @@ ${loreText}`
       aiContent = `⚠️ 오류가 발생했습니다: ${e.message || e}`
       updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId)
     } finally {
-      setLoading(false)
+      updateLoading(false)
     }
   }
 
@@ -1329,7 +1380,7 @@ ${loreText}`
     const lastMsg = messages[messages.length - 1]
     if (lastMsg.role !== 'ai') return
 
-    setLoading(true)
+    updateLoading(true)
 
     const currentThreadMsgs = messages.slice(0, -1)
     setMessages(currentThreadMsgs)
@@ -1365,7 +1416,7 @@ ${loreText}`
     const msgIndex = messages.findIndex(m => m.id === msgId)
     if (msgIndex === -1) return
 
-    setLoading(true)
+    updateLoading(true)
 
     // Truncate messages after the edited message, and update the edited message's content
     const truncatedMsgs = messages.slice(0, msgIndex + 1).map((m, idx) => {
@@ -1425,7 +1476,7 @@ ${loreText}`
         const newId = await handleCreateNewThreadRef.current(query)
         if (newId) {
           setTimeout(() => {
-            triggerSend(query, newId)
+            triggerSendRef.current(query, newId)
           }, 150)
         }
       }
@@ -1619,6 +1670,16 @@ ${loreText}`
               style={{ width: 'auto', cursor: 'pointer' }}
               checked={config.renderMarkdown}
               onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
+            />
+          </div>
+          <div className="btw-control-row">
+            <label htmlFor="stream-response" style={{ cursor: 'pointer' }}>실시간 스트리밍 활성화</label>
+            <input 
+              type="checkbox"
+              id="stream-response"
+              style={{ width: 'auto', cursor: 'pointer' }}
+              checked={config.streamResponse ?? true}
+              onChange={(e) => saveConfig({ ...config, streamResponse: e.target.checked })}
             />
           </div>
         </div>

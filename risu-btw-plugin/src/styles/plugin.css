@@ -475,6 +475,10 @@ button.icon-only {
 }
 
 /* Markdown Rendering Content Styling */
+.btw-markdown-content {
+  white-space: normal;
+}
+
 .btw-markdown-content p {
   margin: 0 0 0.5rem 0;
   line-height: 1.4;
@@ -518,6 +522,7 @@ button.icon-only {
   border-radius: 4px;
   overflow-x: auto;
   margin: 0.5rem 0;
+  white-space: pre;
 }
 
 .dark-theme .btw-markdown-content pre {

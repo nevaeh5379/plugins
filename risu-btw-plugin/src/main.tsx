@@ -69,7 +69,6 @@ if (isPlugin) {
           const query = trimmed.replace(/^\/btw\s*/, '')
 
           if (!appRoot) appRoot = mountApp()
-          window.dispatchEvent(new CustomEvent('risu-editor:reload'))
           api.showContainer('fullscreen').catch((err) => {
             console.error('[BTW Plugin] Failed to show container:', err)
           })
