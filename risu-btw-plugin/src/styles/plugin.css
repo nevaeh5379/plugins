@@ -646,3 +646,74 @@ button.btw-btn-sm {
     font-size: 0.85rem;
   }
 }
+
+/* Collapsible Reasoning Block */
+.btw-reasoning-container {
+  margin-top: 0.25rem;
+  margin-bottom: 0.6rem;
+  border-left: 2px solid var(--btw-fg-dim);
+  background: var(--btw-bg-msg-user);
+  border-radius: 2px;
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+
+.btw-reasoning-header {
+  padding: 0.35rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  user-select: none;
+  border-bottom: 1px dashed var(--btw-border);
+  color: var(--btw-fg-muted);
+  font-weight: 500;
+}
+
+.btw-reasoning-header:hover {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--btw-fg);
+}
+
+.dark-theme .btw-reasoning-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btw-reasoning-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.btw-reasoning-icon {
+  flex-shrink: 0;
+  color: var(--btw-fg-muted);
+}
+
+.btw-reasoning-title {
+  font-size: 0.78rem;
+}
+
+.btw-reasoning-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: var(--btw-fg-dim);
+}
+
+.btw-reasoning-body {
+  padding: 0.5rem 0.6rem;
+  color: var(--btw-fg-muted);
+  font-style: italic;
+  max-height: 250px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.btw-reasoning-body::-webkit-scrollbar {
+  width: 4px;
+}
+.btw-reasoning-body::-webkit-scrollbar-thumb {
+  background: var(--btw-fg-dim);
+  border-radius: 2px;
+}
+

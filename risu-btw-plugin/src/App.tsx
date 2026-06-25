@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit } from 'lucide-react'
+import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit, Brain, ChevronDown, ChevronUp } from 'lucide-react'
 import './styles/plugin.css'
 import { marked } from 'marked'
 
@@ -62,6 +62,80 @@ const RenderedMessage: React.FC<{ content: string; enabled: boolean }> = ({ cont
     return <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{content}</div>
   }
 }
+
+interface ParsedMessage {
+  reasoning: string
+  cleanContent: string
+  hasOpenThink: boolean
+}
+
+const parseMessage = (text: string): ParsedMessage => {
+  if (!text) {
+    return { reasoning: '', cleanContent: '', hasOpenThink: false }
+  }
+
+  let reasoning = ''
+  let cleanContent = text
+  let hasOpenThink = false
+
+  // 1. Check for complete <think>...</think> or <thought>...</thought> tags
+  const thinkRegex = /<(think|thought)>([\s\S]*?)<\/\1>/gi
+  const reasonings: string[] = []
+  
+  cleanContent = text.replace(thinkRegex, (match, tag, innerText) => {
+    reasonings.push(innerText.trim())
+    return ''
+  })
+
+  // 2. Check for open-ended <think> or <thought> tags (typically when streaming)
+  const openTagMatch = /<(think|thought)>([\s\S]*)$/i.exec(cleanContent)
+  if (openTagMatch) {
+    reasonings.push(openTagMatch[2].trim())
+    cleanContent = cleanContent.slice(0, openTagMatch.index)
+    hasOpenThink = true
+  }
+
+  reasoning = reasonings.join('\n\n').trim()
+  cleanContent = cleanContent.trim()
+
+  return { reasoning, cleanContent, hasOpenThink }
+}
+
+const CollapsibleReasoning: React.FC<{ content: string; enabled: boolean; isStreaming: boolean }> = ({ content, enabled, isStreaming }) => {
+  const [isOpen, setIsOpen] = useState(isStreaming)
+
+  useEffect(() => {
+    if (isStreaming) {
+      setIsOpen(true)
+    }
+  }, [isStreaming])
+
+  if (!content) return null
+
+  return (
+    <div className="btw-reasoning-container">
+      <div 
+        className="btw-reasoning-header" 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ cursor: 'pointer' }}
+      >
+        <Brain size={14} className="btw-reasoning-icon" />
+        <span className="btw-reasoning-title">
+          {isStreaming ? '추론 중...' : '추론 과정'}
+        </span>
+        <span className="btw-reasoning-toggle">
+          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </div>
+      {isOpen && (
+        <div className="btw-reasoning-body">
+          <RenderedMessage content={content} enabled={enabled} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<PluginConfig>(DEFAULT_CONFIG)
@@ -1322,6 +1396,7 @@ ${loreText}`
 
           const decoder = new TextDecoder()
           let buffer = ''
+          let aiReasoning = ''
           try {
             while (true) {
               const { done, value } = await reader.read()
@@ -1338,10 +1413,20 @@ ${loreText}`
                   if (dataStr === '[DONE]') break
                   try {
                     const json = JSON.parse(dataStr)
-                    const chunkText = json.choices?.[0]?.delta?.content || ''
-                    if (chunkText) {
+                    const delta = json.choices?.[0]?.delta
+                    const chunkText = delta?.content || ''
+                    const reasoningText = delta?.reasoning_content || ''
+
+                    if (reasoningText) {
+                      aiReasoning += reasoningText
+                      const formattedContent = `<think>${aiReasoning}`
+                      updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false)
+                    } else if (chunkText) {
                       aiContent += chunkText
-                      updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+                      const formattedContent = aiReasoning
+                        ? `<think>${aiReasoning}</think>\n${aiContent}`
+                        : aiContent
+                      updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false)
                     }
                   } catch (e) {
                     // ignore JSON parse error
@@ -1349,17 +1434,21 @@ ${loreText}`
                 }
               }
             }
-            updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
+            const finalContent = aiReasoning
+              ? `<think>${aiReasoning}</think>\n${aiContent}`
+              : aiContent
+            updateAiMessage(aiMsgId, finalContent, currentThreadMsgs, activeId, true)
           } finally {
             reader.releaseLock()
           }
         } else {
           const json = await res.json()
           const content = json.choices?.[0]?.message?.content || ''
-          if (!content) {
+          const reasoning = json.choices?.[0]?.message?.reasoning_content || ''
+          if (!content && !reasoning) {
             throw new Error('API로부터 응답 내용을 받지 못했습니다.')
           }
-          aiContent = content
+          aiContent = reasoning ? `<think>${reasoning}</think>\n${content}` : content
           updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
         }
       }
@@ -1740,7 +1829,30 @@ ${loreText}`
                     </div>
                   ) : (
                     <div className="btw-msg-content">
-                      <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                      {m.role === 'ai' ? (
+                        (() => {
+                          const { reasoning, cleanContent, hasOpenThink } = parseMessage(m.content)
+                          return (
+                            <>
+                              {reasoning && (
+                                <CollapsibleReasoning 
+                                  content={reasoning} 
+                                  enabled={config.renderMarkdown ?? true} 
+                                  isStreaming={loading && idx === messages.length - 1 && hasOpenThink} 
+                                />
+                              )}
+                              {cleanContent && (
+                                <RenderedMessage content={cleanContent} enabled={config.renderMarkdown ?? true} />
+                              )}
+                              {!cleanContent && !reasoning && m.content && (
+                                <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                              )}
+                            </>
+                          )
+                        })()
+                      ) : (
+                        <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                      )}
                       <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
                         {m.role === 'user' && !loading && (
                           <button 

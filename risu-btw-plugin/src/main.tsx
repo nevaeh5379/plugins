@@ -35,10 +35,21 @@ if (isPlugin) {
     try {
       let appRoot: ReturnType<typeof createRoot> | null = mountApp()
 
+      const showBtwContainer = async () => {
+        try {
+          if (api && typeof api.getDatabase === 'function') {
+            await api.getDatabase()
+          }
+        } catch (error) {
+          console.error('[BTW Plugin] Pre-fetching database for permission failed:', error)
+        }
+        await api.showContainer('fullscreen')
+      }
+
       const openBtwPanel = async () => {
         if (!appRoot) appRoot = mountApp()
         window.dispatchEvent(new CustomEvent('risu-editor:reload'))
-        await api.showContainer('fullscreen')
+        await showBtwContainer()
       }
 
       // 1. Register Setting menu item
@@ -69,7 +80,7 @@ if (isPlugin) {
           const query = trimmed.replace(/^\/btw\s*/, '')
 
           if (!appRoot) appRoot = mountApp()
-          api.showContainer('fullscreen').catch((err) => {
+          showBtwContainer().catch((err) => {
             console.error('[BTW Plugin] Failed to show container:', err)
           })
 
