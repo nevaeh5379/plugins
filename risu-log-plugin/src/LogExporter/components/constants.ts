@@ -1,0 +1,280 @@
+import type { ThemeInfo, ColorPalette, ThemeKey, ColorKey } from '../../types/index';
+
+// (기존 코드의 THEMES, COLORS 객체를 여기에 붙여넣고 타입을 지정합니다)
+export const THEMES: Record<ThemeKey, ThemeInfo> = {
+    basic: {
+        name: '기본',
+        description: '가장 일반적인 말풍선 디자인입니다. 색상 팔레트를 자유롭게 변경할 수 있습니다.'
+        // 이 테마는 COLORS 객체에서 선택된 색상을 사용합니다.
+    },
+    custom: {
+        name: '커스텀 (CSS)',
+        description: '사용자가 직접 CSS를 작성하여 테마를 꾸밀 수 있습니다.'
+    },
+    modern: {
+        name: '현대',
+        description: '카드형 UI와 깔끔한 선으로 구성된 모던한 다크 디자인입니다.',
+        // 고정 다크 색상 값
+        color: {
+            background: '#1c1e22', cardBg: '#282a2e', cardBgUser: '#282a2e',
+            text: '#d1d5db', nameColor: '#8fbaff', border: '#373b41',
+            shadow: '0 4px 12px rgba(0,0,0,0.3)', avatarBorder: '#8fbaff',
+            // [추가] 하이라이트 색상
+            quoteBg: 'rgba(143, 186, 255, 0.1)', quoteText: '#a1c6ff',
+            thoughtBg: 'rgba(209, 213, 219, 0.08)', thoughtText: '#b0b8c4'
+        }
+    },
+    smart: {
+        name: '스마트',
+        description: '세련된 글래스모피즘 효과와 부드러운 곡선을 가진 현대적인 디자인입니다.',
+        color: {
+            background: '#21252b', 
+            cardBg: 'rgba(40, 44, 52, 0.7)', 
+            cardBgUser: 'rgba(60, 64, 72, 0.7)',
+            text: '#eceff4', 
+            nameColor: '#61afef', 
+            border: 'rgba(171, 178, 191, 0.2)',
+            shadow: '0 8px 32px rgba(0, 0, 0, 0.2)', 
+            avatarBorder: 'transparent',
+            quoteBg: 'rgba(97, 175, 239, 0.15)', 
+            quoteText: '#98c379',
+            thoughtBg: 'rgba(198, 120, 221, 0.1)', 
+            thoughtText: '#d19a66',
+            soundBg: 'rgba(224, 108, 117, 0.1)', 
+            soundText: '#e06c75',
+            separator: '#3e4451',
+            textSecondary: '#abb2bf'
+        }
+    },
+    simple: {
+        name: '심플',
+        description: '이미지와 장식을 최소화하여 텍스트에 집중할 수 있는 간결한 디자인입니다.',
+        color: {
+            background: '#ffffff',
+            cardBg: 'transparent',
+            cardBgUser: 'transparent',
+            text: '#333333',
+            textSecondary: '#666666',
+            nameColor: '#000000',
+            border: '#dddddd',
+            shadow: 'none',
+            avatarBorder: 'none',
+            quoteBg: '#f5f5f5',
+            quoteText: '#555555',
+            thoughtBg: '#f9f9f9',
+            thoughtText: '#777777'
+        }
+    },
+    log: {
+    name: '로그',
+    description: '채팅 로그처럼 보이는 간단한 테마입니다.',
+  },
+  raw: {
+    name: 'Raw',
+    description: '원본 HTML 형식으로 렌더링합니다.',
+  },
+};
+
+export const COLORS: Record<ColorKey, ColorPalette> = {
+    dark: {
+        name: '다크 (모던)',
+        background: '#0f1117',
+        cardBg: '#1c1e26',
+        cardBgUser: '#252834',
+        text: '#e4e6eb',
+        textSecondary: '#b8bcc8',
+        nameColor: '#61afef',
+        border: '#2e3240',
+        quoteBg: 'rgba(97, 175, 239, 0.12)',
+        quoteText: '#89c4f4',
+        thoughtBg: 'rgba(198, 120, 221, 0.12)',
+        thoughtText: '#c98edd',
+        soundBg: 'rgba(152, 195, 121, 0.12)',
+        soundText: '#98c379',
+        shadow: '0 6px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+        avatarBorder: '#61afef'
+    },
+    classic: {
+        name: '클래식',
+        background: '#1a1b26',
+        cardBg: '#24283b',
+        cardBgUser: '#414868',
+        text: '#c0caf5',
+        textSecondary: '#8a98c9',
+        nameColor: '#7aa2f7',
+        border: '#414868',
+        quoteBg: 'rgba(187, 154, 247, 0.15)',
+        quoteText: '#d8e2ff',
+        thoughtBg: 'rgba(122, 162, 247, 0.15)',
+        thoughtText: '#a9d1ff',
+        soundBg: 'rgba(158, 206, 106, 0.15)',
+        soundText: '#b8e090',
+        shadow: '0 4px 6px rgba(0,0,0,0.3)',
+        avatarBorder: '#565f89'
+    },
+    light: {
+        name: '라이트',
+        background: '#ffffff',
+        cardBg: '#f8f9fa',
+        cardBgUser: '#e3f2fd',
+        text: '#212529',
+        textSecondary: '#6c757d',
+        nameColor: '#0066cc',
+        border: '#dee2e6',
+        quoteBg: 'rgba(108, 117, 125, 0.1)',
+        quoteText: '#495057',
+        thoughtBg: 'rgba(0, 102, 204, 0.1)',
+        thoughtText: '#004085',
+        soundBg: 'rgba(40, 167, 69, 0.1)',
+        soundText: '#155724',
+        shadow: '0 2px 4px rgba(0,0,0,0.1)',
+        avatarBorder: '#0066cc'
+    },
+    sepia: {
+        name: '세피아',
+        background: '#f4f1ea',
+        cardBg: '#fff8f0',
+        cardBgUser: '#f5e6d3',
+        text: '#3a3029',
+        textSecondary: '#6b5d4f',
+        nameColor: '#8b4513',
+        border: '#d4c5b0',
+        quoteBg: 'rgba(139, 69, 19, 0.1)',
+        quoteText: '#704214',
+        thoughtBg: 'rgba(160, 82, 45, 0.1)',
+        thoughtText: '#8b4513',
+        soundBg: 'rgba(107, 142, 35, 0.1)',
+        soundText: '#556b2f',
+        shadow: '0 2px 4px rgba(139,69,19,0.2)',
+        avatarBorder: '#a0522d'
+    },
+    ocean: {
+        name: '오션',
+        background: '#0a192f',
+        cardBg: '#172a45',
+        cardBgUser: '#1e3a5f',
+        text: '#ccd6f6',
+        textSecondary: '#8892b0',
+        nameColor: '#64ffda',
+        border: '#233554',
+        quoteBg: 'rgba(100, 255, 218, 0.1)',
+        quoteText: '#64ffda',
+        thoughtBg: 'rgba(99, 179, 237, 0.1)',
+        thoughtText: '#63b3ed',
+        soundBg: 'rgba(255, 107, 107, 0.1)',
+        soundText: '#ff6b6b',
+        shadow: '0 4px 6px rgba(0,0,0,0.4)',
+        avatarBorder: '#64ffda'
+    },
+    forest: {
+        name: '포레스트',
+        background: '#1a2f1a',
+        cardBg: '#2d4a2b',
+        cardBgUser: '#3e5c3a',
+        text: '#e8f5e9',
+        textSecondary: '#a5d6a7',
+        nameColor: '#81c784',
+        border: '#4a6741',
+        quoteBg: 'rgba(129, 199, 132, 0.15)',
+        quoteText: '#a5d6a7',
+        thoughtBg: 'rgba(102, 187, 106, 0.15)',
+        thoughtText: '#81c784',
+        soundBg: 'rgba(255, 193, 7, 0.15)',
+        soundText: '#ffd54f',
+        shadow: '0 4px 6px rgba(0,0,0,0.3)',
+        avatarBorder: '#66bb6a'
+    },
+    sunset: {
+        name: '선셋',
+        background: '#2d1b69',
+        cardBg: '#4a2c7a',
+        cardBgUser: '#6b3aa0',
+        text: '#ffd4e5',
+        textSecondary: '#d4a5a5',
+        nameColor: '#ff9a9e',
+        border: '#6b3aa0',
+        quoteBg: 'rgba(255, 154, 158, 0.15)',
+        quoteText: '#ffd4e5',
+        thoughtBg: 'rgba(250, 208, 196, 0.15)',
+        thoughtText: '#fad0c4',
+        soundBg: 'rgba(254, 200, 154, 0.15)',
+        soundText: '#fec89a',
+        shadow: '0 4px 8px rgba(45,27,105,0.4)',
+        avatarBorder: '#ff9a9e'
+    },
+    cyberpunk: {
+        name: '사이버펑크',
+        background: '#0a0e27',
+        cardBg: '#1a1e3a',
+        cardBgUser: '#2d1b69',
+        text: '#00ffff',
+        textSecondary: '#ff00ff',
+        nameColor: '#ffff00',
+        border: '#ff00ff',
+        quoteBg: 'rgba(255, 0, 255, 0.2)',
+        quoteText: '#ff00ff',
+        thoughtBg: 'rgba(0, 255, 255, 0.2)',
+        thoughtText: '#00ffff',
+        soundBg: 'rgba(255, 255, 0, 0.2)',
+        soundText: '#ffff00',
+        shadow: '0 0 20px rgba(255,0,255,0.5)',
+        avatarBorder: '#00ffff'
+    },
+    monochrome: {
+        name: '모노크롬',
+        background: '#1a1a1a',
+        cardBg: '#2a2a2a',
+        cardBgUser: '#3a3a3a',
+        text: '#e0e0e0',
+        textSecondary: '#a0a0a0',
+        nameColor: '#ffffff',
+        border: '#4a4a4a',
+        quoteBg: 'rgba(255, 255, 255, 0.1)',
+        quoteText: '#ffffff',
+        thoughtBg: 'rgba(200, 200, 200, 0.1)',
+        thoughtText: '#d0d0d0',
+        soundBg: 'rgba(160, 160, 160, 0.1)',
+        soundText: '#b0b0b0',
+        shadow: '0 2px 4px rgba(0,0,0,0.5)',
+        avatarBorder: '#808080'
+    },
+    highcontrast: {
+        name: '하이 콘트라스트',
+        background: '#000000',
+        cardBg: '#111111',
+        cardBgUser: '#1e1e1e',
+        text: '#ffffff',
+        textSecondary: '#d0d0d0',
+        nameColor: '#ffffff',
+        border: '#3d3d3d',
+        quoteBg: 'rgba(255,255,255,0.08)',
+        quoteText: '#ffffff',
+        thoughtBg: 'rgba(255,255,255,0.08)',
+        thoughtText: '#ffffff',
+        soundBg: 'rgba(255,255,255,0.08)',
+        soundText: '#ffffff',
+        shadow: '0 0 0 1px rgba(255,255,255,0.04), 0 4px 8px rgba(0,0,0,0.8)',
+        avatarBorder: '#ffffff'
+    },
+    darkcontrast: {
+        name: '다크 하이 콘트라스트',
+        background: '#0b0f19',
+        cardBg: '#1b2330',
+        cardBgUser: '#263246',
+        text: '#ffffff',
+        textSecondary: '#c7d6ff',
+        nameColor: '#8fbaff',
+        border: '#3d5b99',
+        quoteBg: 'rgba(143,186,255,0.15)',
+        quoteText: '#ffffff',
+        thoughtBg: 'rgba(120,160,255,0.18)',
+        thoughtText: '#ffffff',
+        soundBg: 'rgba(255,200,120,0.18)',
+        soundText: '#ffd9a0',
+        shadow: '0 0 0 1px rgba(255,255,255,0.05), 0 6px 14px rgba(0,0,0,0.65)',
+        avatarBorder: '#6ba8ff'
+    }
+};
+
+
+export const AVATAR_ATTR = 'data-log-exporter-avatar';
