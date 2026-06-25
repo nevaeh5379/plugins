@@ -479,10 +479,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
 
     const handleClose = async () => {
         clearBlobUrlCache();
-        // React unmount를 먼저 수행하여 이벤트 핸들러/리스너를 정리한 뒤
-        // iframe을 숨깁니다. 순서가 중요: unmount → container.remove → hideContainer.
-        onClose();
+        // iframe을 먼저 숨겨 사용자 클릭이 iframe에 닿지 않도록 한 뒤
+        // React를 정리합니다. 순서가 중요: hideContainer → unmount → remove.
         await Risuai.hideContainer();
+        onClose();
     };
 
     // ESC 단축키로 닫기 (중복 호출 방지)
@@ -755,6 +755,8 @@ export const showCopyPreviewModal = async (options: {
   const handleClose = async () => {
     if (!isModalOpen) return;
     isModalOpen = false;
+    // iframe을 먼저 숨겨 클릭이 iframe에 닿지 않도록 한 뒤 React 정리
+    await Risuai.hideContainer();
     if (root) {
       root.unmount();
       root = null;
@@ -763,7 +765,6 @@ export const showCopyPreviewModal = async (options: {
       container.remove();
       container = null;
     }
-    await Risuai.hideContainer();
   };
 
   root.render(

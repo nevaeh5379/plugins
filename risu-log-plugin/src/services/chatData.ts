@@ -42,41 +42,29 @@ export async function ensureRootDoc(): Promise<SafeDocument | null> {
 }
 
 /**
- * 사이드바에서 현재 캐릭터의 아바타 URL을 추출합니다.
- * RisuAI SidebarAvatar 컴포넌트는 data-char-id 속성과 background-image 스타일을 사용합니다.
- * character.chaId로 사이드바에서 정확히 해당 캐릭터의 아바타를 찾습니다.
+ * 캐릭터 아바타를 data URL로 추출합니다.
+ * RisuAI의 character.image는 asset id(예: "assets/...")입니다.
+ * Risuai.readImage(assetId)로 원본 바이트를 가져와 data URL로 변환합니다.
+ * DOM 기반 추출(사이드바)은 폴더 아이콘 등과 혼동될 수 있어 사용하지 않습니다.
  */
-async function extractAvatarFromSidebar(rootDoc: SafeDocument, chaId: string): Promise<string> {
+async function extractAvatarDataUrl(imageAssetId: string): Promise<string> {
+  if (!imageAssetId) return ''
   try {
-    // 1순위: data-char-id 속성으로 정확히 해당 캐릭터의 아바타 요소 찾기
-    // SidebarAvatar.svelte가 data-char-id={chaId} 속성을 가지고 있음
-    const charEl = await rootDoc.querySelector(`[data-char-id="${chaId}"]`)
-    if (charEl) {
-      // 해당 요소 내부에서 background-image를 가진 .sidebar-avatar 찾기
-      const avatarEl = await charEl.querySelector('.sidebar-avatar')
-      if (avatarEl) {
-        const style = await avatarEl.getStyleAttribute()
-        const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/)
-        if (urlMatch && urlMatch[1] && !urlMatch[1].includes('none.webp')) {
-          return urlMatch[1]
-        }
-      }
-    }
-
-    // 2순위: 사이드바의 모든 .sidebar-avatar 중 background-image를 가진 첫 번째
-    const allAvatars = await rootDoc.querySelectorAll('.sidebar-avatar')
-    const avatarArr = await Risuai.unwarpSafeArray(allAvatars)
-    for (const el of avatarArr) {
-      const style = await el.getStyleAttribute()
-      const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/)
-      if (urlMatch && urlMatch[1] && !urlMatch[1].includes('none.webp')) {
-        return urlMatch[1]
-      }
-    }
+    const data = await Risuai.readImage(imageAssetId)
+    if (!data) return ''
+    // readImage는 Uint8Array를 반환합니다.
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
+    const blob = new Blob([bytes])
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('FileReader failed'))
+      reader.readAsDataURL(blob)
+    })
   } catch (e) {
-    console.error('[log plugin] Avatar extract error:', e)
+    console.warn('[log plugin] readImage avatar failed:', e)
+    return ''
   }
-  return ''
 }
 
 /**
@@ -103,11 +91,11 @@ export async function processChatLog(
   const charName = character?.name || 'Unknown'
   const chatName = chat?.name || `Chat ${targetChatIndex}`
 
-  // 아바타 URL은 DOM에서 추출 (asset id → URL 변환을 플러그인에서 직접 할 수 없으므로)
-  // character.chaId로 사이드바에서 정확히 해당 캐릭터의 아바타를 찾습니다.
+  // 아바타: Risuai.readImage(character.image)로 asset 데이터를 직접 가져와
+  // data URL로 변환합니다. DOM 추출(사이드바)은 폴더 아이콘 혼동 위험이 있어 사용하지 않습니다.
   let charAvatarUrl = ''
-  if (character?.chaId && rootDoc) {
-    charAvatarUrl = await extractAvatarFromSidebar(rootDoc, String(character.chaId))
+  if (character?.image) {
+    charAvatarUrl = await extractAvatarDataUrl(String(character.image))
   }
 
   // 메시지 DOM 노드 수집 (문서 순서)
