@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit, Brain, ChevronDown, ChevronUp } from 'lucide-react'
+import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit, Brain, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
 import './styles/plugin.css'
 import { marked } from 'marked'
 
@@ -33,6 +33,10 @@ interface PluginConfig {
   systemPrompt: string
   contextDepth: 'none' | '1' | '5' | '10' | 'full'
   includeLore: boolean
+  includeCharDesc: boolean
+  includeLorebook: boolean
+  includeUserPersona: boolean
+  disabledLorebookIds: string[]
   renderMarkdown: boolean
   streamResponse: boolean
 
@@ -60,11 +64,74 @@ const DEFAULT_CONFIG: PluginConfig = {
   systemPrompt: 'You are a BTW (Out-of-Character) Assistant. Answer the user\'s questions about the story, character, or world settings. Answer concisely as an assistant, not in roleplay.',
   contextDepth: '5',
   includeLore: true,
+  includeCharDesc: true,
+  includeLorebook: true,
+  includeUserPersona: true,
+  disabledLorebookIds: [],
   renderMarkdown: true,
   streamResponse: true
 }
 
 const api = typeof Risuai !== 'undefined' ? Risuai : (typeof risuai !== 'undefined' ? risuai : null);
+
+const isLorebookTriggered = (entry: any, messages: any[], depth: number, isFullWord: boolean) => {
+  if (entry.alwaysActive) return true;
+  const keys = (entry.key || '').split(',').map((k: string) => k.trim()).filter(Boolean);
+  if (keys.length === 0) return false;
+
+  const sliced = messages.slice(Math.max(0, messages.length - depth));
+  const mList = sliced.map((msg: any) => {
+    const data = msg.data || '';
+    const cleanData = data.toLowerCase().replace(/\{\{\/\/(.+?)\}\}/g, '').replace(/\{\{comment:(.+?)\}\}/g, '');
+    return { data: cleanData };
+  });
+
+  const checkMatch = (keyList: string[], useRegex: boolean) => {
+    if (useRegex) {
+      for (const mText of mList) {
+        for (const regexString of keyList) {
+          if (!regexString.startsWith('/')) continue;
+          const parts = regexString.split('/');
+          const flags = parts.pop() || '';
+          const pattern = parts.slice(1).join('/');
+          try {
+            const rx = new RegExp(pattern, flags);
+            if (rx.test(mText.data)) return true;
+          } catch (e) {
+            // ignore regexp errors
+          }
+        }
+      }
+      return false;
+    }
+
+    for (const m of mList) {
+      let mText = m.data;
+      if (isFullWord) {
+        const words = mText.split(' ');
+        for (const key of keyList) {
+          if (words.includes(key.toLowerCase())) return true;
+        }
+      } else {
+        const cleanMText = mText.replace(/ /g, '');
+        for (const key of keyList) {
+          const cleanKey = key.toLowerCase().replace(/ /g, '');
+          if (cleanKey && cleanMText.includes(cleanKey)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const firstMatch = checkMatch(keys, !!entry.useRegex);
+  if (entry.selective && entry.secondkey) {
+    const secondKeys = entry.secondkey.split(',').map((k: string) => k.trim()).filter(Boolean);
+    if (secondKeys.length > 0) {
+      return firstMatch && checkMatch(secondKeys, !!entry.useRegex);
+    }
+  }
+  return firstMatch;
+};
 
 const RenderedMessage: React.FC<{ content: string; enabled: boolean }> = ({ content, enabled }) => {
   if (!enabled) {
@@ -174,7 +241,9 @@ export const App: React.FC = () => {
     setLoading(val)
     isLoadingRef.current = val
   }
-  const [showSettings, setShowSettings] = useState(false)
+  const [activeTab, setActiveTab] = useState<'chat' | 'settings'>('chat')
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'connection' | 'prompt' | 'context'>('connection')
+  const [loadingSettings, setLoadingSettings] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   
@@ -187,6 +256,11 @@ export const App: React.FC = () => {
   const [characterId, setCharacterId] = useState<string>('default')
   const [characterName, setCharacterName] = useState<string>('Character')
   const [chatIndex, setChatIndex] = useState<number>(0)
+  const [availableLoreEntries, setAvailableLoreEntries] = useState<any[]>([])
+  const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({})
+  const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [loreDepth, setLoreDepth] = useState<number>(10)
+  const [fullWordMatching, setFullWordMatching] = useState<boolean>(false)
   
   const [toastMessage, setToastMessage] = useState('')
   const [showToast, setShowToast] = useState(false)
@@ -245,7 +319,7 @@ export const App: React.FC = () => {
 
       if (char) {
         const charId = char.chaId || 'default'
-
+        
         // 3. Load thread list for this character/chat
         const threadsKey = `btw_threads_${charId}_${activeChatIndex}`
         let savedThreads = await storage.getItem<OocThread[]>(threadsKey) || []
@@ -301,7 +375,11 @@ export const App: React.FC = () => {
             ...prev,
             ...savedConfig,
             customEndpoints: migratedEndpoints,
-            activeEndpointId: activeEpId
+            activeEndpointId: activeEpId,
+            includeCharDesc: savedConfig.includeCharDesc !== undefined ? savedConfig.includeCharDesc : (savedConfig.includeLore ?? true),
+            includeLorebook: savedConfig.includeLorebook !== undefined ? savedConfig.includeLorebook : (savedConfig.includeLore ?? true),
+            includeUserPersona: savedConfig.includeUserPersona !== undefined ? savedConfig.includeUserPersona : false,
+            disabledLorebookIds: savedConfig.disabledLorebookIds || []
           }))
         }
         setCharacterId(charId)
@@ -332,6 +410,37 @@ export const App: React.FC = () => {
       triggerToast('데이터를 불러오지 못했습니다.')
     }
   }, [triggerToast])
+
+  // Load settings data on demand to prevent iframe mount freeze
+  const handleOpenSettings = async () => {
+    setActiveTab('settings')
+    setLoadingSettings(true)
+    try {
+      if (api) {
+        const char = await api.getCharacter()
+        const activeChatIndex = await api.getCurrentChatIndex()
+        if (char) {
+          const charIndex = await api.getCurrentCharacterIndex()
+          const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
+          const characterLore = char.globalLore ?? []
+          const chatLore = chat?.localLore ?? []
+          const mappedCharLore = characterLore.map((e: any) => ({ ...e, isCharLore: true }))
+          const mappedChatLore = chatLore.map((e: any) => ({ ...e, isCharLore: false }))
+          setAvailableLoreEntries(mappedCharLore.concat(mappedChatLore))
+          
+          const db = await api.getDatabase()
+          setChatMessages(chat?.message || [])
+          setLoreDepth(char?.loreSettings?.scanDepth ?? db?.loreBookDepth ?? 10)
+          setFullWordMatching(db?.fullWordMatching ?? false)
+        }
+      }
+    } catch (e) {
+      console.error('[BTW Settings] Lazy load error:', e)
+      triggerToast('설정 데이터를 불러오는 데 실패했습니다.')
+    } finally {
+      setLoadingSettings(false)
+    }
+  }
 
   // Save config settings
   const saveConfig = async (newConfig: PluginConfig) => {
@@ -1290,34 +1399,59 @@ export const App: React.FC = () => {
       // Also render the system prompt itself, in case it contains macros like {{char}} or {{user}}
       systemPromptContent = evaluateCBS(parseCBS(systemPromptContent), contextData)
       
-      if (configRef.current.includeLore && char) {
-        // Exclude module lorebooks by fetching globalLore and chat localLore directly
-        const charIndex = await api.getCurrentCharacterIndex()
-        const activeChatIndex = await api.getCurrentChatIndex()
-        const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
-        
-        const characterLore = char.globalLore ?? []
-        const chatLore = chat?.localLore ?? []
-        const rawLoreEntries = characterLore.concat(chatLore)
+      const hasActiveContext = 
+        configRef.current.includeCharDesc || 
+        configRef.current.includeLorebook || 
+        configRef.current.includeUserPersona;
 
-        const loreText = rawLoreEntries && rawLoreEntries.length > 0 
-          ? rawLoreEntries.map((e: any, i: number) => {
-              const renderedKey = evaluateCBS(parseCBS(e.key || ''), contextData)
-              const renderedContent = evaluateCBS(parseCBS(e.content || ''), contextData)
-              return `[Lore Entry #${i+1}]\nKeys: ${renderedKey}\nContent: ${renderedContent}`
-            }).join('\n\n')
-          : 'None'
+      if (hasActiveContext && char) {
+        let contextBlock = `\n\n[Active Character Context]\nCharacter Name: ${charName}`
 
-        const renderedDesc = evaluateCBS(parseCBS(char.desc || char.description || ''), contextData)
-        const renderedPers = evaluateCBS(parseCBS(char.personality || ''), contextData)
+        if (configRef.current.includeCharDesc) {
+          const renderedDesc = evaluateCBS(parseCBS(char.desc || char.description || ''), contextData)
+          contextBlock += `\nDescription: ${renderedDesc}`
+        }
+        if (configRef.current.includeUserPersona) {
+          contextBlock += `\nUser Name: ${userName}`
+          if (userPersona) {
+            contextBlock += `\nUser Persona: ${userPersona}`
+          }
+        }
 
-        systemPromptContent += `\n\n[Active Character Context]
-Character Name: ${charName}
-Description: ${renderedDesc}
-Personality: ${renderedPers}
+        if (configRef.current.includeLorebook) {
+          // Exclude module lorebooks by fetching globalLore and chat localLore directly
+          const charIndex = await api.getCurrentCharacterIndex()
+          const activeChatIndex = await api.getCurrentChatIndex()
+          const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
+          
+          const characterLore = char.globalLore ?? []
+          const chatLore = chat?.localLore ?? []
+          const rawLoreEntries = characterLore.concat(chatLore)
 
-[Active World Lorebook]
-${loreText}`
+          const disabledIds = configRef.current.disabledLorebookIds || []
+          const db = await api.getDatabase()
+          const scanDepthVal = char?.loreSettings?.scanDepth ?? db?.loreBookDepth ?? 10
+          const isFullWordVal = db?.fullWordMatching ?? false
+          const chatMsgs = chat?.message || []
+
+          const activeLoreEntries = rawLoreEntries.filter((e: any) => {
+            if (e.mode === 'folder') return false;
+            if (disabledIds.includes(e.id)) return false;
+            return isLorebookTriggered(e, chatMsgs, scanDepthVal, isFullWordVal);
+          })
+
+          const loreText = activeLoreEntries && activeLoreEntries.length > 0 
+            ? activeLoreEntries.map((e: any, i: number) => {
+                const renderedKey = evaluateCBS(parseCBS(e.key || ''), contextData)
+                const renderedContent = evaluateCBS(parseCBS(e.content || ''), contextData)
+                return `[Lore Entry #${i+1}]\nKeys: ${renderedKey}\nContent: ${renderedContent}`
+              }).join('\n\n')
+            : 'None'
+
+          contextBlock += `\n\n[Active World Lorebook]\n${loreText}`
+        }
+
+        systemPromptContent += contextBlock
       }
 
       if (configRef.current.contextDepth !== 'none') {
@@ -1755,8 +1889,14 @@ ${loreText}`
           <h2>BTW - {characterName}</h2>
           <div className="btw-header-actions">
             <button 
-              className="icon-only" 
-              onClick={() => setShowSettings(!showSettings)}
+              className={`icon-only ${activeTab === 'settings' ? 'primary' : ''}`}
+              onClick={() => {
+                if (activeTab === 'chat') {
+                  handleOpenSettings()
+                } else {
+                  setActiveTab('chat')
+                }
+              }}
               title="설정"
             >
               <Settings size={16} />
@@ -1771,446 +1911,656 @@ ${loreText}`
           </div>
         </div>
 
-        {/* Thread Session Selector Bar */}
-        <div className="btw-thread-bar">
-          <select
-            value={activeThreadId}
-            onChange={(e) => handleSelectThread(e.target.value)}
-            title="대화방 선택"
-            className="btw-thread-select"
-            disabled={loading}
-          >
-            {threads.map(t => (
-              <option key={t.id} value={t.id}>{t.title}</option>
-            ))}
-          </select>
+        {/* Tab Bar */}
+        <div className="btw-tab-bar">
           <button 
-            onClick={() => handleCreateNewThread()}
-            disabled={loading}
-            title="새 대화방 개설"
+            type="button"
+            className={`btw-tab-button ${activeTab === 'chat' ? 'active' : ''}`}
+            onClick={() => setActiveTab('chat')}
           >
-            <Plus size={14} /> 
+            대화창
           </button>
           <button 
-            className="danger icon-only"
-            onClick={handleDeleteThread}
-            disabled={loading || threads.length <= 1}
-            title="현재 대화방 삭제"
+            type="button"
+            className={`btw-tab-button ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={handleOpenSettings}
           >
-            <Trash2 size={14} />
+            설정
           </button>
         </div>
 
-        {/* Configuration settings panel */}
-        {showSettings && (
-          <div className="btw-settings-panel">
-            <h3>설정</h3>
-
-            <div className="btw-form-group">
-              <label>모델 프로바이더</label>
-              <select 
-                value={config.provider}
-                onChange={(e) => saveConfig({ ...config, provider: e.target.value as any })}
-              >
-                <option value="risu">RisuAI 모델 (추천)</option>
-                <option value="custom">외부 OpenAI 호환 API</option>
-              </select>
-            </div>
-
-            {config.provider === 'risu' ? (
-              <div className="btw-form-group">
-                <label>RisuAI 모델 모드</label>
-                <select 
-                  value={config.customModelMode}
-                  onChange={(e) => saveConfig({ ...config, customModelMode: e.target.value as any })}
-                >
-                  <option value="model">채팅방 메인 모델</option>
-                  <option value="otherAx">보조 모델 (Other Ax)</option>
-                </select>
-              </div>
-            ) : (
-              <>
-                <div className="btw-form-group">
-                  <label>외부 API 설정 선택</label>
-                  <div className="btw-endpoint-selector-row">
-                    <select
-                      value={config.activeEndpointId}
-                      onChange={(e) => saveConfig({ ...config, activeEndpointId: e.target.value })}
-                    >
-                      {(config.customEndpoints || []).map(ep => (
-                        <option key={ep.id} value={ep.id}>{ep.name}</option>
-                      ))}
-                    </select>
-                    <button 
-                      onClick={handleAddEndpoint}
-                      title="API 설정 추가"
-                      type="button"
-                    >
-                      <Plus size={14} />
-                    </button>
-                    <button 
-                      className="danger"
-                      onClick={() => handleDeleteEndpoint(config.activeEndpointId)}
-                      disabled={(config.customEndpoints || []).length <= 1}
-                      title="API 설정 삭제"
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {(() => {
-                  const activeEp = (config.customEndpoints || []).find(e => e.id === config.activeEndpointId)
-                  if (!activeEp) return null
-                  return (
-                    <>
-                      <div className="btw-form-group">
-                        <label>설정 이름</label>
-                        <input 
-                          type="text" 
-                          value={activeEp.name}
-                          onChange={(e) => handleUpdateActiveEndpoint({ name: e.target.value })}
-                          onBlur={() => saveConfig(config)}
-                          placeholder="예: OpenAI, OpenRouter 등"
-                        />
-                      </div>
-                      <div className="btw-form-group">
-                        <label>API Base URL</label>
-                        <input 
-                          type="text" 
-                          value={activeEp.apiUrl}
-                          onChange={(e) => handleUpdateActiveEndpoint({ apiUrl: e.target.value })}
-                          onBlur={() => saveConfig(config)}
-                          placeholder="https://api.openai.com/v1"
-                        />
-                      </div>
-                      <div className="btw-form-group">
-                        <label>API Key</label>
-                        <input 
-                          type="password" 
-                          value={activeEp.apiKey}
-                          onChange={(e) => handleUpdateActiveEndpoint({ apiKey: e.target.value })}
-                          onBlur={() => saveConfig(config)}
-                          placeholder="sk-..."
-                        />
-                      </div>
-                      <div className="btw-form-group">
-                        {((fetchedModels[activeEp.id] || []).length > 0 && !customInputMode[activeEp.id]) ? (
-                          <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
-                              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                <button
-                                  type="button"
-                                  className="btw-btn-sm"
-                                  style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
-                                  onClick={() => handleFetchModels(activeEp)}
-                                  disabled={fetchingModels[activeEp.id]}
-                                >
-                                  {fetchingModels[activeEp.id] ? '불러오는 중...' : '다시 가져오기'}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btw-btn-sm"
-                                  style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
-                                  onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))}
-                                >
-                                  직접 입력
-                                </button>
-                              </div>
-                            </div>
-                            <select
-                              value={activeEp.model}
-                              onChange={(e) => {
-                                if (e.target.value === '__custom__') {
-                                  setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))
-                                } else {
-                                  handleUpdateActiveEndpoint({ model: e.target.value })
-                                  const updatedEndpoints = (config.customEndpoints || []).map(ep =>
-                                    ep.id === activeEp.id ? { ...ep, model: e.target.value } : ep
-                                  )
-                                  saveConfig({ ...config, customEndpoints: updatedEndpoints })
-                                }
-                              }}
-                            >
-                              {!(fetchedModels[activeEp.id] || []).includes(activeEp.model) && activeEp.model && (
-                                <option value={activeEp.model}>{activeEp.model} (현재 선택)</option>
-                              )}
-                              {(fetchedModels[activeEp.id] || []).map(m => (
-                                <option key={m} value={m}>{m}</option>
-                              ))}
-                              <option value="__custom__">[ 직접 입력... ]</option>
-                            </select>
-                          </>
-                        ) : (
-                          <>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
-                              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                {(fetchedModels[activeEp.id] || []).length > 0 ? (
-                                  <button
-                                    type="button"
-                                    className="btw-btn-sm"
-                                    style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
-                                    onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: false }))}
-                                  >
-                                    목록에서 선택
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="btw-btn-sm"
-                                    style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
-                                    onClick={() => handleFetchModels(activeEp)}
-                                    disabled={fetchingModels[activeEp.id]}
-                                  >
-                                    {fetchingModels[activeEp.id] ? '불러오는 중...' : '목록 가져오기'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <input 
-                              type="text" 
-                              value={activeEp.model}
-                              onChange={(e) => handleUpdateActiveEndpoint({ model: e.target.value })}
-                              onBlur={() => saveConfig(config)}
-                              placeholder="gpt-4o-mini"
-                            />
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )
-                })()}
-              </>
-            )}
-
-            <div className="btw-form-group">
-              <label>시스템 프롬프트</label>
-              <textarea 
-                value={config.systemPrompt}
-                rows={4}
-                onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
-                onBlur={() => saveConfig(config)}
-                placeholder="시스템 지침을 입력하세요..."
-              />
-              
-            </div>
-
-            <hr style={{ border: 'none', borderTop: 'var(--btw-border)', margin: '0.5rem 0' }} />
-
-            <div className="btw-control-row">
-              <label htmlFor="context-depth">메인 대화 깊이</label>
+        {activeTab === 'chat' ? (
+          <>
+            {/* Thread Selector Bar */}
+            <div className="btw-thread-bar">
               <select
-                id="context-depth"
-                value={config.contextDepth}
-                style={{ width: 'auto' }}
-                onChange={(e) => saveConfig({ ...config, contextDepth: e.target.value as any })}
+                value={activeThreadId}
+                onChange={(e) => handleSelectThread(e.target.value)}
+                title="대화방 선택"
+                className="btw-thread-select"
+                disabled={loading}
               >
-                <option value="none">역할극 기록 미포함</option>
-                <option value="1">직전 1개 대화 포함</option>
-                <option value="5">최근 5개 대화 포함</option>
-                <option value="10">최근 10개 대화 포함</option>
-                <option value="full">전체 대화 역사 포함</option>
+                {threads.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
               </select>
+              <button 
+                onClick={() => handleCreateNewThread()}
+                disabled={loading}
+                title="새 대화방 개설"
+              >
+                <Plus size={14} /> 
+              </button>
+              <button 
+                className="danger icon-only"
+                onClick={handleDeleteThread}
+                disabled={loading || threads.length <= 1}
+                title="현재 대화방 삭제"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
 
-            <div className="btw-control-row">
-              <label htmlFor="include-lore" style={{ cursor: 'pointer' }}>로어북 및 캐릭터 정보 포함</label>
-              <input 
-                type="checkbox"
-                id="include-lore"
-                style={{ width: 'auto', cursor: 'pointer' }}
-                checked={config.includeLore}
-                onChange={(e) => saveConfig({ ...config, includeLore: e.target.checked })}
-              />
-            </div>
-
-            <div className="btw-control-row">
-              <label htmlFor="render-markdown" style={{ cursor: 'pointer' }}>마크다운 렌더링 활성화</label>
-              <input 
-                type="checkbox"
-                id="render-markdown"
-                style={{ width: 'auto', cursor: 'pointer' }}
-                checked={config.renderMarkdown}
-                onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
-              />
-            </div>
-
-            <div className="btw-control-row">
-              <label htmlFor="stream-response" style={{ cursor: 'pointer' }}>실시간 스트리밍 활성화</label>
-              <input 
-                type="checkbox"
-                id="stream-response"
-                style={{ width: 'auto', cursor: 'pointer' }}
-                checked={config.streamResponse ?? true}
-                onChange={(e) => saveConfig({ ...config, streamResponse: e.target.checked })}
-              />
-            </div>
-
-            <button onClick={() => setShowSettings(false)} className="primary">확인</button>
-          </div>
-        )}
-
-        {/* Message Log */}
-        <div className="btw-chat-log" ref={chatLogRef}>
-          {messages.length === 0 ? (
-            <div className="btw-empty">
-              <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>💬</div>
-              <strong>/btw 플러그인에 오신 걸 환영합니다.</strong>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
-                쿰질하다가 문득 적을 인풋이 떠오르지 못해서 물어보거나, 대화 주제를 조언을 구할 때 등등 하는 곳입니다.
-              </p>
-            </div>
-          ) : (
-            messages.map((m, idx) => {
-              if (m.role === 'ai' && !m.content && loading) {
-                return null
-              }
-              return (
-                <div key={m.id} className={`btw-msg-row ${m.role}`}>
-                  <div className="btw-msg-meta">
-                    {m.role === 'user' ? '나' : `${characterName}`}
-                    {m.role === 'ai' && m.model && (
-                      <span className="btw-msg-model-badge">
-                        {m.model}
-                      </span>
-                    )}
-                  </div>
-                  {editingMessageId === m.id ? (
-                    <div className="btw-msg-content">
-                      <textarea
-                        style={{
-                          width: '100%',
-                          background: 'var(--btw-bg-input)',
-                          color: 'var(--btw-fg)',
-                          border: 'var(--btw-border)',
-                          borderRadius: '4px',
-                          padding: '0.4rem',
-                          fontSize: '0.85rem',
-                          fontFamily: 'inherit',
-                          resize: 'vertical',
-                          outline: 'none'
-                        }}
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        rows={Math.max(2, editingText.split('\n').length)}
-                      />
-                      <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
-                        <button 
-                          className="btw-btn-sm primary" 
-                          onClick={() => handleSaveEdit(m.id)}
-                          disabled={loading}
-                        >
-                          저장 후 재생성
-                        </button>
-                        <button 
-                          className="btw-btn-sm"
-                          onClick={handleCancelEdit}
-                        >
-                          취소
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="btw-msg-content">
-                      {m.role === 'ai' ? (
-                        (() => {
-                          const { reasoning, cleanContent, hasOpenThink } = parseMessage(m.content)
-                          return (
-                            <>
-                              {reasoning && (
-                                <CollapsibleReasoning 
-                                  content={reasoning} 
-                                  enabled={config.renderMarkdown ?? true} 
-                                  isStreaming={loading && idx === messages.length - 1 && hasOpenThink} 
-                                />
-                              )}
-                              {cleanContent && (
-                                <RenderedMessage content={cleanContent} enabled={config.renderMarkdown ?? true} />
-                              )}
-                              {!cleanContent && !reasoning && m.content && (
-                                <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
-                              )}
-                            </>
-                          )
-                        })()
-                      ) : (
-                        <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
-                      )}
-                      <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
-                        {m.role === 'user' && !loading && (
-                          <button 
-                            className="btw-btn-sm"
-                            onClick={() => handleStartEdit(m.id, m.content)}
-                          >
-                            <Edit size={12} />
-                          </button>
+            {/* Message Log */}
+            <div className="btw-chat-log" ref={chatLogRef}>
+              {messages.length === 0 ? (
+                <div className="btw-empty">
+                  <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>💬</div>
+                  <strong>/btw 플러그인에 오신 걸 환영합니다.</strong>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
+                    쿰질하다가 문득 적을 인풋이 떠오르지 못해서 물어보거나, 대화 주제를 조언을 구할 때 등등 하는 곳입니다.
+                  </p>
+                </div>
+              ) : (
+                messages.map((m, idx) => {
+                  if (m.role === 'ai' && !m.content && loading) {
+                    return null
+                  }
+                  return (
+                    <div key={m.id} className={`btw-msg-row ${m.role}`}>
+                      <div className="btw-msg-meta">
+                        {m.role === 'user' ? '나' : `${characterName}`}
+                        {m.role === 'ai' && m.model && (
+                          <span className="btw-msg-model-badge">
+                            {m.model}
+                          </span>
                         )}
-                        {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
-                          <>
+                      </div>
+                      {editingMessageId === m.id ? (
+                        <div className="btw-msg-content">
+                          <textarea
+                            style={{
+                              width: '100%',
+                              background: 'var(--btw-bg-input)',
+                              color: 'var(--btw-fg)',
+                              border: 'var(--btw-border)',
+                              borderRadius: '4px',
+                              padding: '0.4rem',
+                              fontSize: '0.85rem',
+                              fontFamily: 'inherit',
+                              resize: 'vertical',
+                              outline: 'none'
+                            }}
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            rows={Math.max(2, editingText.split('\n').length)}
+                          />
+                          <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem' }}>
+                            <button 
+                              className="btw-btn-sm primary" 
+                              onClick={() => handleSaveEdit(m.id)}
+                              disabled={loading}
+                            >
+                              저장 후 재생성
+                            </button>
                             <button 
                               className="btw-btn-sm"
-                              onClick={() => copyToClipboard(m.content)}
+                              onClick={handleCancelEdit}
                             >
-                              <Copy size={12} />
+                              취소
                             </button>
-                            {idx === messages.length - 1 && (
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="btw-msg-content">
+                          {m.role === 'ai' ? (
+                            (() => {
+                              const { reasoning, cleanContent, hasOpenThink } = parseMessage(m.content)
+                              return (
+                                <>
+                                  {reasoning && (
+                                    <CollapsibleReasoning 
+                                      content={reasoning} 
+                                      enabled={config.renderMarkdown ?? true} 
+                                      isStreaming={loading && idx === messages.length - 1 && hasOpenThink} 
+                                    />
+                                  )}
+                                  {cleanContent && (
+                                    <RenderedMessage content={cleanContent} enabled={config.renderMarkdown ?? true} />
+                                  )}
+                                  {!cleanContent && !reasoning && m.content && (
+                                    <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                                  )}
+                                </>
+                              )
+                            })()
+                          ) : (
+                            <RenderedMessage content={m.content} enabled={config.renderMarkdown ?? true} />
+                          )}
+                          <div style={{ marginTop: '0.35rem', display: 'flex', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                            {m.role === 'user' && !loading && (
                               <button 
                                 className="btw-btn-sm"
-                                onClick={handleReroll}
-                                disabled={loading}
+                                onClick={() => handleStartEdit(m.id, m.content)}
                               >
-                                <RotateCw size={12} className={loading ? 'spin' : ''} />
+                                <Edit size={12} />
                               </button>
                             )}
-                          </>
-                        )}
-                      </div>
+                            {m.role === 'ai' && m.content && !m.content.startsWith('⚠️') && (
+                              <>
+                                <button 
+                                  className="btw-btn-sm"
+                                  onClick={() => copyToClipboard(m.content)}
+                                >
+                                  <Copy size={12} />
+                                </button>
+                                {idx === messages.length - 1 && (
+                                  <button 
+                                    className="btw-btn-sm"
+                                    onClick={handleReroll}
+                                    disabled={loading}
+                                  >
+                                    <RotateCw size={12} className={loading ? 'spin' : ''} />
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  )
+                })
+              )}
+
+              {/* Typing Loading Indicator */}
+              {loading && (
+                <div className="btw-typing">
+                  <span>답변 작성 중</span>
+                  <div className="btw-typing-dot"></div>
+                  <div className="btw-typing-dot"></div>
+                  <div className="btw-typing-dot"></div>
                 </div>
-              )
-            })
-          )}
-
-          {/* Typing Loading Indicator */}
-          {loading && (
-            <div className="btw-typing">
-              <span>답변 작성 중</span>
-              <div className="btw-typing-dot"></div>
-              <div className="btw-typing-dot"></div>
-              <div className="btw-typing-dot"></div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="btw-footer">
-          <div className="btw-input-wrap">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="입력..."
-              disabled={loading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  triggerSend(inputText)
-                }
-              }}
-            />
-            <button 
-              type="button" 
-              className="primary" 
-              disabled={loading || !inputText.trim()}
-              onClick={() => triggerSend(inputText)}
-            >
-              <Send size={14} />
-            </button>
+            {/* Chat Footer Input */}
+            <div className="btw-footer">
+              <div className="btw-input-wrap">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="입력..."
+                  disabled={loading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      triggerSend(inputText)
+                    }
+                  }}
+                />
+                <button 
+                  type="button" 
+                  className="primary" 
+                  disabled={loading || !inputText.trim()}
+                  onClick={() => triggerSend(inputText)}
+                >
+                  <Send size={14} />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="btw-settings-panel" style={{ flex: 1, maxHeight: 'none', borderTop: 'none', borderBottom: 'none', display: 'flex', flexDirection: 'column' }}>
+            {/* Settings Sub-tabs */}
+            <div className="btw-settings-subtabs">
+              <button 
+                type="button"
+                className={`btw-subtab-button ${activeSettingsTab === 'connection' ? 'active' : ''}`}
+                onClick={() => setActiveSettingsTab('connection')}
+              >
+                연동 설정
+              </button>
+              <button 
+                type="button"
+                className={`btw-subtab-button ${activeSettingsTab === 'prompt' ? 'active' : ''}`}
+                onClick={() => setActiveSettingsTab('prompt')}
+              >
+                프롬프트
+              </button>
+              <button 
+                type="button"
+                className={`btw-subtab-button ${activeSettingsTab === 'context' ? 'active' : ''}`}
+                onClick={() => setActiveSettingsTab('context')}
+              >
+                컨텍스트
+              </button>
+            </div>
+
+            {loadingSettings ? (
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--btw-fg-muted)', fontSize: '0.85rem', gap: '0.4rem', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  <div className="btw-typing-dot"></div>
+                  <div className="btw-typing-dot"></div>
+                  <div className="btw-typing-dot"></div>
+                </div>
+                <span>설정 데이터를 불러오는 중...</span>
+              </div>
+            ) : (
+              <div className="btw-settings-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem', overflowY: 'auto', flex: 1, paddingRight: '0.2rem' }}>
+                {activeSettingsTab === 'connection' && (
+                  <>
+                    <div className="btw-form-group">
+                      <label>모델 프로바이더</label>
+                      <select 
+                        value={config.provider}
+                        onChange={(e) => saveConfig({ ...config, provider: e.target.value as any })}
+                      >
+                        <option value="risu">RisuAI 모델 (추천)</option>
+                        <option value="custom">외부 OpenAI 호환 API</option>
+                      </select>
+                    </div>
+
+                    {config.provider === 'risu' ? (
+                      <div className="btw-form-group">
+                        <label>RisuAI 모델 모드</label>
+                        <select 
+                          value={config.customModelMode}
+                          onChange={(e) => saveConfig({ ...config, customModelMode: e.target.value as any })}
+                        >
+                          <option value="model">채팅방 메인 모델</option>
+                          <option value="otherAx">보조 모델 (Other Ax)</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="btw-form-group">
+                          <label>외부 API 설정 선택</label>
+                          <div className="btw-endpoint-selector-row">
+                            <select
+                              value={config.activeEndpointId}
+                              onChange={(e) => saveConfig({ ...config, activeEndpointId: e.target.value })}
+                            >
+                              {(config.customEndpoints || []).map(ep => (
+                                <option key={ep.id} value={ep.id}>{ep.name}</option>
+                              ))}
+                            </select>
+                            <button 
+                              onClick={handleAddEndpoint}
+                              title="API 설정 추가"
+                              type="button"
+                            >
+                              <Plus size={14} />
+                            </button>
+                            <button 
+                              className="danger"
+                              onClick={() => handleDeleteEndpoint(config.activeEndpointId)}
+                              disabled={(config.customEndpoints || []).length <= 1}
+                              title="API 설정 삭제"
+                              type="button"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const activeEp = (config.customEndpoints || []).find(e => e.id === config.activeEndpointId)
+                          if (!activeEp) return null
+                          return (
+                            <>
+                              <div className="btw-form-group">
+                                <label>설정 이름</label>
+                                <input 
+                                  type="text" 
+                                  value={activeEp.name}
+                                  onChange={(e) => handleUpdateActiveEndpoint({ name: e.target.value })}
+                                  onBlur={() => saveConfig(config)}
+                                  placeholder="예: OpenAI, OpenRouter 등"
+                                />
+                              </div>
+                              <div className="btw-form-group">
+                                <label>API Base URL</label>
+                                <input 
+                                  type="text" 
+                                  value={activeEp.apiUrl}
+                                  onChange={(e) => handleUpdateActiveEndpoint({ apiUrl: e.target.value })}
+                                  onBlur={() => saveConfig(config)}
+                                  placeholder="https://api.openai.com/v1"
+                                />
+                              </div>
+                              <div className="btw-form-group">
+                                <label>API Key</label>
+                                <input 
+                                  type="password" 
+                                  value={activeEp.apiKey}
+                                  onChange={(e) => handleUpdateActiveEndpoint({ apiKey: e.target.value })}
+                                  onBlur={() => saveConfig(config)}
+                                  placeholder="sk-..."
+                                />
+                              </div>
+                              <div className="btw-form-group">
+                                {((fetchedModels[activeEp.id] || []).length > 0 && !customInputMode[activeEp.id]) ? (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
+                                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                        <button
+                                          type="button"
+                                          className="btw-btn-sm"
+                                          style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                          onClick={() => handleFetchModels(activeEp)}
+                                          disabled={fetchingModels[activeEp.id]}
+                                        >
+                                          {fetchingModels[activeEp.id] ? '불러오는 중...' : '다시 가져오기'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="btw-btn-sm"
+                                          style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                          onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))}
+                                        >
+                                          직접 입력
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <select
+                                      value={activeEp.model}
+                                      onChange={(e) => {
+                                        if (e.target.value === '__custom__') {
+                                          setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))
+                                        } else {
+                                          handleUpdateActiveEndpoint({ model: e.target.value })
+                                          const updatedEndpoints = (config.customEndpoints || []).map(ep =>
+                                            ep.id === activeEp.id ? { ...ep, model: e.target.value } : ep
+                                          )
+                                          saveConfig({ ...config, customEndpoints: updatedEndpoints })
+                                        }
+                                      }}
+                                    >
+                                      {!(fetchedModels[activeEp.id] || []).includes(activeEp.model) && activeEp.model && (
+                                        <option value={activeEp.model}>{activeEp.model} (현재 선택)</option>
+                                      )}
+                                      {(fetchedModels[activeEp.id] || []).map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                      ))}
+                                      <option value="__custom__">[ 직접 입력... ]</option>
+                                    </select>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                      <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
+                                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                        {(fetchedModels[activeEp.id] || []).length > 0 ? (
+                                          <button
+                                            type="button"
+                                            className="btw-btn-sm"
+                                            style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                            onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: false }))}
+                                          >
+                                            목록에서 선택
+                                          </button>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            className="btw-btn-sm"
+                                            style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                            onClick={() => handleFetchModels(activeEp)}
+                                            disabled={fetchingModels[activeEp.id]}
+                                          >
+                                            {fetchingModels[activeEp.id] ? '불러오는 중...' : '목록 가져오기'}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <input 
+                                      type="text" 
+                                      value={activeEp.model}
+                                      onChange={(e) => handleUpdateActiveEndpoint({ model: e.target.value })}
+                                      onBlur={() => saveConfig(config)}
+                                      placeholder="gpt-4o-mini"
+                                    />
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </>
+                    )}
+
+                    <hr style={{ border: 'none', borderTop: 'var(--btw-border)', margin: '0.5rem 0' }} />
+
+                    <div className="btw-control-row">
+                      <label htmlFor="render-markdown" style={{ cursor: 'pointer' }}>마크다운 렌더링 활성화</label>
+                      <input 
+                        type="checkbox"
+                        id="render-markdown"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.renderMarkdown}
+                        onChange={(e) => saveConfig({ ...config, renderMarkdown: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="btw-control-row">
+                      <label htmlFor="stream-response" style={{ cursor: 'pointer' }}>실시간 스트리밍 활성화</label>
+                      <input 
+                        type="checkbox"
+                        id="stream-response"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.streamResponse ?? true}
+                        onChange={(e) => saveConfig({ ...config, streamResponse: e.target.checked })}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {activeSettingsTab === 'prompt' && (
+                  <div className="btw-form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <label>시스템 프롬프트</label>
+                    <textarea 
+                      value={config.systemPrompt}
+                      style={{ flex: 1, minHeight: '300px', resize: 'none' }}
+                      onChange={(e) => setConfig({ ...config, systemPrompt: e.target.value })}
+                      onBlur={() => saveConfig(config)}
+                      placeholder="시스템 지침을 입력하세요..."
+                    />
+                  </div>
+                )}
+
+                {activeSettingsTab === 'context' && (
+                  <>
+                    <div className="btw-control-row">
+                      <label htmlFor="context-depth">메인 대화 깊이</label>
+                      <select
+                        id="context-depth"
+                        value={config.contextDepth}
+                        style={{ width: 'auto' }}
+                        onChange={(e) => saveConfig({ ...config, contextDepth: e.target.value as any })}
+                      >
+                        <option value="none">역할극 기록 미포함</option>
+                        <option value="1">직전 1개 대화 포함</option>
+                        <option value="5">최근 5개 대화 포함</option>
+                        <option value="10">최근 10개 대화 포함</option>
+                        <option value="full">전체 대화 역사 포함</option>
+                      </select>
+                    </div>
+
+                    <div className="btw-control-row">
+                      <label htmlFor="include-char-desc" style={{ cursor: 'pointer' }}>캐릭터 설명(Description) 포함</label>
+                      <input 
+                        type="checkbox"
+                        id="include-char-desc"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.includeCharDesc}
+                        onChange={(e) => saveConfig({ ...config, includeCharDesc: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="btw-control-row">
+                      <label htmlFor="include-lorebook" style={{ cursor: 'pointer' }}>세계관 및 로어북 정보 포함</label>
+                      <input 
+                        type="checkbox"
+                        id="include-lorebook"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.includeLorebook}
+                        onChange={(e) => saveConfig({ ...config, includeLorebook: e.target.checked })}
+                      />
+                    </div>
+
+                    {config.includeLorebook && availableLoreEntries.length > 0 && (() => {
+                      const folders = availableLoreEntries.filter((e: any) => e.mode === 'folder');
+                      const getFolderChildren = (folderKey: string, isCharLore: boolean) => {
+                        return availableLoreEntries.filter((e: any) => e.mode !== 'folder' && e.folder === folderKey && e.isCharLore === isCharLore);
+                      };
+                      const rootItems = availableLoreEntries.filter((e: any) => {
+                        if (e.mode === 'folder') return false;
+                        if (!e.folder) return true;
+                        return !folders.some((f: any) => f.key === e.folder && f.isCharLore === e.isCharLore);
+                      });
+
+                      const renderLoreItem = (entry: any, hasSpacer = true) => {
+                        const id = entry.id;
+                        const label = entry.comment || entry.key || '이름 없는 로어북';
+                        const isChecked = !(config.disabledLorebookIds || []).includes(id);
+                        const typeLabel = entry.isCharLore ? '[캐릭터]' : '[채팅]';
+                        
+                        const isTriggered = isLorebookTriggered(entry, chatMessages, loreDepth, fullWordMatching);
+                        const statusLabel = isTriggered ? ' (활성화됨)' : ' (비활성화됨)';
+                        const statusColor = isTriggered ? '#10b981' : '#6b7280';
+                        const activationDetail = entry.alwaysActive ? ' [항상]' : ` [키: ${entry.key || ''}]`;
+
+                        return (
+                          <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            {hasSpacer && <div style={{ width: '1.25rem', height: '1.25rem' }} />}
+                            <input 
+                              type="checkbox" 
+                              id={`lore-entry-${id}`} 
+                              checked={isChecked}
+                              style={{ width: 'auto', height: 'auto', margin: 0, cursor: 'pointer' }}
+                              onChange={(e) => {
+                                const disabledList = config.disabledLorebookIds || [];
+                                let updatedList: string[];
+                                if (e.target.checked) {
+                                  updatedList = disabledList.filter(item => item !== id);
+                                } else {
+                                  updatedList = [...disabledList, id];
+                                }
+                                saveConfig({ ...config, disabledLorebookIds: updatedList });
+                              }}
+                            />
+                            <label htmlFor={`lore-entry-${id}`} style={{ fontSize: '0.75rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'normal', flexWrap: 'wrap' }}>
+                              <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{typeLabel}</span>
+                              <span style={{ fontWeight: 'bold' }}>{label}</span>
+                              <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{activationDetail}</span>
+                              <span style={{ color: statusColor, fontSize: '0.68rem', fontWeight: 'bold' }}>{statusLabel}</span>
+                            </label>
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <div className="btw-lore-selective-list" style={{ marginLeft: '1rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--btw-border)', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '-0.25rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--btw-fg-muted)', fontWeight: 'bold', marginBottom: '0.1rem' }}>포함할 로어북 항목 선택:</span>
+                          
+                          {/* Folders */}
+                          {folders.map((folder: any) => {
+                            const children = getFolderChildren(folder.key, folder.isCharLore);
+                            if (children.length === 0) return null;
+
+                            const folderId = `${folder.key || 'default'}_${folder.isCharLore ? 'char' : 'chat'}`;
+                            const folderLabel = folder.comment || folder.key || '이름 없는 폴더';
+                            const isCollapsed = !!collapsedFolders[folderId];
+                            
+                            const disabledList = config.disabledLorebookIds || [];
+                            const isAllChecked = children.every(c => !disabledList.includes(c.id));
+                            const typeLabel = folder.isCharLore ? '[캐릭터]' : '[채팅]';
+
+                            return (
+                              <div key={folderId} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCollapsedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }))}
+                                    style={{ background: 'none', border: 'none', padding: '0 0.15rem', color: 'var(--btw-fg-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '1.25rem', height: '1.25rem' }}
+                                  >
+                                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                  </button>
+                                  
+                                  <input 
+                                    type="checkbox" 
+                                    id={`folder-checkbox-${folderId}`} 
+                                    checked={isAllChecked}
+                                    style={{ width: 'auto', height: 'auto', margin: 0, cursor: 'pointer' }}
+                                    onChange={(e) => {
+                                      const check = e.target.checked;
+                                      const childIds = children.map(c => c.id);
+                                      let updatedList = [...disabledList];
+                                      if (check) {
+                                        updatedList = updatedList.filter(id => !childIds.includes(id));
+                                      } else {
+                                        childIds.forEach(id => {
+                                          if (!updatedList.includes(id)) {
+                                            updatedList.push(id);
+                                          }
+                                        });
+                                      }
+                                      saveConfig({ ...config, disabledLorebookIds: updatedList });
+                                    }}
+                                  />
+                                  
+                                  <label htmlFor={`folder-checkbox-${folderId}`} style={{ fontSize: '0.78rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold' }}>
+                                    <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{typeLabel} 📁</span>
+                                    <span>{folderLabel}</span>
+                                  </label>
+                                </div>
+                                
+                                {!isCollapsed && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '1.5rem' }}>
+                                    {children.map(c => renderLoreItem(c, false))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* Root-level items */}
+                          {rootItems.map(item => renderLoreItem(item, true))}
+                        </div>
+                      );
+                    })()}
+
+                    <div className="btw-control-row">
+                      <label htmlFor="include-user-persona" style={{ cursor: 'pointer' }}>유저 정보 및 페르소나 포함</label>
+                      <input 
+                        type="checkbox"
+                        id="include-user-persona"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.includeUserPersona}
+                        onChange={(e) => saveConfig({ ...config, includeUserPersona: e.target.checked })}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem', borderTop: 'var(--btw-border)' }}>
+              <button onClick={() => setActiveTab('chat')} className="primary">대화창으로 돌아가기</button>
+            </div>
           </div>
-        </div>
-
+        )}
         {/* Toast Notification */}
         <div className={`btw-toast ${showToast ? 'show' : ''}`}>
           {toastMessage}

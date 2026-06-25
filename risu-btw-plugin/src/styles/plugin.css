@@ -749,4 +749,77 @@ button.btw-btn-sm {
   justify-content: center;
 }
 
+/* Tab Navigation Styles */
+.btw-tab-bar {
+  display: flex;
+  border-bottom: var(--btw-border);
+  background: var(--btw-bg-body);
+}
+
+.btw-tab-button {
+  flex: 1;
+  text-align: center;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  height: 2.25rem !important;
+  background: transparent !important;
+  font-weight: bold !important;
+  font-size: 0.85rem !important;
+  color: var(--btw-fg-muted) !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btw-tab-button:hover {
+  background: rgba(128, 128, 128, 0.08) !important;
+  color: var(--btw-fg) !important;
+}
+
+.btw-tab-button.active {
+  border-bottom: 2px solid var(--btw-fg) !important;
+  color: var(--btw-fg) !important;
+  background: rgba(128, 128, 128, 0.04) !important;
+}
+
+.btw-settings-subtabs {
+  display: flex;
+  background: var(--btw-bg-input);
+  border: var(--btw-border);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 2px;
+  margin-bottom: 0.5rem;
+}
+
+.btw-subtab-button {
+  flex: 1;
+  border: none !important;
+  border-radius: 3px !important;
+  height: 1.85rem !important;
+  font-size: 0.78rem !important;
+  font-weight: bold !important;
+  background: transparent !important;
+  color: var(--btw-fg-muted) !important;
+  padding: 0 !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease-in-out;
+}
+
+.btw-subtab-button:hover {
+  background: rgba(128, 128, 128, 0.05) !important;
+  color: var(--btw-fg) !important;
+}
+
+.btw-subtab-button.active {
+  background: var(--btw-fg) !important;
+  color: var(--btw-bg-body) !important;
+}
+
+
 
