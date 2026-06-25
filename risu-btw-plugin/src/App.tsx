@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit, Brain, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
+import { Settings, Trash2, X, Plus, Send, Copy, RotateCw, Edit, Brain, ChevronDown, ChevronUp, ChevronRight, Search } from 'lucide-react'
 import './styles/plugin.css'
 import { marked } from 'marked'
 
@@ -37,6 +37,7 @@ interface PluginConfig {
   includeLorebook: boolean
   includeUserPersona: boolean
   disabledLorebookIds: string[]
+  forceEnabledLorebookIds: string[]
   renderMarkdown: boolean
   streamResponse: boolean
 
@@ -68,6 +69,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   includeLorebook: true,
   includeUserPersona: true,
   disabledLorebookIds: [],
+  forceEnabledLorebookIds: [],
   renderMarkdown: true,
   streamResponse: true
 }
@@ -225,6 +227,85 @@ const CollapsibleReasoning: React.FC<{ content: string; enabled: boolean; isStre
   )
 }
 
+const TriStateCheckbox: React.FC<{
+  state: 'force-on' | 'auto' | 'force-off' | 'mixed';
+  onChange: (nextState: 'force-on' | 'auto' | 'force-off') => void;
+}> = ({ state, onChange }) => {
+  const handleClick = () => {
+    if (state === 'force-off' || state === 'mixed') {
+      onChange('auto');
+    } else if (state === 'auto') {
+      onChange('force-on');
+    } else {
+      onChange('force-off');
+    }
+  };
+
+  let bg = 'transparent';
+  let borderColor = 'var(--btw-border)';
+  let checkColor = 'transparent';
+  let showCheck = false;
+  let showDash = false;
+
+  if (state === 'force-on') {
+    bg = '#10b981';
+    borderColor = '#10b981';
+    checkColor = '#ffffff';
+    showCheck = true;
+  } else if (state === 'auto') {
+    bg = 'var(--btw-bg-msg-user)';
+    borderColor = 'var(--btw-border)';
+    checkColor = 'var(--btw-fg-muted)';
+    showCheck = true;
+  } else if (state === 'mixed') {
+    bg = 'var(--btw-bg-msg-user)';
+    borderColor = 'var(--btw-border)';
+    checkColor = 'var(--btw-fg-muted)';
+    showDash = true;
+  }
+
+  return (
+    <div 
+      onClick={handleClick}
+      style={{
+        width: '1.1rem',
+        height: '1.1rem',
+        border: `1px solid ${borderColor}`,
+        backgroundColor: bg,
+        borderRadius: '3px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        userSelect: 'none',
+        flexShrink: 0
+      }}
+      title={
+        state === 'force-on' ? '항상 활성화 (항상 켬)' : 
+        state === 'auto' ? '자동 활성화 (키워드 감지)' : 
+        state === 'mixed' ? '일부 활성화 (다양함)' : 
+        '비활성화 (항상 끔)'
+      }
+    >
+      {showCheck && (
+        <svg 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke={checkColor} 
+          strokeWidth="4" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          style={{ width: '0.75rem', height: '0.75rem' }}
+        >
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      )}
+      {showDash && (
+        <div style={{ width: '0.5rem', height: '2px', backgroundColor: checkColor }} />
+      )}
+    </div>
+  );
+};
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<PluginConfig>(DEFAULT_CONFIG)
@@ -258,6 +339,7 @@ export const App: React.FC = () => {
   const [chatIndex, setChatIndex] = useState<number>(0)
   const [availableLoreEntries, setAvailableLoreEntries] = useState<any[]>([])
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({})
+  const [loreSearchTerm, setLoreSearchTerm] = useState('')
   const [chatMessages, setChatMessages] = useState<any[]>([])
   const [loreDepth, setLoreDepth] = useState<number>(10)
   const [fullWordMatching, setFullWordMatching] = useState<boolean>(false)
@@ -379,7 +461,8 @@ export const App: React.FC = () => {
             includeCharDesc: savedConfig.includeCharDesc !== undefined ? savedConfig.includeCharDesc : (savedConfig.includeLore ?? true),
             includeLorebook: savedConfig.includeLorebook !== undefined ? savedConfig.includeLorebook : (savedConfig.includeLore ?? true),
             includeUserPersona: savedConfig.includeUserPersona !== undefined ? savedConfig.includeUserPersona : false,
-            disabledLorebookIds: savedConfig.disabledLorebookIds || []
+            disabledLorebookIds: savedConfig.disabledLorebookIds || [],
+            forceEnabledLorebookIds: savedConfig.forceEnabledLorebookIds || []
           }))
         }
         setCharacterId(charId)
@@ -424,8 +507,16 @@ export const App: React.FC = () => {
           const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
           const characterLore = char.globalLore ?? []
           const chatLore = chat?.localLore ?? []
-          const mappedCharLore = characterLore.map((e: any) => ({ ...e, isCharLore: true }))
-          const mappedChatLore = chatLore.map((e: any) => ({ ...e, isCharLore: false }))
+          const mappedCharLore = characterLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: true,
+            id: e.id || `char_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
+          const mappedChatLore = chatLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: false,
+            id: e.id || `chat_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
           setAvailableLoreEntries(mappedCharLore.concat(mappedChatLore))
           
           const db = await api.getDatabase()
@@ -1384,10 +1475,19 @@ export const App: React.FC = () => {
             }
           })
 
-          // Populate Lorebook for World Info mapping
           const characterLore = char.globalLore ?? []
           const chatLore = chat?.localLore ?? []
-          const rawLoreEntries = characterLore.concat(chatLore)
+          const mappedCharLore = characterLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: true,
+            id: e.id || `char_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
+          const mappedChatLore = chatLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: false,
+            id: e.id || `chat_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
+          const rawLoreEntries = mappedCharLore.concat(mappedChatLore)
           chatVars['__lorebook__'] = JSON.stringify(rawLoreEntries)
         }
       } catch (e) {
@@ -1423,12 +1523,22 @@ export const App: React.FC = () => {
           const charIndex = await api.getCurrentCharacterIndex()
           const activeChatIndex = await api.getCurrentChatIndex()
           const chat = await api.getChatFromIndex(charIndex, activeChatIndex)
-          
           const characterLore = char.globalLore ?? []
           const chatLore = chat?.localLore ?? []
-          const rawLoreEntries = characterLore.concat(chatLore)
+          const mappedCharLore = characterLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: true,
+            id: e.id || `char_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
+          const mappedChatLore = chatLore.map((e: any, idx: number) => ({
+            ...e,
+            isCharLore: false,
+            id: e.id || `chat_${idx}_${e.key || ''}_${e.comment || ''}`
+          }))
+          const rawLoreEntries = mappedCharLore.concat(mappedChatLore)
 
           const disabledIds = configRef.current.disabledLorebookIds || []
+          const forceEnabledIds = configRef.current.forceEnabledLorebookIds || []
           const db = await api.getDatabase()
           const scanDepthVal = char?.loreSettings?.scanDepth ?? db?.loreBookDepth ?? 10
           const isFullWordVal = db?.fullWordMatching ?? false
@@ -1437,6 +1547,7 @@ export const App: React.FC = () => {
           const activeLoreEntries = rawLoreEntries.filter((e: any) => {
             if (e.mode === 'folder') return false;
             if (disabledIds.includes(e.id)) return false;
+            if (forceEnabledIds.includes(e.id)) return true;
             return isLorebookTriggered(e, chatMsgs, scanDepthVal, isFullWordVal);
           })
 
@@ -1911,23 +2022,6 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Bar */}
-        <div className="btw-tab-bar">
-          <button 
-            type="button"
-            className={`btw-tab-button ${activeTab === 'chat' ? 'active' : ''}`}
-            onClick={() => setActiveTab('chat')}
-          >
-            대화창
-          </button>
-          <button 
-            type="button"
-            className={`btw-tab-button ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={handleOpenSettings}
-          >
-            설정
-          </button>
-        </div>
 
         {activeTab === 'chat' ? (
           <>
@@ -2418,14 +2512,40 @@ export const App: React.FC = () => {
                         onChange={(e) => saveConfig({ ...config, includeLorebook: e.target.checked })}
                       />
                     </div>
-
+                    <div className="btw-control-row">
+                      <label htmlFor="include-user-persona" style={{ cursor: 'pointer' }}>유저 정보 및 페르소나 포함</label>
+                      <input 
+                        type="checkbox"
+                        id="include-user-persona"
+                        style={{ width: 'auto', cursor: 'pointer' }}
+                        checked={config.includeUserPersona}
+                        onChange={(e) => saveConfig({ ...config, includeUserPersona: e.target.checked })}
+                      />
+                    </div>
                     {config.includeLorebook && availableLoreEntries.length > 0 && (() => {
-                      const folders = availableLoreEntries.filter((e: any) => e.mode === 'folder');
-                      const getFolderChildren = (folderKey: string, isCharLore: boolean) => {
-                        return availableLoreEntries.filter((e: any) => e.mode !== 'folder' && e.folder === folderKey && e.isCharLore === isCharLore);
+                      const searchLower = loreSearchTerm.toLowerCase().trim();
+                      const matchesSearch = (e: any) => {
+                        if (!searchLower) return true;
+                        const label = (e.comment || '').toLowerCase();
+                        const key = (e.key || '').toLowerCase();
+                        const content = (e.content || '').toLowerCase();
+                        return label.includes(searchLower) || key.includes(searchLower) || content.includes(searchLower);
                       };
+
+                      const folders = availableLoreEntries.filter((e: any) => e.mode === 'folder');
+                      
+                      const getFolderChildren = (folderKey: string, isCharLore: boolean) => {
+                        return availableLoreEntries.filter((e: any) => 
+                          e.mode !== 'folder' && 
+                          e.folder === folderKey && 
+                          e.isCharLore === isCharLore &&
+                          matchesSearch(e)
+                        );
+                      };
+
                       const rootItems = availableLoreEntries.filter((e: any) => {
                         if (e.mode === 'folder') return false;
+                        if (!matchesSearch(e)) return false;
                         if (!e.folder) return true;
                         return !folders.some((f: any) => f.key === e.folder && f.isCharLore === e.isCharLore);
                       });
@@ -2433,34 +2553,62 @@ export const App: React.FC = () => {
                       const renderLoreItem = (entry: any, hasSpacer = true) => {
                         const id = entry.id;
                         const label = entry.comment || entry.key || '이름 없는 로어북';
-                        const isChecked = !(config.disabledLorebookIds || []).includes(id);
                         const typeLabel = entry.isCharLore ? '[캐릭터]' : '[채팅]';
                         
-                        const isTriggered = isLorebookTriggered(entry, chatMessages, loreDepth, fullWordMatching);
+                        let loreState: 'force-on' | 'force-off' | 'auto' = 'auto';
+                        if ((config.disabledLorebookIds || []).includes(id)) {
+                          loreState = 'force-off';
+                        } else if ((config.forceEnabledLorebookIds || []).includes(id)) {
+                          loreState = 'force-on';
+                        }
+
+                        let isTriggered = false;
+                        if (loreState === 'force-on') {
+                          isTriggered = true;
+                        } else if (loreState === 'force-off') {
+                          isTriggered = false;
+                        } else {
+                          isTriggered = isLorebookTriggered(entry, chatMessages, loreDepth, fullWordMatching);
+                        }
+
                         const statusLabel = isTriggered ? ' (활성화됨)' : ' (비활성화됨)';
                         const statusColor = isTriggered ? '#10b981' : '#6b7280';
-                        const activationDetail = entry.alwaysActive ? ' [항상]' : ` [키: ${entry.key || ''}]`;
+                        
+                        let activationDetail = '';
+                        if (loreState === 'force-on') {
+                          activationDetail = ' [항상 켬]';
+                        } else if (loreState === 'force-off') {
+                          activationDetail = ' [항상 끔]';
+                        } else {
+                          activationDetail = entry.alwaysActive ? ' [자동: 항상]' : ` [자동: 키: ${entry.key || ''}]`;
+                        }
 
                         return (
-                          <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             {hasSpacer && <div style={{ width: '1.25rem', height: '1.25rem' }} />}
-                            <input 
-                              type="checkbox" 
-                              id={`lore-entry-${id}`} 
-                              checked={isChecked}
-                              style={{ width: 'auto', height: 'auto', margin: 0, cursor: 'pointer' }}
-                              onChange={(e) => {
+                            <TriStateCheckbox 
+                              state={loreState}
+                              onChange={(nextState) => {
                                 const disabledList = config.disabledLorebookIds || [];
-                                let updatedList: string[];
-                                if (e.target.checked) {
-                                  updatedList = disabledList.filter(item => item !== id);
-                                } else {
-                                  updatedList = [...disabledList, id];
+                                const forceEnabledList = config.forceEnabledLorebookIds || [];
+                                
+                                let updatedDisabled = disabledList.filter(item => item !== id);
+                                let updatedForceEnabled = forceEnabledList.filter(item => item !== id);
+                                
+                                if (nextState === 'force-off') {
+                                  updatedDisabled = [...updatedDisabled, id];
+                                } else if (nextState === 'force-on') {
+                                  updatedForceEnabled = [...updatedForceEnabled, id];
                                 }
-                                saveConfig({ ...config, disabledLorebookIds: updatedList });
+                                
+                                saveConfig({
+                                  ...config,
+                                  disabledLorebookIds: updatedDisabled,
+                                  forceEnabledLorebookIds: updatedForceEnabled
+                                });
                               }}
                             />
-                            <label htmlFor={`lore-entry-${id}`} style={{ fontSize: '0.75rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'normal', flexWrap: 'wrap' }}>
+                            <label style={{ fontSize: '0.75rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'normal', flexWrap: 'wrap', userSelect: 'none' }}>
                               <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{typeLabel}</span>
                               <span style={{ fontWeight: 'bold' }}>{label}</span>
                               <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{activationDetail}</span>
@@ -2474,6 +2622,50 @@ export const App: React.FC = () => {
                         <div className="btw-lore-selective-list" style={{ marginLeft: '1rem', paddingLeft: '0.5rem', borderLeft: '2px solid var(--btw-border)', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '-0.25rem', marginBottom: '0.25rem' }}>
                           <span style={{ fontSize: '0.72rem', color: 'var(--btw-fg-muted)', fontWeight: 'bold', marginBottom: '0.1rem' }}>포함할 로어북 항목 선택:</span>
                           
+                          {/* Search Input */}
+                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '0.15rem', maxWidth: '300px' }}>
+                            <Search size={12} style={{ position: 'absolute', left: '0.45rem', color: 'var(--btw-fg-muted)', pointerEvents: 'none' }} />
+                            <input 
+                              type="text"
+                              value={loreSearchTerm}
+                              placeholder="로어북 이름, 키워드, 내용 검색..."
+                              onChange={(e) => setLoreSearchTerm(e.target.value)}
+                              style={{ 
+                                height: '1.65rem', 
+                                paddingLeft: '1.5rem', 
+                                paddingRight: '1.4rem', 
+                                fontSize: '0.75rem', 
+                                borderRadius: '3px',
+                                border: 'var(--btw-border)',
+                                background: 'var(--btw-bg-input)',
+                                color: 'var(--btw-fg)',
+                                width: '100%'
+                              }}
+                            />
+                            {loreSearchTerm && (
+                              <button 
+                                type="button"
+                                onClick={() => setLoreSearchTerm('')}
+                                style={{ 
+                                  position: 'absolute', 
+                                  right: '0.25rem', 
+                                  background: 'none', 
+                                  border: 'none', 
+                                  cursor: 'pointer', 
+                                  color: 'var(--btw-fg-muted)', 
+                                  padding: 0,
+                                  height: '1.1rem',
+                                  width: '1.1rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                <X size={10} />
+                              </button>
+                            )}
+                          </div>
+
                           {/* Folders */}
                           {folders.map((folder: any) => {
                             const children = getFolderChildren(folder.key, folder.isCharLore);
@@ -2481,15 +2673,28 @@ export const App: React.FC = () => {
 
                             const folderId = `${folder.key || 'default'}_${folder.isCharLore ? 'char' : 'chat'}`;
                             const folderLabel = folder.comment || folder.key || '이름 없는 폴더';
-                            const isCollapsed = !!collapsedFolders[folderId];
+                            const isCollapsed = loreSearchTerm.trim() !== '' ? false : !!collapsedFolders[folderId];
                             
                             const disabledList = config.disabledLorebookIds || [];
-                            const isAllChecked = children.every(c => !disabledList.includes(c.id));
+                            const forceEnabledList = config.forceEnabledLorebookIds || [];
+
+                            const getChildState = (child: any) => {
+                              if (disabledList.includes(child.id)) return 'force-off';
+                              if (forceEnabledList.includes(child.id)) return 'force-on';
+                              return 'auto';
+                            };
+                            
+                            const childrenStates = children.map(getChildState);
+                            const isAllForceOn = childrenStates.every(s => s === 'force-on');
+                            const isAllForceOff = childrenStates.every(s => s === 'force-off');
+                            const isAllAuto = childrenStates.every(s => s === 'auto');
+                            const folderState = isAllForceOn ? 'force-on' : (isAllForceOff ? 'force-off' : (isAllAuto ? 'auto' : 'mixed'));
+
                             const typeLabel = folder.isCharLore ? '[캐릭터]' : '[채팅]';
 
                             return (
                               <div key={folderId} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   <button
                                     type="button"
                                     onClick={() => setCollapsedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }))}
@@ -2498,29 +2703,32 @@ export const App: React.FC = () => {
                                     {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                                   </button>
                                   
-                                  <input 
-                                    type="checkbox" 
-                                    id={`folder-checkbox-${folderId}`} 
-                                    checked={isAllChecked}
-                                    style={{ width: 'auto', height: 'auto', margin: 0, cursor: 'pointer' }}
-                                    onChange={(e) => {
-                                      const check = e.target.checked;
+                                  <TriStateCheckbox 
+                                    state={folderState}
+                                    onChange={(nextState) => {
                                       const childIds = children.map(c => c.id);
-                                      let updatedList = [...disabledList];
-                                      if (check) {
-                                        updatedList = updatedList.filter(id => !childIds.includes(id));
-                                      } else {
-                                        childIds.forEach(id => {
-                                          if (!updatedList.includes(id)) {
-                                            updatedList.push(id);
-                                          }
+                                      let updatedDisabled = (config.disabledLorebookIds || []).filter(item => !childIds.includes(item));
+                                      let updatedForceEnabled = (config.forceEnabledLorebookIds || []).filter(item => !childIds.includes(item));
+                                      
+                                      if (nextState === 'force-off') {
+                                        childIds.forEach(cid => {
+                                          if (!updatedDisabled.includes(cid)) updatedDisabled.push(cid);
+                                        });
+                                      } else if (nextState === 'force-on') {
+                                        childIds.forEach(cid => {
+                                          if (!updatedForceEnabled.includes(cid)) updatedForceEnabled.push(cid);
                                         });
                                       }
-                                      saveConfig({ ...config, disabledLorebookIds: updatedList });
+                                      
+                                      saveConfig({
+                                        ...config,
+                                        disabledLorebookIds: updatedDisabled,
+                                        forceEnabledLorebookIds: updatedForceEnabled
+                                      });
                                     }}
                                   />
                                   
-                                  <label htmlFor={`folder-checkbox-${folderId}`} style={{ fontSize: '0.78rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold' }}>
+                                  <label style={{ fontSize: '0.78rem', cursor: 'pointer', display: 'flex', gap: '0.25rem', alignItems: 'center', fontWeight: 'bold', userSelect: 'none' }} onClick={() => setCollapsedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }))}>
                                     <span style={{ color: 'var(--btw-fg-muted)', fontSize: '0.68rem' }}>{typeLabel} 📁</span>
                                     <span>{folderLabel}</span>
                                   </label>
@@ -2541,16 +2749,7 @@ export const App: React.FC = () => {
                       );
                     })()}
 
-                    <div className="btw-control-row">
-                      <label htmlFor="include-user-persona" style={{ cursor: 'pointer' }}>유저 정보 및 페르소나 포함</label>
-                      <input 
-                        type="checkbox"
-                        id="include-user-persona"
-                        style={{ width: 'auto', cursor: 'pointer' }}
-                        checked={config.includeUserPersona}
-                        onChange={(e) => saveConfig({ ...config, includeUserPersona: e.target.checked })}
-                      />
-                    </div>
+                    
                   </>
                 )}
               </div>
