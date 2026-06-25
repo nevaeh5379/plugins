@@ -70,17 +70,26 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
     let contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
 
-    const bgImagePromises = Array.from(contentSourceEl.querySelectorAll('[style*="background-image"]')).map(async (el) => {
-        const style = el.getAttribute('style');
-        const urlMatch = style?.match(/url\(["'"]?(.+?)["'"]?\)/);
-        if (urlMatch?.[1]) {
-            const img = document.createElement('img');
-            img.src = embedImages ? await imageUrlToBlob(urlMatch[1]) : urlMatch[1];
-            el.parentNode?.insertBefore(img, el);
-            el.remove();
+    const mediaPromises = Array.from(contentSourceEl.querySelectorAll('img, [style*="background-image"]')).map(async (el) => {
+        if (el.tagName === 'IMG') {
+            const img = el as HTMLImageElement;
+            if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+                try {
+                    img.src = await imageUrlToBlob(img.src);
+                } catch (e) { /* ignore */ }
+            }
+        } else {
+            const style = el.getAttribute('style');
+            const urlMatch = style?.match(/url\(["'"]?(.+?)["'"]?\)/);
+            if (urlMatch?.[1]) {
+                const img = document.createElement('img');
+                img.src = embedImages ? await imageUrlToBlob(urlMatch[1]) : urlMatch[1];
+                el.parentNode?.insertBefore(img, el);
+                el.remove();
+            }
         }
     });
-    await Promise.all(bgImagePromises);
+    await Promise.all(mediaPromises);
 
     if (imageScale && imageScale !== 100) {
         contentSourceEl.querySelectorAll('img, video').forEach(el => {

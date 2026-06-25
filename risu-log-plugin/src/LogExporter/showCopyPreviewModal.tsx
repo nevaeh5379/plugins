@@ -164,8 +164,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     const [globalSettings, setGlobalSettings] = useState<any>({});
     const [otherFormatContent, setOtherFormatContent] = useState('');
     const [activeTab, setActiveTab] = useState('export');
-    const [isPluginSettingsOpen, setIsPluginSettingsOpen] = useState(false);
     const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [progress, setProgress] = useState({ active: false, message: '', current: 0, total: 0 });
     const [selectedIndices, setSelectedIndices] = useState(new Set<number>());
@@ -518,17 +518,32 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     }, []);
 
     const uiTheme = globalSettings.uiTheme || 'dark';
+    useEffect(() => {
+        document.body.setAttribute('data-theme', uiTheme);
+        const rootEl = document.getElementById('log-exporter-react-modal-root');
+        if (rootEl) {
+            rootEl.setAttribute('data-theme', uiTheme);
+        }
+    }, [uiTheme]);
+
     const antTheme = {
         algorithm: uiTheme === 'light' ? theme.defaultAlgorithm : theme.darkAlgorithm,
         token: {
             colorPrimary: '#61afef',
+            motion: false,
+        }
+    };
+
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            handleClose();
         }
     };
 
     if (error) {
         return (
             <ConfigProvider theme={antTheme}>
-                <div className="log-exporter-modal-backdrop" onClick={handleClose}>
+                <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
                     <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()} style={{ padding: '24px', maxWidth: '600px', margin: '40px auto', overflowY: 'auto' }}>
                         <h3 style={{ color: '#ff4d4f', margin: '0 0 12px 0' }}>[Log Exporter] 오류 발생</h3>
                         <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-color)', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', maxHeight: '400px', overflowY: 'auto' }}>{error}</pre>
@@ -541,19 +556,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
 
     return (
         <ConfigProvider theme={antTheme}>
-            <div className="log-exporter-modal-backdrop" onClick={isArcaHelperOpen ? () => setIsArcaHelperOpen(false) : handleClose}>
-                {isArcaHelperOpen ? (
-                    <ArcaHelperModal
-                        isOpen={isArcaHelperOpen}
-                        onClose={() => setIsArcaHelperOpen(false)}
-                        messageNodes={messageNodes}
-                        charInfo={{ name: charName, chatName: chatName, avatarUrl: charAvatarUrl }}
-                        settings={savedSettings}
-                        globalSettings={globalSettings}
-                        uiTheme={uiTheme}
-                        colorPalette={colorPalette}
-                    />
-                ) : (
+            <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
+                {!isArcaHelperOpen && (
                     <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
                         <div className="log-exporter-modal-header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
                             <Button 
@@ -566,14 +570,14 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                 onClick={handleClose}
                                 style={{ color: 'var(--text-white)' }}
                             />
-                            <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 내보내기</span>
+                            <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 플러그인</span>
                             <Button 
                                 type="text"
                                 icon={<SettingOutlined />}
-                                onClick={() => setIsPluginSettingsOpen(true)}
+                                onClick={() => setIsSettingsOpen(true)}
                                 style={{ color: 'var(--text-white)' }}
                             >
-                                플러그인 설정
+                                설정
                             </Button>
                         </div>
                         {isLoading ? (
@@ -668,14 +672,12 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                                         </span>
                                                     ),
                                                     children: (
-                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
-                                                            <ExportTab
-                                                                settings={savedSettings}
-                                                                onSettingChange={handleSettingChange}
-                                                                themes={THEMES}
-                                                                colors={COLORS}
-                                                            />
-                                                        </div>
+                                                        <ExportTab
+                                                            settings={savedSettings}
+                                                            onSettingChange={handleSettingChange}
+                                                            themes={THEMES}
+                                                            colors={COLORS}
+                                                        />
                                                     ),
                                                 },
                                                 {
@@ -687,16 +689,14 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                                         </span>
                                                     ),
                                                     children: (
-                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
-                                                            <FilterTab
-                                                                settings={savedSettings}
-                                                                onSettingChange={handleSettingChange}
-                                                                participants={participants}
-                                                                globalSettings={globalSettings}
-                                                                onGlobalSettingChange={handleGlobalSettingChange}
-                                                                uiClasses={uiClasses}
-                                                            />
-                                                        </div>
+                                                        <FilterTab
+                                                            settings={savedSettings}
+                                                            onSettingChange={handleSettingChange}
+                                                            participants={participants}
+                                                            globalSettings={globalSettings}
+                                                            onGlobalSettingChange={handleGlobalSettingChange}
+                                                            uiClasses={uiClasses}
+                                                        />
                                                     ),
                                                 },
                                                 {
@@ -708,12 +708,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                                         </span>
                                                     ),
                                                     children: (
-                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
-                                                            <ReplacementTab
-                                                                rules={savedSettings.replacementRules || []}
-                                                                onRulesChange={(rules) => handleSettingChange('replacementRules', rules)}
-                                                            />
-                                                        </div>
+                                                        <ReplacementTab
+                                                            rules={savedSettings.replacementRules || []}
+                                                            onRulesChange={(rules) => handleSettingChange('replacementRules', rules)}
+                                                        />
                                                     ),
                                                 },
                                                 {
@@ -725,13 +723,11 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                                         </span>
                                                     ),
                                                     children: (
-                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
-                                                            <AdvancedTab
-                                                                settings={savedSettings}
-                                                                onSettingChange={handleSettingChange}
-                                                                imageSizeWarning={imageSizeWarning}
-                                                            />
-                                                        </div>
+                                                        <AdvancedTab
+                                                            settings={savedSettings}
+                                                            onSettingChange={handleSettingChange}
+                                                            imageSizeWarning={imageSizeWarning}
+                                                        />
                                                     ),
                                                 },
                                             ]}
@@ -776,12 +772,6 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                             </>
                         )}
 
-                        <PluginSettingsModal
-                            isOpen={isPluginSettingsOpen}
-                            onClose={() => setIsPluginSettingsOpen(false)}
-                            globalSettings={globalSettings}
-                            onGlobalSettingChange={handleGlobalSettingChange}
-                        />
                     </div>
                 )}
                 {progress.active && (
@@ -794,6 +784,29 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                     </div>
                 )}
             </div>
+
+
+
+            {isArcaHelperOpen && (
+                <ArcaHelperModal
+                    isOpen={isArcaHelperOpen}
+                    onClose={() => setIsArcaHelperOpen(false)}
+                    messageNodes={messageNodes}
+                    charInfo={{ name: charName, chatName: chatName, avatarUrl: charAvatarUrl }}
+                    settings={savedSettings}
+                    globalSettings={globalSettings}
+                    uiTheme={uiTheme}
+                    colorPalette={colorPalette}
+                />
+            )}
+            {isSettingsOpen && (
+                <PluginSettingsModal
+                    isOpen={isSettingsOpen}
+                    onClose={() => setIsSettingsOpen(false)}
+                    globalSettings={globalSettings}
+                    onGlobalSettingChange={handleGlobalSettingChange}
+                />
+            )}
         </ConfigProvider>
     );
 };
@@ -853,6 +866,10 @@ export const showCopyPreviewModal = async (options: {
 
   // iframe 전체화면 표시 (v3.0)
   await Risuai.showContainer('fullscreen');
+  window.focus();
+  if (container) {
+    container.focus();
+  }
 };
 
 export default ShowCopyPreviewModal;

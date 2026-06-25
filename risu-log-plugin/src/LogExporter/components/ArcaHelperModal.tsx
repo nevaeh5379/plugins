@@ -260,13 +260,14 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         return null;
     }
   };
-
   return (
     <Modal
       title="아카라이브 도우미"
       open={isOpen}
       onCancel={handleClose}
       width={650}
+      transitionName=""
+      maskTransitionName=""
       footer={[
         step === 'intro' && (
           <Button 

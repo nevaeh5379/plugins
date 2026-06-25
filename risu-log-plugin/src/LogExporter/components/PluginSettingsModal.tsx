@@ -15,32 +15,38 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
   globalSettings, 
   onGlobalSettingChange 
 }) => {
+  // 런타임 방어적 변수 추출
+  const settings = globalSettings || {};
+  const profileClasses = Array.isArray(settings.profileClasses) ? settings.profileClasses : [];
+  const participantNameClasses = Array.isArray(settings.participantNameClasses) ? settings.participantNameClasses : [];
+  const uiTheme = settings.uiTheme || 'dark';
+
   const [newProfileClass, setNewProfileClass] = useState('');
   const [newParticipantNameClass, setNewParticipantNameClass] = useState('');
 
   const handleAddProfileClass = () => {
-    if (newProfileClass && !globalSettings.profileClasses?.includes(newProfileClass)) {
-      const newClasses = [...(globalSettings.profileClasses || []), newProfileClass];
+    if (newProfileClass && !profileClasses.includes(newProfileClass)) {
+      const newClasses = [...profileClasses, newProfileClass];
       onGlobalSettingChange('profileClasses', newClasses);
       setNewProfileClass('');
     }
   };
 
   const handleRemoveProfileClass = (cls: string) => {
-    const newClasses = globalSettings.profileClasses?.filter((c: string) => c !== cls);
+    const newClasses = profileClasses.filter((c: string) => c !== cls);
     onGlobalSettingChange('profileClasses', newClasses);
   };
 
   const handleAddParticipantNameClass = () => {
-    if (newParticipantNameClass && !globalSettings.participantNameClasses?.includes(newParticipantNameClass)) {
-      const newClasses = [...(globalSettings.participantNameClasses || []), newParticipantNameClass];
+    if (newParticipantNameClass && !participantNameClasses.includes(newParticipantNameClass)) {
+      const newClasses = [...participantNameClasses, newParticipantNameClass];
       onGlobalSettingChange('participantNameClasses', newClasses);
       setNewParticipantNameClass('');
     }
   };
 
   const handleRemoveParticipantNameClass = (cls: string) => {
-    const newClasses = globalSettings.participantNameClasses?.filter((c: string) => c !== cls);
+    const newClasses = participantNameClasses.filter((c: string) => c !== cls);
     onGlobalSettingChange('participantNameClasses', newClasses);
   };
 
@@ -49,6 +55,9 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
       title="플러그인 설정"
       open={isOpen}
       onCancel={onClose}
+      getContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
+      transitionName=""
+      maskTransitionName=""
       footer={[
         <Button key="close" onClick={onClose}>
           닫기
@@ -63,14 +72,15 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
           <div className="setting-item" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ minWidth: '80px' }}>모달 테마</span>
             <Select 
-              value={globalSettings.uiTheme || 'dark'} 
+              value={uiTheme} 
               onChange={(val) => onGlobalSettingChange('uiTheme', val)}
               style={{ flex: 1 }}
-            >
-              <Select.Option value="dark">다크 모던</Select.Option>
-              <Select.Option value="classic">클래식 다크</Select.Option>
-              <Select.Option value="light">라이트</Select.Option>
-            </Select>
+              options={[
+                { value: 'dark', label: '다크 모던' },
+                { value: 'classic', label: '클래식 다크' },
+                { value: 'light', label: '라이트' }
+              ]}
+            />
           </div>
         </div>
 
@@ -94,7 +104,7 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
               <Button icon={<PlusOutlined />} onClick={handleAddProfileClass}>추가</Button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-              {globalSettings.profileClasses?.map((cls: string) => (
+              {profileClasses.map((cls: string) => (
                 <Tag key={cls} closable onClose={() => handleRemoveProfileClass(cls)} style={{ fontFamily: 'monospace' }}>
                   {cls}
                 </Tag>
@@ -116,7 +126,7 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
               <Button icon={<PlusOutlined />} onClick={handleAddParticipantNameClass}>추가</Button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-              {globalSettings.participantNameClasses?.map((cls: string) => (
+              {participantNameClasses.map((cls: string) => (
                 <Tag key={cls} closable onClose={() => handleRemoveParticipantNameClass(cls)} style={{ fontFamily: 'monospace' }}>
                   {cls}
                 </Tag>

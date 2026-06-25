@@ -120,7 +120,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   return (
     <>
         <div className="desktop-preview-toolbar">
-            <span className="desktop-preview-toolbar-title">📱 미리보기</span>
             <div className="desktop-selection-controls">
                 <button className="desktop-btn desktop-btn-xs desktop-btn-secondary" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</button>
                 <button className="desktop-btn desktop-btn-xs desktop-btn-secondary" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</button>
