@@ -71,17 +71,30 @@ interface ShowCopyPreviewModalProps {
   onClose: () => void;
 }
 
-const useMediaQuery = (query: string) => {
-    const [matches, setMatches] = useState(window.matchMedia(query).matches);
+const useWindowWidth = () => {
+    const [width, setWidth] = useState(window.innerWidth || 1200);
 
     useEffect(() => {
-      const media = window.matchMedia(query);
-      const listener = () => setMatches(media.matches);
-      media.addEventListener('change', listener);
-      return () => media.removeEventListener('change', listener);
-    }, [query]);
+      const handleResize = () => {
+        setWidth(window.innerWidth);
+      };
+      window.addEventListener('resize', handleResize);
+      handleResize();
 
-    return matches;
+      // iframe이 display: none에서 block으로 전환될 때 width를 정확히 잡기 위해 마운트 직후 수차례 재측정
+      const timers = [
+        setTimeout(handleResize, 50),
+        setTimeout(handleResize, 150),
+        setTimeout(handleResize, 300)
+      ];
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        timers.forEach(clearTimeout);
+      };
+    }, []);
+
+    return width;
   };
 
 // SafeElement[]의 outerHTML을 받아 iframe 내 표준 HTMLElement[]로 재구성
@@ -159,6 +172,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
     const [estimatedImageSize, setEstimatedImageSize] = useState<{width: number, height: number, maxMessageHeight: number} | null>(null);
     const [imageSizeWarning, setImageSizeWarning] = useState<string>('');
+    const [error, setError] = useState<string | null>(null);
 
     const handleSelectionChange = (newSelection: Set<number>) => {
         setSelectedIndices(newSelection);
@@ -204,8 +218,9 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         setProgress({ active: false, message: '', current: 0, total: 0 });
     };
 
-    const isMobile = useMediaQuery('(max-width: 768px)');
-    const isTablet = useMediaQuery('(min-width: 769px) and (max-width: 1024px)');
+    const width = useWindowWidth();
+    const isMobile = width <= 768;
+    const isTablet = width > 768 && width <= 1024;
 
     const themeInfo = THEMES[savedSettings.theme || 'basic'] || THEMES.basic;
     const colorPalette = savedSettings.theme === 'basic' ? (COLORS[savedSettings.color || 'dark'] || COLORS.dark) : (themeInfo.color || COLORS.dark);
@@ -295,6 +310,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
+            setError(null);
             try {
                 // v3.0: processChatLog이 SafeElement[] 반환 → outerHTML로 직렬화 후 iframe 내 HTMLElement로 재구성
                 const { charName, chatName, charAvatarUrl, messageNodes: safeNodes, character } = await processChatLog(undefined, options);
@@ -323,8 +339,9 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
 
                 setUiClasses(collectUIClasses(nodes));
 
-            } catch (error) {
-                console.error('[Log Exporter] Modal open error:', error);
+            } catch (err: any) {
+                console.error('[Log Exporter] Modal open error:', err);
+                setError(err?.stack || String(err));
             } finally {
                 setIsLoading(false);
             }
@@ -507,6 +524,20 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
             colorPrimary: '#61afef',
         }
     };
+
+    if (error) {
+        return (
+            <ConfigProvider theme={antTheme}>
+                <div className="log-exporter-modal-backdrop" onClick={handleClose}>
+                    <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()} style={{ padding: '24px', maxWidth: '600px', margin: '40px auto', overflowY: 'auto' }}>
+                        <h3 style={{ color: '#ff4d4f', margin: '0 0 12px 0' }}>[Log Exporter] 오류 발생</h3>
+                        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-color)', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', maxHeight: '400px', overflowY: 'auto' }}>{error}</pre>
+                        <Button type="primary" danger onClick={handleClose}>닫기</Button>
+                    </div>
+                </div>
+            </ConfigProvider>
+        );
+    }
 
     return (
         <ConfigProvider theme={antTheme}>
