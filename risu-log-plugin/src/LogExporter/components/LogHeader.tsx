@@ -1,14 +1,14 @@
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import type { CharInfo, ColorPalette } from '../../types';
 
-const DefaultHeader = lazy(() => import('./headers/DefaultHeader'));
-const CompactHeader = lazy(() => import('./headers/CompactHeader'));
-const BannerHeader = lazy(() => import('./headers/BannerHeader'));
-const SmartHeader = lazy(() => import('./headers/SmartHeader'));
-const SimpleHeader = lazy(() => import('./headers/SimpleHeader'));
-const ModernHeader = lazy(() => import('./headers/ModernHeader'));
-const LogThemeHeader = lazy(() => import('./headers/LogThemeHeader'));
-const CoverHeader = lazy(() => import('./headers/CoverHeader'));
+import DefaultHeader from './headers/DefaultHeader';
+import CompactHeader from './headers/CompactHeader';
+import BannerHeader from './headers/BannerHeader';
+import SmartHeader from './headers/SmartHeader';
+import SimpleHeader from './headers/SimpleHeader';
+import ModernHeader from './headers/ModernHeader';
+import LogThemeHeader from './headers/LogThemeHeader';
+import CoverHeader from './headers/CoverHeader';
 
 export type HeaderLayout = 'default' | 'compact' | 'banner' | 'smart' | 'cover';
 
@@ -55,9 +55,7 @@ const LogHeader: React.FC<LogHeaderProps> = (props) => {
   }
 
   return (
-    <Suspense fallback={<div>Loading header...</div>}>
-      <HeaderComponent {...props} />
-    </Suspense>
+    <HeaderComponent {...props} />
   );
 };
 

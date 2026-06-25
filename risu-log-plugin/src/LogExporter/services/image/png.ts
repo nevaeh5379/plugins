@@ -199,6 +199,9 @@ export const mergePNGsBinary = async (
         // zlib 압축 해제
         try {
             const inflated = pako.inflate(combinedIDAT);
+            if (!inflated) {
+                throw new Error(`pako.inflate returned undefined. combinedIDAT length: ${combinedIDAT.length}`);
+            }
             
             // 데이터 크기 검증
             const expectedSize = imgHeight * bytesPerScanline;

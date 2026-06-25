@@ -109,7 +109,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
             style={{ width: '100%' }}
           >
             <Select.Option value="html-to-image">html-to-image (권장)</Select.Option>
-            <Select.Option value="html2canvas">html2canvas</Select.Option>
+            <Select.Option value="snapdom">snapdom</Select.Option>
             <Select.Option value="dom-to-image">dom-to-image-more</Select.Option>
           </Select>
         </div>

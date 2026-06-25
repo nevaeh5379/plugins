@@ -85,7 +85,7 @@ const MobileToolsPanel: React.FC<MobileToolsPanelProps> = ({ settings, onSetting
               style={{ width: '100%' }}
             >
               <Select.Option value="html-to-image">html-to-image</Select.Option>
-              <Select.Option value="html2canvas">html2canvas</Select.Option>
+              <Select.Option value="snapdom">snapdom</Select.Option>
               <Select.Option value="dom-to-image">dom-to-image-more</Select.Option>
             </Select>
           </div>

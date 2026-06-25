@@ -51,7 +51,7 @@ interface Settings {
   embedImages?: boolean;
   expandHover?: boolean;
   imageResolution?: number | 'auto';
-  imageLibrary?: 'html-to-image' | 'dom-to-image' | 'html2canvas';
+  imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
   imageFormat?: 'png' | 'jpeg' | 'webp';
   previewFontSize?: number;
   previewWidth?: number;

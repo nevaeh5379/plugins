@@ -77,7 +77,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({ settings, onSettingChange }) =>
                     <span className="desktop-option-label">라이브러리</span>
                     <select className="desktop-select" data-setting-key="imageLibrary" value={settings.imageLibrary || 'html-to-image'} onChange={(e) => onSettingChange('imageLibrary', e.target.value)}>
                         <option value="html-to-image">html-to-image</option>
-                        <option value="html2canvas">html2canvas</option>
+                        <option value="snapdom">snapdom</option>
                         <option value="dom-to-image">dom-to-image-more</option>
                     </select>
                 </div>

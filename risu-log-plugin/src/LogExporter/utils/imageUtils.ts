@@ -18,10 +18,64 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   })
 }
 
-// 네이티브 fetch → blob (메인 측 동일 출처, CORS 회피)
-// 주의: Risuai.nativeFetch(url, options)는 내부적으로 fetchNative(url, arg)를 호출하며,
-// arg가 undefined면 arg.interceptor 접근 시 크래시하므로 반드시 { method: 'GET' }을 전달합니다.
-async function fetchToBlobNative(url: string): Promise<Blob> {
+export async function fetchToBlobNative(url: string): Promise<Blob> {
+  const swImgMatch = url.match(/\/sw\/img\/([0-9a-fA-F]+)/);
+  if (swImgMatch && swImgMatch[1]) {
+    try {
+      const hex = swImgMatch[1];
+      let loc = '';
+      for (let i = 0; i < hex.length; i += 2) {
+        loc += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+      }
+      console.log('[log plugin] SW image URL detected. Decoding key:', loc);
+      const data = await Risuai.readImage(loc);
+      if (data) {
+        let mimeType = 'image/png';
+        if (loc.endsWith('.jpg') || loc.endsWith('.jpeg')) {
+          mimeType = 'image/jpeg';
+        } else if (loc.endsWith('.webp')) {
+          mimeType = 'image/webp';
+        } else if (loc.endsWith('.gif')) {
+          mimeType = 'image/gif';
+        }
+        return new Blob([data], { type: mimeType });
+      }
+      throw new Error(`readImage returned empty data for ${loc}`);
+    } catch (e) {
+      console.warn('[log plugin] Failed to readImage for SW URL, falling back:', e);
+    }
+  }
+
+  let parentHost = '';
+  try {
+    if (document.referrer) {
+      parentHost = new URL(document.referrer).host;
+    }
+  } catch (e) {
+    /* ignore */
+  }
+
+  const isRelative = url.startsWith('/') || (!url.startsWith('http://') && !url.startsWith('https://'));
+  const isSameOrigin = isRelative || (parentHost && url.includes(parentHost));
+
+  if (isSameOrigin) {
+    try {
+      console.log('[log plugin] Same-origin URL detected, fetching via risuFetch:', url);
+      const res = await (Risuai as any).risuFetch(url, {
+        method: 'GET',
+        plainFetchForce: true,
+        rawResponse: true
+      } as any);
+      if (res && res.ok && res.data) {
+        const mimeType = res.headers?.['content-type'] || 'image/png';
+        return new Blob([res.data], { type: mimeType });
+      }
+      throw new Error(`risuFetch failed with status ${res?.status}`);
+    } catch (e) {
+      console.warn('[log plugin] Same-origin risuFetch failed, falling back to nativeFetch:', e);
+    }
+  }
+
   const res = await Risuai.nativeFetch(url, { method: 'GET' } as any)
   if (!res.ok) throw new Error(`nativeFetch failed: ${res.status} ${res.statusText} for ${url}`)
   return await res.blob()

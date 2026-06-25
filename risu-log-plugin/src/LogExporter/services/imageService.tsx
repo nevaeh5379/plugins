@@ -7,11 +7,12 @@ import { convertWebMToAnimatedWebP } from '../../services/webmConverter';
 import { getLogHtml } from './htmlGenerator';
 import { collectCharacterAvatars } from './avatarService';
 import type { CharInfo } from '../../types';
-import html2canvas from 'html2canvas';
+import { snapdom } from '@zumer/snapdom';
 import { loadGlobalSettings } from './settingsService';
 import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
+import { imageUrlToBlob, fetchToBlobNative } from '../utils/imageUtils';
 
 const waitForMedia = async (element: HTMLElement) => {
     const images = Array.from(element.querySelectorAll('img'));
@@ -40,6 +41,35 @@ const waitForMedia = async (element: HTMLElement) => {
         Promise.all(promises),
         new Promise(resolve => setTimeout(resolve, 5000)) // 5s timeout
     ]);
+};
+
+const convertBlobToWebP = async (pngBlob: Blob): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Failed to get 2D context'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((webpBlob) => {
+                if (webpBlob) {
+                    resolve(webpBlob);
+                } else {
+                    reject(new Error('Failed to convert canvas to WebP'));
+                }
+            }, 'image/webp');
+            URL.revokeObjectURL(img.src);
+        };
+        img.onerror = (err) => {
+            reject(err);
+        };
+        img.src = URL.createObjectURL(pngBlob);
+    });
 };
 
 // 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합하는 함수
@@ -93,17 +123,16 @@ const splitAndMergeAsOneFile = async (
             // WebP의 경우 PNG로 캡처 후 나중에 변환 (이미지 에셋 보존)
             const captureFormat = format === 'webp' ? 'png' : format;
             
-            if (imageLibrary === 'html2canvas') {
-                const canvas = await html2canvas(wrapper, { 
-                    scale: resolution, 
-                    useCORS: true, 
-                    backgroundColor: bgColor,
+            if (imageLibrary === 'snapdom') {
+                blob = await snapdom.toBlob(wrapper, {
+                    scale: resolution,
                     width: commonOptions.width,
-                    height: commonOptions.height
-                });
-                blob = await new Promise(resolve => canvas.toBlob(resolve, `image/${captureFormat}`));
+                    height: commonOptions.height,
+                    type: captureFormat === 'jpeg' ? 'jpeg' : captureFormat,
+                    backgroundColor: bgColor
+                } as any);
             } else if (imageLibrary === 'dom-to-image') {
-                const libOptions = { ...commonOptions, bgcolor: bgColor };
+                const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
                 if (captureFormat === 'png') {
                     blob = await domtoimage.toBlob(wrapper, libOptions);
                 } else { // jpeg
@@ -227,30 +256,24 @@ const splitAndSaveAsSeparateFiles = async (
             
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
             
-            if (imageLibrary === 'html2canvas') {
-                const canvas = await html2canvas(wrapper, { 
-                    scale: resolution, 
-                    useCORS: true, 
-                    backgroundColor: bgColor,
+            if (imageLibrary === 'snapdom') {
+                blob = await snapdom.toBlob(wrapper, {
+                    scale: resolution,
                     width: commonOptions.width,
-                    height: commonOptions.height
-                });
-                blob = await new Promise(resolve => canvas.toBlob(resolve, `image/${format}`));
+                    height: commonOptions.height,
+                    type: format === 'jpeg' ? 'jpeg' : format,
+                    backgroundColor: bgColor
+                } as any);
             } else if (imageLibrary === 'dom-to-image') {
-                const libOptions = { ...commonOptions, bgcolor: bgColor };
+                const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
                 if (format === 'png') {
                     blob = await domtoimage.toBlob(wrapper, libOptions);
                 } else if (format === 'jpeg') {
                     blob = await domtoimage.toBlob(wrapper, { ...libOptions, quality: 1.0 });
                 } else {
-                    const canvas = await html2canvas(wrapper, { 
-                        scale: resolution, 
-                        useCORS: true, 
-                        backgroundColor: bgColor,
-                        width: commonOptions.width,
-                        height: commonOptions.height
-                    });
-                    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp'));
+                    const pngBlob = await domtoimage.toBlob(wrapper, libOptions);
+                    if (!pngBlob) throw new Error('Failed to capture PNG');
+                    blob = await convertBlobToWebP(pngBlob);
                 }
             } else { // html-to-image
                 const libOptions = { ...commonOptions, backgroundColor: bgColor };
@@ -259,14 +282,9 @@ const splitAndSaveAsSeparateFiles = async (
                 } else if (format === 'jpeg') {
                     blob = await toBlob(wrapper, { ...libOptions, quality: 1.0 });
                 } else {
-                    const canvas = await html2canvas(wrapper, { 
-                        scale: resolution, 
-                        useCORS: true, 
-                        backgroundColor: bgColor,
-                        width: commonOptions.width,
-                        height: commonOptions.height
-                    });
-                    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp'));
+                    const pngBlob = await toBlob(wrapper, libOptions);
+                    if (!pngBlob) throw new Error('Failed to capture PNG');
+                    blob = await convertBlobToWebP(pngBlob);
                 }
             }
             
@@ -295,186 +313,227 @@ const splitAndSaveAsSeparateFiles = async (
 };
 
 export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'png' | 'jpeg' | 'webp', charName: string, chatName: string, options: any, backgroundColor?: string) => {
-    const { 
-        imageResolution: initialImageResolution = 1, 
-        imageLibrary = 'html-to-image', 
-        splitImage = 'none', 
-        maxImageHeight: userMaxImageHeight = 10000,
-        onProgressStart = (_message: string, _total?: number) => {},
-        onProgressUpdate = (_update: { current?: number; message?: string }) => {},
-        onProgressEnd = () => {},
-        ...htmlOptions
-    } = options;
+    try {
+        const { 
+            imageResolution: initialImageResolution = 1, 
+            imageLibrary = 'html-to-image', 
+            splitImage = 'none', 
+            maxImageHeight: userMaxImageHeight = 10000,
+            onProgressStart = (_message: string, _total?: number) => {},
+            onProgressUpdate = (_update: { current?: number; message?: string }) => {},
+            onProgressEnd = () => {},
+            ...htmlOptions
+        } = options;
 
-    const BROWSER_MAX_HEIGHT = 16384;
+        // Pre-convert remote avatar and banner URLs to base64 data URLs to prevent async rendering delays and CSP blocks
+        const resolvedAvatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
+        const resolvedBannerUrl = htmlOptions.headerBannerUrl ? await imageUrlToBlob(htmlOptions.headerBannerUrl) : '';
 
-    const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
-        onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
-        await new Promise(resolve => setTimeout(resolve, 50));
-        const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
-        const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
-        const filename = totalParts > 1 
-            ? `Risu_Log_${safeCharName}_${safeChatName}_part${part + 1}.${format}`
-            : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
+        const BROWSER_MAX_HEIGHT = 16384;
 
-        const bgColor = backgroundColor || '#1a1b26';
-
-        try {
-            let blob: Blob | null = null;
-            
-            const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
-            const isTooTall = element.offsetHeight > finalMaxHeight;
-            
-            if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
-                if (splitImage === 'chunk') {
-                    blob = await splitAndMergeAsOneFile(
-                        element,
-                        finalMaxHeight,
-                        resolution,
-                        format,
-                        imageLibrary,
-                        bgColor,
-                        onProgressUpdate
-                    );
-                } else { // splitImage === 'message'
-                    await splitAndSaveAsSeparateFiles(
-                        element,
-                        finalMaxHeight,
-                        resolution,
-                        format,
-                        imageLibrary,
-                        bgColor,
-                        onProgressUpdate,
-                        safeCharName,
-                        safeChatName,
-                        part,
-                        totalParts
-                    );
-                    return; 
-                }
-            } else {
-                const commonOptions = {
-                    pixelRatio: resolution,
-                    width: element.offsetWidth,
-                    height: element.offsetHeight,
-                };
-
-                if (imageLibrary === 'html2canvas') {
-                    const canvas = await html2canvas(element, { 
-                        scale: resolution, 
-                        useCORS: true, 
-                        backgroundColor: bgColor,
-                        width: commonOptions.width,
-                        height: commonOptions.height
-                    });
-                    blob = await new Promise(resolve => canvas.toBlob(resolve, `image/${format}`));
-                } else if (imageLibrary === 'dom-to-image') {
-                    const libOptions = { ...commonOptions, bgcolor: bgColor };
-                    if (format === 'png') {
-                        blob = await domtoimage.toBlob(element, libOptions);
-                    } else if (format === 'jpeg') {
-                        blob = await domtoimage.toBlob(element, { ...libOptions, quality: 1.0 });
-                    } else { // webp fallback
-                        const canvas = await html2canvas(element, { 
-                            scale: resolution, 
-                            useCORS: true, 
-                            backgroundColor: bgColor,
-                            width: commonOptions.width,
-                            height: commonOptions.height
-                        });
-                        blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp'));
-                    }
-                } else { // html-to-image
-                    const libOptions = { ...commonOptions, backgroundColor: bgColor };
-                    if (format === 'png') {
-                        blob = await toBlob(element, libOptions);
-                    } else if (format === 'jpeg') {
-                        blob = await toBlob(element, { ...libOptions, quality: 1.0 });
-                    } else { // webp fallback
-                        const canvas = await html2canvas(element, { 
-                            scale: resolution, 
-                            useCORS: true, 
-                            backgroundColor: bgColor,
-                            width: commonOptions.width,
-                            height: commonOptions.height
-                        });
-                        blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp'));
-                    }
-                }
-            }
-
-            if (!blob) {
-                throw new Error('Failed to generate image blob.');
-            }
-            
-            onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
+        const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
+            onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
             await new Promise(resolve => setTimeout(resolve, 50));
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            await new Promise(resolve => setTimeout(resolve, 100));
+            const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
+            const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
+            const filename = totalParts > 1 
+                ? `Risu_Log_${safeCharName}_${safeChatName}_part${part + 1}.${format}`
+                : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
 
-        } catch (error) {
-            console.error('Error saving image part:', error);
-            alert(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
-        }
-    };
+            const bgColor = backgroundColor || '#1a1b26';
 
-    const getChunks = (nodesToChunk: HTMLElement[], resolutionForChunking: number) => {
-        const chunks: { nodes: HTMLElement[] }[] = [];
-        const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
-        const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
-
-        if (splitImage === 'message') {
-            let currentChunk: HTMLElement[] = [];
-            let currentHeight = 0;
-            const tempRenderDiv = document.createElement('div');
-            tempRenderDiv.style.position = 'absolute';
-            tempRenderDiv.style.top = '-9999px';
-            tempRenderDiv.style.left = '-9999px';
-            tempRenderDiv.style.width = `${htmlOptions.previewWidth || 900}px`;
-            document.body.appendChild(tempRenderDiv);
-
-            for (const node of nodesToChunk) {
-                const nodeClone = node.cloneNode(true) as HTMLElement;
-                tempRenderDiv.appendChild(nodeClone);
-                const nodeHeight = nodeClone.offsetHeight;
-                tempRenderDiv.removeChild(nodeClone);
-
-                if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
-                    chunks.push({ nodes: currentChunk });
-                    currentChunk = [node];
-                    currentHeight = nodeHeight;
+            try {
+                let blob: Blob | null = null;
+                
+                const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
+                const isTooTall = element.offsetHeight > finalMaxHeight;
+                
+                if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
+                    if (splitImage === 'chunk') {
+                        blob = await splitAndMergeAsOneFile(
+                            element,
+                            finalMaxHeight,
+                            resolution,
+                            format,
+                            imageLibrary,
+                            bgColor,
+                            onProgressUpdate
+                        );
+                    } else { // splitImage === 'message'
+                        await splitAndSaveAsSeparateFiles(
+                            element,
+                            finalMaxHeight,
+                            resolution,
+                            format,
+                            imageLibrary,
+                            bgColor,
+                            onProgressUpdate,
+                            safeCharName,
+                            safeChatName,
+                            part,
+                            totalParts
+                        );
+                        return; 
+                    }
                 } else {
-                    currentChunk.push(node);
-                    currentHeight += nodeHeight;
+                    const commonOptions = {
+                        pixelRatio: resolution,
+                        width: element.offsetWidth,
+                        height: element.offsetHeight,
+                    };
+
+                    if (imageLibrary === 'snapdom') {
+                        blob = await snapdom.toBlob(element, {
+                            scale: resolution,
+                            width: commonOptions.width,
+                            height: commonOptions.height,
+                            type: format === 'jpeg' ? 'jpeg' : format,
+                            backgroundColor: bgColor
+                        } as any);
+                    } else if (imageLibrary === 'dom-to-image') {
+                        const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
+                        if (format === 'png') {
+                            blob = await domtoimage.toBlob(element, libOptions);
+                        } else if (format === 'jpeg') {
+                            blob = await domtoimage.toBlob(element, { ...libOptions, quality: 1.0 });
+                        } else {
+                            const pngBlob = await domtoimage.toBlob(element, libOptions);
+                            if (!pngBlob) throw new Error('Failed to capture PNG');
+                            blob = await convertBlobToWebP(pngBlob);
+                        }
+                    } else { // html-to-image
+                        const libOptions = { ...commonOptions, backgroundColor: bgColor };
+                        if (format === 'png') {
+                            blob = await toBlob(element, libOptions);
+                        } else if (format === 'jpeg') {
+                            blob = await toBlob(element, { ...libOptions, quality: 1.0 });
+                        } else {
+                            const pngBlob = await toBlob(element, libOptions);
+                            if (!pngBlob) throw new Error('Failed to capture PNG');
+                            blob = await convertBlobToWebP(pngBlob);
+                        }
+                    }
                 }
+
+                if (!blob) {
+                    throw new Error('Failed to generate image blob.');
+                }
+                
+                onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+            } catch (error) {
+                console.error('Error saving image part:', error);
+                alert(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
             }
-            if (currentChunk.length > 0) {
-                chunks.push({ nodes: currentChunk });
+        };
+
+        const getChunks = (nodesToChunk: HTMLElement[], resolutionForChunking: number) => {
+            const chunks: { nodes: HTMLElement[] }[] = [];
+            const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
+            const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
+
+            if (splitImage === 'message') {
+                let currentChunk: HTMLElement[] = [];
+                let currentHeight = 0;
+                const tempRenderDiv = document.createElement('div');
+                tempRenderDiv.style.position = 'absolute';
+                tempRenderDiv.style.top = '-9999px';
+                tempRenderDiv.style.left = '-9999px';
+                tempRenderDiv.style.width = `${htmlOptions.previewWidth || 900}px`;
+                document.body.appendChild(tempRenderDiv);
+
+                for (const node of nodesToChunk) {
+                    const nodeClone = node.cloneNode(true) as HTMLElement;
+                    tempRenderDiv.appendChild(nodeClone);
+                    const nodeHeight = nodeClone.offsetHeight;
+                    tempRenderDiv.removeChild(nodeClone);
+
+                    if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
+                        chunks.push({ nodes: currentChunk });
+                        currentChunk = [node];
+                        currentHeight = nodeHeight;
+                    } else {
+                        currentChunk.push(node);
+                        currentHeight += nodeHeight;
+                    }
+                }
+                if (currentChunk.length > 0) {
+                    chunks.push({ nodes: currentChunk });
+                }
+                document.body.removeChild(tempRenderDiv);
+            } else {
+                chunks.push({ nodes: nodesToChunk });
             }
-            document.body.removeChild(tempRenderDiv);
-        } else {
-            chunks.push({ nodes: nodesToChunk });
+            return chunks;
         }
-        return chunks;
-    }
 
-    onProgressStart('분할 이미지 계산 중...', 1);
-    await new Promise(resolve => setTimeout(resolve, 50));
+        onProgressStart('분할 이미지 계산 중...', 1);
+        await new Promise(resolve => setTimeout(resolve, 50));
 
-    if (!Array.isArray(nodes)) {
-        const singleElement = nodes;
-        const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-        const chunks = getChunks([singleElement], resolutionForChunking);
+        if (!Array.isArray(nodes)) {
+            const singleElement = nodes;
+            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
+            const chunks = getChunks([singleElement], resolutionForChunking);
 
-        onProgressStart(`이미지 생성 중...`, chunks.length);
+            onProgressStart(`이미지 생성 중...`, chunks.length);
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.top = '-9999px';
+            container.style.left = '-9999px';
+            document.body.appendChild(container);
+
+            try {
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunk = chunks[i];
+                    const elementToRender = chunk.nodes[0];
+                    
+                    container.innerHTML = '';
+                    container.appendChild(elementToRender);
+
+                    let finalResolution: number;
+                    if (initialImageResolution === 'auto') {
+                        const height = elementToRender.offsetHeight;
+                        if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) {
+                            finalResolution = 4;
+                        } else if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) {
+                            finalResolution = 3;
+                        } else if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) {
+                            finalResolution = 2;
+                        } else {
+                            finalResolution = 1;
+                        }
+                    } else {
+                        finalResolution = initialImageResolution as number;
+                    }
+
+                    if (elementToRender.offsetHeight * finalResolution > BROWSER_MAX_HEIGHT) {
+                        const oldRes = finalResolution;
+                        finalResolution = Math.floor(BROWSER_MAX_HEIGHT / elementToRender.offsetHeight);
+                        if (finalResolution < 1) finalResolution = 1;
+                        onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
+                    }
+                    
+                    await waitForMedia(elementToRender);
+                    await renderImage(elementToRender, finalResolution, i, chunks.length);
+                }
+            } finally {
+                onProgressEnd();
+                document.body.removeChild(container);
+            }
+            return;
+        }
+
         const container = document.createElement('div');
         container.style.position = 'absolute';
         container.style.top = '-9999px';
@@ -482,12 +541,53 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
         document.body.appendChild(container);
 
         try {
+            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
+            const chunks = getChunks(nodes, resolutionForChunking);
+            onProgressStart(`이미지 생성 중...`, chunks.length);
+            await new Promise(resolve => setTimeout(resolve, 50));
+
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
-                const elementToRender = chunk.nodes[0];
-                
-                container.innerHTML = '';
-                container.appendChild(elementToRender);
+                const chunkNodes = chunk.nodes;
+                onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                await new Promise<void>(resolve => {
+                    const onReady = () => resolve();
+                    const props = {
+                        nodes: chunkNodes,
+                        charInfo: { name: charName, chatName: chatName, avatarUrl: resolvedAvatarUrl },
+                        selectedThemeKey: htmlOptions.theme,
+                        selectedColorKey: htmlOptions.color,
+                        color: htmlOptions.color,
+                        showAvatar: htmlOptions.showAvatar,
+                        showHeader: htmlOptions.showHeader,
+                        showHeaderIcon: htmlOptions.showHeaderIcon,
+                        headerTags: htmlOptions.headerTags,
+                        headerLayout: htmlOptions.headerLayout,
+                        headerBannerUrl: resolvedBannerUrl,
+                        headerBannerBlur: htmlOptions.headerBannerBlur,
+                        headerBannerAlign: htmlOptions.headerBannerAlign,
+                        showFooter: htmlOptions.showFooter,
+                        footerLeft: htmlOptions.footerLeft,
+                        footerCenter: htmlOptions.footerCenter,
+                        footerRight: htmlOptions.footerRight,
+                        showBubble: htmlOptions.showBubble,
+                        embedImagesAsBlob: true,
+                        globalSettings: loadGlobalSettings(),
+                        onReady: onReady,
+                        fontSize: Number(htmlOptions.previewFontSize),
+                        containerWidth: htmlOptions.previewWidth,
+                        imageScale: Number(htmlOptions.imageScale),
+                        isForImageExport: true,
+                        replacementRules: htmlOptions.replacementRules,
+                    };
+                    const root = createRoot(container);
+                    root.render(<LogContainer {...props} />);
+                });
+
+                const elementToRender = container.firstChild as HTMLElement;
+                if (!elementToRender) continue;
 
                 let finalResolution: number;
                 if (initialImageResolution === 'auto') {
@@ -501,6 +601,7 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                     } else {
                         finalResolution = 1;
                     }
+                    onProgressUpdate({ message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x` });
                 } else {
                     finalResolution = initialImageResolution as number;
                 }
@@ -511,106 +612,20 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                     if (finalResolution < 1) finalResolution = 1;
                     onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
                 }
-                
+
                 await waitForMedia(elementToRender);
                 await renderImage(elementToRender, finalResolution, i, chunks.length);
+                container.innerHTML = '';
             }
+        } catch (error) {
+            console.error('Error preparing images:', error);
+            alert('이미지 준비 중 오류가 발생했습니다.');
         } finally {
             onProgressEnd();
             document.body.removeChild(container);
         }
-        return;
-    }
-
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.top = '-9999px';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
-
-    try {
-        const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-        const chunks = getChunks(nodes, resolutionForChunking);
-        onProgressStart(`이미지 생성 중...`, chunks.length);
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const chunkNodes = chunk.nodes;
-            onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            await new Promise<void>(resolve => {
-                const onReady = () => resolve();
-                const props = {
-                    nodes: chunkNodes,
-                    charInfo: { name: charName, chatName: chatName, avatarUrl: options.charAvatarUrl },
-                    selectedThemeKey: htmlOptions.theme,
-                    selectedColorKey: htmlOptions.color,
-                    color: htmlOptions.color,
-                    showAvatar: htmlOptions.showAvatar,
-                    showHeader: htmlOptions.showHeader,
-                    showHeaderIcon: htmlOptions.showHeaderIcon,
-                    headerTags: htmlOptions.headerTags,
-                    headerLayout: htmlOptions.headerLayout,
-                    headerBannerUrl: htmlOptions.headerBannerUrl,
-                    headerBannerBlur: htmlOptions.headerBannerBlur,
-                    headerBannerAlign: htmlOptions.headerBannerAlign,
-                    showFooter: htmlOptions.showFooter,
-                    footerLeft: htmlOptions.footerLeft,
-                    footerCenter: htmlOptions.footerCenter,
-                    footerRight: htmlOptions.footerRight,
-                    showBubble: htmlOptions.showBubble,
-                    embedImagesAsBlob: true,
-                    globalSettings: loadGlobalSettings(),
-                    onReady: onReady,
-                    fontSize: Number(htmlOptions.previewFontSize),
-                    containerWidth: htmlOptions.previewWidth,
-                    imageScale: Number(htmlOptions.imageScale),
-                    isForImageExport: true,
-                    replacementRules: htmlOptions.replacementRules,
-                };
-                const root = createRoot(container);
-                root.render(<LogContainer {...props} />);
-            });
-
-            const elementToRender = container.firstChild as HTMLElement;
-            if (!elementToRender) continue;
-
-            let finalResolution: number;
-            if (initialImageResolution === 'auto') {
-                const height = elementToRender.offsetHeight;
-                if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) {
-                    finalResolution = 4;
-                } else if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) {
-                    finalResolution = 3;
-                } else if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) {
-                    finalResolution = 2;
-                } else {
-                    finalResolution = 1;
-                }
-                onProgressUpdate({ message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x` });
-            } else {
-                finalResolution = initialImageResolution as number;
-            }
-
-            if (elementToRender.offsetHeight * finalResolution > BROWSER_MAX_HEIGHT) {
-                const oldRes = finalResolution;
-                finalResolution = Math.floor(BROWSER_MAX_HEIGHT / elementToRender.offsetHeight);
-                if (finalResolution < 1) finalResolution = 1;
-                onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
-            }
-
-            await waitForMedia(elementToRender);
-            await renderImage(elementToRender, finalResolution, i, chunks.length);
-            container.innerHTML = '';
-        }
-    } catch (error) {
-        console.error('Error preparing images:', error);
-        alert('이미지 준비 중 오류가 발생했습니다.');
-    } finally {
-        onProgressEnd();
-        document.body.removeChild(container);
+    } catch (e) {
+        console.error('Error in saveAsImage:', e);
     }
 };
 
@@ -648,11 +663,7 @@ export const downloadImagesAsZip = async (
             const baseFilename = `media_${String(mediaCounter).padStart(3, '0')}`;
 
             mediaPromises.push(
-                Risuai.nativeFetch(src, { method: 'GET' } as any)
-                    .then(res => {
-                        if (!res.ok) throw new Error(`Media download failed: ${src}`);
-                        return res.blob();
-                    })
+                fetchToBlobNative(src)
                     .then(async (blob) => {
                         const urlLower = src.toLowerCase();
                         const isWebMFromUrl = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
