@@ -5,6 +5,8 @@ import { processChatLog, serializeNodes } from '../services/chatData';
 import { THEMES, COLORS } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
 import type { ThemeKey, ColorKey } from '../types';
+import { ConfigProvider, theme, Spin, Button, Tabs } from 'antd';
+import { SettingOutlined, ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, CloseOutlined } from '@ant-design/icons';
 
 import PluginSettingsModal from './components/PluginSettingsModal';
 import ExportTab from './components/ExportTab';
@@ -499,224 +501,269 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     }, []);
 
     const uiTheme = globalSettings.uiTheme || 'dark';
+    const antTheme = {
+        algorithm: uiTheme === 'light' ? theme.defaultAlgorithm : theme.darkAlgorithm,
+        token: {
+            colorPrimary: '#61afef',
+        }
+    };
 
     return (
-        <div className="log-exporter-modal-backdrop" onClick={isArcaHelperOpen ? () => setIsArcaHelperOpen(false) : handleClose}>
-            {isArcaHelperOpen ? (
-                <ArcaHelperModal
-                    isOpen={isArcaHelperOpen}
-                    onClose={() => setIsArcaHelperOpen(false)}
-                    messageNodes={messageNodes}
-                    charInfo={{ name: charName, chatName: chatName, avatarUrl: charAvatarUrl }}
-                    settings={savedSettings}
-                    globalSettings={globalSettings}
-                    uiTheme={uiTheme}
-                    colorPalette={colorPalette}
-                />
-            ) : (
-                <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
-                    <div className="log-exporter-modal-header-bar">
-                        <button id="log-exporter-close" className="log-exporter-modal-close-btn" title="닫기 (Esc)" aria-label="모달 닫기" onClick={handleClose}>
-                            &times;
-                        </button>
-                        <span className="header-title">로그 내보내기</span>
-                        <button className="settings-button" onClick={() => setIsPluginSettingsOpen(true)}>
-                            ⚙️ 플러그인 설정
-                        </button>
-                    </div>
-                    {isLoading ? (
-                        <div className="desktop-modal-loading">
-                            <div className="desktop-spinner"></div>
-                            <p>로그 데이터를 불러오는 중...</p>
+        <ConfigProvider theme={antTheme}>
+            <div className="log-exporter-modal-backdrop" onClick={isArcaHelperOpen ? () => setIsArcaHelperOpen(false) : handleClose}>
+                {isArcaHelperOpen ? (
+                    <ArcaHelperModal
+                        isOpen={isArcaHelperOpen}
+                        onClose={() => setIsArcaHelperOpen(false)}
+                        messageNodes={messageNodes}
+                        charInfo={{ name: charName, chatName: chatName, avatarUrl: charAvatarUrl }}
+                        settings={savedSettings}
+                        globalSettings={globalSettings}
+                        uiTheme={uiTheme}
+                        colorPalette={colorPalette}
+                    />
+                ) : (
+                    <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
+                        <div className="log-exporter-modal-header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+                            <Button 
+                                id="log-exporter-close" 
+                                className="log-exporter-modal-close-btn" 
+                                type="text"
+                                icon={<CloseOutlined />}
+                                title="닫기 (Esc)" 
+                                aria-label="모달 닫기" 
+                                onClick={handleClose}
+                                style={{ color: 'var(--text-white)' }}
+                            />
+                            <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 내보내기</span>
+                            <Button 
+                                type="text"
+                                icon={<SettingOutlined />}
+                                onClick={() => setIsPluginSettingsOpen(true)}
+                                style={{ color: 'var(--text-white)' }}
+                            >
+                                플러그인 설정
+                            </Button>
                         </div>
-                    ) : (isMobile || isTablet) ? (
-                        <div className="log-exporter-modal-content">
-                            <div className="mobile-tab-navigation">
-                                <button className={`mobile-tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-                                    설정
-                                </button>
-                                <button className={`mobile-tab-btn ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>
-                                    미리보기
-                                </button>
-                                <button className={`mobile-tab-btn ${activeTab === 'tools' ? 'active' : ''}`} onClick={() => setActiveTab('tools')}>
-                                    도구
-                                </button>
+                        {isLoading ? (
+                            <div className="desktop-modal-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '12px' }}>
+                                <Spin size="large" />
+                                <p>로그 데이터를 불러오는 중...</p>
                             </div>
-                            <div className={`mobile-tab-content mobile-settings-tab ${activeTab === 'settings' ? 'active' : ''}`}>
-                                <MobileSettingsPanel
-                                    settings={savedSettings}
-                                    onSettingChange={handleSettingChange}
-                                    themes={THEMES}
-                                    colors={COLORS}
-                                    participants={participants}
-                                    globalSettings={globalSettings}
-                                    onGlobalSettingChange={handleGlobalSettingChange}
-                                    uiClasses={uiClasses}
-                                />
-                            </div>
-                            <div className={`mobile-tab-content mobile-preview-tab ${activeTab === 'preview' ? 'active' : ''}`}>
-                                <PreviewPanel
-                                    logContainerProps={logContainerProps}
-                                    settings={savedSettings}
-                                    otherFormatContent={otherFormatContent}
-                                    selectedIndices={selectedIndices}
-                                    onSelectionChange={handleSelectionChange}
-                                    lastSelectedIndex={lastSelectedIndex}
-                                    onLastSelectedIndexChange={handleLastSelectedIndexChange}
-                                    onSelectAll={handleSelectAll}
-                                    onDeselectAll={handleDeselectAll}
-                                    onInvertSelection={handleInvertSelection}
-                                    onDimensionsChange={handleDimensionsChange}
-                                />
-                            </div>
-                            <div className={`mobile-tab-content mobile-tools-tab ${activeTab === 'tools' ? 'active' : ''}`}>
-                                <MobileToolsPanel
-                                    settings={savedSettings}
-                                    onSettingChange={handleSettingChange}
-                                    imageSizeWarning={imageSizeWarning}
-                                />
-                            </div>
-                            <div className="mobile-action-bar">
-                                <Actionbar
-                                    charName={charName}
-                                    chatName={chatName}
-                                    getPreviewContent={getPreviewContentForExport}
-                                    messageNodes={nodesForExport}
-                                    settings={savedSettings}
-                                    backgroundColor={backgroundColor}
-                                    color={colorPalette}
-                                    charAvatarUrl={charAvatarUrl}
-                                    onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                                    onProgressStart={handleProgressStart}
-                                    onProgressUpdate={handleProgressUpdate}
-                                    onProgressEnd={handleProgressEnd}
-                                    onSaveLogData={handleSaveLogData}
-                                    onLoadLogData={handleLoadLogData}
-                                    onDeleteSelected={handleDeleteSelected}
-                                    hasSelection={selectedIndices.size > 0}
-                                />
-                            </div>
-                        </div>
-                    ) : (
-                        <>
+                        ) : (isMobile || isTablet) ? (
                             <div className="log-exporter-modal-content">
-                                <div className="desktop-settings-panel">
-                                    <div className="tab-navigation">
-                                        <button
-                                            className={`tab-button ${activeTab === 'export' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('export')}
-                                        >
-                                            📤 내보내기
-                                        </button>
-                                        <button
-                                            className={`tab-button ${activeTab === 'filter' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('filter')}
-                                        >
-                                            🔍 필터
-                                        </button>
-                                        <button
-                                            className={`tab-button ${activeTab === 'replacement' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('replacement')}
-                                        >
-                                            🔤 단어 바꾸기
-                                        </button>
-                                        <button
-                                            className={`tab-button ${activeTab === 'advanced' ? 'active' : ''}`}
-                                            onClick={() => setActiveTab('advanced')}
-                                        >
-                                            ⚡ 고급
-                                        </button>
+                                <div className="mobile-tab-navigation">
+                                    <button className={`mobile-tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                                        설정
+                                    </button>
+                                    <button className={`mobile-tab-btn ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>
+                                        미리보기
+                                    </button>
+                                    <button className={`mobile-tab-btn ${activeTab === 'tools' ? 'active' : ''}`} onClick={() => setActiveTab('tools')}>
+                                        도구
+                                    </button>
+                                </div>
+                                <div className={`mobile-tab-content mobile-settings-tab ${activeTab === 'settings' ? 'active' : ''}`}>
+                                    <MobileSettingsPanel
+                                        settings={savedSettings}
+                                        onSettingChange={handleSettingChange}
+                                        themes={THEMES}
+                                        colors={COLORS}
+                                        participants={participants}
+                                        globalSettings={globalSettings}
+                                        onGlobalSettingChange={handleGlobalSettingChange}
+                                        uiClasses={uiClasses}
+                                    />
+                                </div>
+                                <div className={`mobile-tab-content mobile-preview-tab ${activeTab === 'preview' ? 'active' : ''}`}>
+                                    <PreviewPanel
+                                        logContainerProps={logContainerProps}
+                                        settings={savedSettings}
+                                        otherFormatContent={otherFormatContent}
+                                        selectedIndices={selectedIndices}
+                                        onSelectionChange={handleSelectionChange}
+                                        lastSelectedIndex={lastSelectedIndex}
+                                        onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                        onSelectAll={handleSelectAll}
+                                        onDeselectAll={handleDeselectAll}
+                                        onInvertSelection={handleInvertSelection}
+                                        onDimensionsChange={handleDimensionsChange}
+                                    />
+                                </div>
+                                <div className={`mobile-tab-content mobile-tools-tab ${activeTab === 'tools' ? 'active' : ''}`}>
+                                    <MobileToolsPanel
+                                        settings={savedSettings}
+                                        onSettingChange={handleSettingChange}
+                                        imageSizeWarning={imageSizeWarning}
+                                    />
+                                </div>
+                                <div className="mobile-action-bar">
+                                    <Actionbar
+                                        charName={charName}
+                                        chatName={chatName}
+                                        getPreviewContent={getPreviewContentForExport}
+                                        messageNodes={nodesForExport}
+                                        settings={savedSettings}
+                                        backgroundColor={backgroundColor}
+                                        color={colorPalette}
+                                        charAvatarUrl={charAvatarUrl}
+                                        onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                                        onProgressStart={handleProgressStart}
+                                        onProgressUpdate={handleProgressUpdate}
+                                        onProgressEnd={handleProgressEnd}
+                                        onSaveLogData={handleSaveLogData}
+                                        onLoadLogData={handleLoadLogData}
+                                        onDeleteSelected={handleDeleteSelected}
+                                        hasSelection={selectedIndices.size > 0}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 130px)', overflow: 'hidden' }}>
+                                    <div className="desktop-settings-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                                        <Tabs
+                                            activeKey={activeTab}
+                                            onChange={setActiveTab}
+                                            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+                                            tabBarStyle={{ padding: '0 16px', margin: 0 }}
+                                            items={[
+                                                {
+                                                    key: 'export',
+                                                    label: (
+                                                        <span>
+                                                            <ExportOutlined />
+                                                            내보내기
+                                                        </span>
+                                                    ),
+                                                    children: (
+                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
+                                                            <ExportTab
+                                                                settings={savedSettings}
+                                                                onSettingChange={handleSettingChange}
+                                                                themes={THEMES}
+                                                                colors={COLORS}
+                                                            />
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'filter',
+                                                    label: (
+                                                        <span>
+                                                            <FilterOutlined />
+                                                            필터
+                                                        </span>
+                                                    ),
+                                                    children: (
+                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
+                                                            <FilterTab
+                                                                settings={savedSettings}
+                                                                onSettingChange={handleSettingChange}
+                                                                participants={participants}
+                                                                globalSettings={globalSettings}
+                                                                onGlobalSettingChange={handleGlobalSettingChange}
+                                                                uiClasses={uiClasses}
+                                                            />
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'replacement',
+                                                    label: (
+                                                        <span>
+                                                            <TranslationOutlined />
+                                                            단어 바꾸기
+                                                        </span>
+                                                    ),
+                                                    children: (
+                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
+                                                            <ReplacementTab
+                                                                rules={savedSettings.replacementRules || []}
+                                                                onRulesChange={(rules) => handleSettingChange('replacementRules', rules)}
+                                                            />
+                                                        </div>
+                                                    ),
+                                                },
+                                                {
+                                                    key: 'advanced',
+                                                    label: (
+                                                        <span>
+                                                            <SlidersOutlined />
+                                                            고급
+                                                        </span>
+                                                    ),
+                                                    children: (
+                                                        <div style={{ padding: '16px', height: 'calc(90vh - 180px)', overflowY: 'auto' }}>
+                                                            <AdvancedTab
+                                                                settings={savedSettings}
+                                                                onSettingChange={handleSettingChange}
+                                                                imageSizeWarning={imageSizeWarning}
+                                                            />
+                                                        </div>
+                                                    ),
+                                                },
+                                            ]}
+                                        />
                                     </div>
-                                    <div style={{flex: 1, overflow: 'hidden'}}>
-                                        {activeTab === 'export' && (
-                                            <ExportTab
-                                                settings={savedSettings}
-                                                onSettingChange={handleSettingChange}
-                                                themes={THEMES}
-                                                colors={COLORS}
-                                            />
-                                        )}
-                                        {activeTab === 'filter' && (
-                                            <FilterTab
-                                                settings={savedSettings}
-                                                onSettingChange={handleSettingChange}
-                                                participants={participants}
-                                                globalSettings={globalSettings}
-                                                onGlobalSettingChange={handleGlobalSettingChange}
-                                                uiClasses={uiClasses}
-                                            />
-                                        )}
-                                        {activeTab === 'replacement' && (
-                                            <ReplacementTab
-                                                rules={savedSettings.replacementRules || []}
-                                                onRulesChange={(rules) => handleSettingChange('replacementRules', rules)}
-                                            />
-                                        )}
-                                        {activeTab === 'advanced' && (
-                                            <AdvancedTab
-                                                settings={savedSettings}
-                                                onSettingChange={handleSettingChange}
-                                                imageSizeWarning={imageSizeWarning}
-                                            />
-                                        )}
+                                    <div className="desktop-preview-panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                        <PreviewPanel
+                                            logContainerProps={logContainerProps}
+                                            settings={savedSettings}
+                                            otherFormatContent={otherFormatContent}
+                                            selectedIndices={selectedIndices}
+                                            onSelectionChange={handleSelectionChange}
+                                            lastSelectedIndex={lastSelectedIndex}
+                                            onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                            onSelectAll={handleSelectAll}
+                                            onDeselectAll={handleDeselectAll}
+                                            onInvertSelection={handleInvertSelection}
+                                            onDimensionsChange={handleDimensionsChange}
+                                        />
                                     </div>
                                 </div>
-                                <div className="desktop-preview-panel">
-                                                                    <PreviewPanel
-                                                                        logContainerProps={logContainerProps}
-                                                                        settings={savedSettings}
-                                                                        otherFormatContent={otherFormatContent}
-                                                                        selectedIndices={selectedIndices}
-                                                                        onSelectionChange={handleSelectionChange}
-                                                                        lastSelectedIndex={lastSelectedIndex}
-                                                                        onLastSelectedIndexChange={handleLastSelectedIndexChange}
-                                                                        onSelectAll={handleSelectAll}
-                                                                        onDeselectAll={handleDeselectAll}
-                                                                        onInvertSelection={handleInvertSelection}
-                                                                        onDimensionsChange={handleDimensionsChange}
-                                                                    />                                </div>
-                            </div>
-                            <div className="desktop-action-bar">
-                                <Actionbar
-                                    charName={charName}
-                                    chatName={chatName}
-                                    getPreviewContent={getPreviewContentForExport}
-                                    messageNodes={nodesForExport}
-                                    settings={savedSettings}
-                                    backgroundColor={backgroundColor}
-                                    color={colorPalette}
-                                    charAvatarUrl={charAvatarUrl}
-                                    onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                                    onProgressStart={handleProgressStart}
-                                    onProgressUpdate={handleProgressUpdate}
-                                    onProgressEnd={handleProgressEnd}
-                                    onSaveLogData={handleSaveLogData}
-                                    onLoadLogData={handleLoadLogData}
-                                    onDeleteSelected={handleDeleteSelected}
-                                    hasSelection={selectedIndices.size > 0}
-                                />
-                            </div>
-                        </>
-                    )}
+                                <div className="desktop-action-bar">
+                                    <Actionbar
+                                        charName={charName}
+                                        chatName={chatName}
+                                        getPreviewContent={getPreviewContentForExport}
+                                        messageNodes={nodesForExport}
+                                        settings={savedSettings}
+                                        backgroundColor={backgroundColor}
+                                        color={colorPalette}
+                                        charAvatarUrl={charAvatarUrl}
+                                        onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                                        onProgressStart={handleProgressStart}
+                                        onProgressUpdate={handleProgressUpdate}
+                                        onProgressEnd={handleProgressEnd}
+                                        onSaveLogData={handleSaveLogData}
+                                        onLoadLogData={handleLoadLogData}
+                                        onDeleteSelected={handleDeleteSelected}
+                                        hasSelection={selectedIndices.size > 0}
+                                    />
+                                </div>
+                            </>
+                        )}
 
-                    <PluginSettingsModal
-                        isOpen={isPluginSettingsOpen}
-                        onClose={() => setIsPluginSettingsOpen(false)}
-                        globalSettings={globalSettings}
-                        onGlobalSettingChange={handleGlobalSettingChange}
-                    />
-                </div>
-            )}
-            {progress.active && (
-                <div className="desktop-modal-loading progress-overlay">
-                    <div className="desktop-spinner"></div>
-                    <p>{progress.message}</p>
-                    {progress.total > 0 && (
-                        <span>{progress.current} / {progress.total}</span>
-                    )}
-                </div>
-            )}
-        </div>
+                        <PluginSettingsModal
+                            isOpen={isPluginSettingsOpen}
+                            onClose={() => setIsPluginSettingsOpen(false)}
+                            globalSettings={globalSettings}
+                            onGlobalSettingChange={handleGlobalSettingChange}
+                        />
+                    </div>
+                )}
+                {progress.active && (
+                    <div className="desktop-modal-loading progress-overlay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                        <Spin size="large" />
+                        <p>{progress.message}</p>
+                        {progress.total > 0 && (
+                            <span>{progress.current} / {progress.total}</span>
+                        )}
+                    </div>
+                )}
+            </div>
+        </ConfigProvider>
     );
 };
 

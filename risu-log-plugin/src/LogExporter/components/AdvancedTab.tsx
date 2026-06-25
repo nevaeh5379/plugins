@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Select, Switch, InputNumber, Alert, Divider } from 'antd';
 
 interface AdvancedTabProps {
   settings: any;
@@ -22,144 +23,144 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
     settingKey, label, value, defaultOn = true, description 
   }) => {
     const isChecked = defaultOn ? value !== false : value === true;
-    const handleChange = () => {
-      onSettingChange(settingKey, !isChecked);
-    };
-    
     return (
-      <div className="tab-option-row">
-        <div className="option-info">
-          <span className="option-label">{label}</span>
-          {description && <span className="option-description">{description}</span>}
+      <div className="tab-option-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0' }}>
+        <div className="option-info" style={{ display: 'flex', flexDirection: 'column' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>{label}</span>
+          {description && <span className="option-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>{description}</span>}
         </div>
-        <div className={`tab-toggle ${isChecked ? 'active' : ''}`} onClick={handleChange}>
-          <input type="checkbox" checked={isChecked} style={{display: 'none'}} readOnly />
-        </div>
+        <Switch checked={isChecked} onChange={(checked) => onSettingChange(settingKey, checked)} />
       </div>
     );
   };
 
   return (
-    <div className="tab-content">
-      <div className="tab-section">
-        <h3 className="tab-section-title">👁️ 미리보기</h3>
-        <div className="tab-option-row">
-          <span className="option-label">글자 크기</span>
-          <div className="number-input-group">
-            <input 
-              type="number" 
-              className="tab-number-input" 
-              value={settings.previewFontSize || 16} 
-              onChange={(e) => onSettingChange('previewFontSize', Number(e.target.value))} 
-              min="10" 
-              max="32" 
-            />
-            <span className="input-unit">px</span>
-          </div>
+    <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 미리보기 */}
+      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>미리보기</h4>
+        
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>글자 크기</span>
+          <InputNumber 
+            value={settings.previewFontSize || 16} 
+            onChange={(val) => onSettingChange('previewFontSize', val)} 
+            min={10} 
+            max={32}
+            addonAfter="px"
+            style={{ width: '100%' }}
+          />
         </div>
-        <div className="tab-option-row">
-          <span className="option-label">너비</span>
-          <div className="number-input-group">
-            <input 
-              type="number" 
-              className="tab-number-input" 
-              value={settings.previewWidth || 800} 
-              onChange={(e) => onSettingChange('previewWidth', Number(e.target.value))} 
-              min="320" 
-              max="1920" 
-              step="10" 
-            />
-            <span className="input-unit">px</span>
-          </div>
+
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>너비</span>
+          <InputNumber 
+            value={settings.previewWidth || 800} 
+            onChange={(val) => onSettingChange('previewWidth', val)} 
+            min={320} 
+            max={1920} 
+            step={10}
+            addonAfter="px"
+            style={{ width: '100%' }}
+          />
         </div>
       </div>
 
-      <div className="tab-section">
-        <h3 className="tab-section-title">📷 이미지 내보내기</h3>
+      <Divider style={{ margin: '8px 0' }} />
+
+      {/* 이미지 내보내기 */}
+      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>이미지 내보내기</h4>
+        
         {imageSizeWarning && (
-          <div className="tab-option-row" style={{ color: 'var(--text-warning)', fontSize: '0.85em', padding: '8px', background: 'rgba(224, 175, 104, 0.1)', borderRadius: '4px', display: 'block' }}>
-            {imageSizeWarning}
-          </div>
+          <Alert 
+            message={imageSizeWarning} 
+            type="warning" 
+            showIcon 
+            style={{ fontSize: '0.9em' }}
+          />
         )}
-        <div className="tab-option-row">
-          <span className="option-label">해상도</span>
-          <select 
-            className="tab-select" 
-            value={settings.imageResolution || 1} 
-            onChange={(e) => onSettingChange('imageResolution', e.target.value)}
+
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>해상도</span>
+          <Select 
+            value={settings.imageResolution || '1'} 
+            onChange={(val) => onSettingChange('imageResolution', val)}
+            style={{ width: '100%' }}
           >
             <option value="auto">자동</option>
-                                        <option value="1">1x</option>
-                                                            <option value="2">2x</option>
-                                                            <option value="3">3x</option>
-                                                            <option value="4">4x</option>
-                                                            <option value="8">8x</option>
-                                                            <option value="16">16x</option>
-                                                            <option value="32">32x</option>
-                                                            <option value="64">64x</option>
-                                                            <option value="128">128x</option>
+            <option value="1">1x</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+            <option value="8">8x</option>
+            <option value="16">16x</option>
+            <option value="32">32x</option>
+            <option value="64">64x</option>
+            <option value="128">128x</option>
+          </Select>
+        </div>
 
-          </select>
-        </div>
-        <div className="tab-option-row">
-          <span className="option-label">라이브러리</span>
-          <select 
-            className="tab-select" 
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>라이브러리</span>
+          <Select 
             value={settings.imageLibrary || 'html-to-image'} 
-            onChange={(e) => onSettingChange('imageLibrary', e.target.value)}
+            onChange={(val) => onSettingChange('imageLibrary', val)}
+            style={{ width: '100%' }}
           >
-            <option value="html-to-image">html-to-image (권장)</option>
-            <option value="html2canvas">html2canvas</option>
-            <option value="dom-to-image">dom-to-image-more</option>
-          </select>
+            <Select.Option value="html-to-image">html-to-image (권장)</Select.Option>
+            <Select.Option value="html2canvas">html2canvas</Select.Option>
+            <Select.Option value="dom-to-image">dom-to-image-more</Select.Option>
+          </Select>
         </div>
-        <div className="tab-option-row">
-          <span className="option-label">포맷</span>
-          <select 
-            className="tab-select" 
+
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>포맷</span>
+          <Select 
             value={settings.imageFormat || 'png'} 
-            onChange={(e) => onSettingChange('imageFormat', e.target.value)}
+            onChange={(val) => onSettingChange('imageFormat', val)}
+            style={{ width: '100%' }}
           >
-            <option value="png">PNG</option>
-            <option value="jpeg">JPEG</option>
-            <option value="webp">WebP</option>
-          </select>
+            <Select.Option value="png">PNG</Select.Option>
+            <Select.Option value="jpeg">JPEG</Select.Option>
+            <Select.Option value="webp">WebP</Select.Option>
+          </Select>
         </div>
         
-        <div className="tab-option-row">
-          <span className="option-label">이미지 분할</span>
-          <select 
-            className="tab-select" 
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>이미지 분할</span>
+          <Select 
             value={settings.splitImage || 'none'} 
-            onChange={(e) => onSettingChange('splitImage', e.target.value)}
+            onChange={(val) => onSettingChange('splitImage', val)}
+            style={{ width: '100%' }}
           >
-            <option value="none">분할 안함</option>
-            <option value="chunk">청크 단위 (1개 파일로 병합)</option>
-            <option value="message">메시지 단위 (여러 파일)</option>
-          </select>
+            <Select.Option value="none">분할 안함</Select.Option>
+            <Select.Option value="chunk">청크 단위 (1개 파일로 병합)</Select.Option>
+            <Select.Option value="message">메시지 단위 (여러 파일)</Select.Option>
+          </Select>
         </div>
         
         {settings.splitImage && settings.splitImage !== 'none' && (
-          <div className="tab-option-row" style={{marginLeft: '20px'}}>
-            <span className="option-label">최대 높이</span>
-            <div className="number-input-group">
-              <input 
-                type="number" 
-                className="tab-number-input" 
-                value={settings.maxImageHeight || 10000} 
-                onChange={(e) => onSettingChange('maxImageHeight', parseInt(e.target.value, 10))} 
-                min="1000" 
-                max={maxAllowedHeight} 
-                step="1000" 
-              />
-              <span className="input-unit">px</span>
-            </div>
+          <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)' }}>
+            <span className="option-label" style={{ fontWeight: '500' }}>최대 높이</span>
+            <InputNumber 
+              value={settings.maxImageHeight || 10000} 
+              onChange={(val) => onSettingChange('maxImageHeight', val || 10000)} 
+              min={1000} 
+              max={maxAllowedHeight} 
+              step={1000} 
+              addonAfter="px"
+              style={{ width: '100%' }}
+            />
           </div>
         )}
       </div>
 
-      <div className="tab-section">
-        <h3 className="tab-section-title">🔧 개발자 도구</h3>
+      <Divider style={{ margin: '8px 0' }} />
+
+      {/* 개발자 도구 */}
+      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <h4 className="tab-section-title" style={{ margin: '0 0 12px 0', fontSize: '1.1em', fontWeight: 'bold' }}>개발자 도구</h4>
         <Toggle 
           settingKey="rawHtmlView" 
           label="Raw HTML 보기" 

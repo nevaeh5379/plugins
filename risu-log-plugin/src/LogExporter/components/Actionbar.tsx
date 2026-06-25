@@ -2,6 +2,16 @@ import React from 'react';
 import { copyToClipboard, saveAsFile } from '../services/fileService';
 import { saveAsImage } from '../services/imageService';
 import { THEMES, COLORS } from './constants';
+import { Button } from 'antd';
+import {
+  CopyOutlined,
+  SaveOutlined,
+  PictureOutlined,
+  RocketOutlined,
+  DownloadOutlined,
+  UploadOutlined,
+  DeleteOutlined,
+} from '@ant-design/icons';
 
 interface ActionbarProps {
   charName: string;
@@ -72,43 +82,76 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
 
   return (
     <>
-        <button className="desktop-btn desktop-btn-primary" onClick={handleCopyHtml} title="HTML을 클립보드에 복사" data-mobile-label="복사">
-            <span className="btn-icon">📋</span>
-            <span className="btn-text">복사</span>
-        </button>
-        <button className="desktop-btn desktop-btn-secondary" onClick={handleSaveHtml} title="HTML 파일로 저장" data-mobile-label="HTML">
-            <span className="btn-icon">💾</span>
-            <span className="btn-text">HTML 저장</span>
-        </button>
-        <button className="desktop-btn desktop-btn-success" onClick={handleSaveAsImage} title="이미지 파일로 저장" data-mobile-label="이미지">
-            <span className="btn-icon">🖼️</span>
-            <span className="btn-text">이미지 저장</span>
-        </button>
-        <button className="desktop-btn desktop-btn-warning" onClick={onOpenArcaHelper} title="아카라이브 업로드 도우미" data-mobile-label="아카">
-            <span className="btn-icon">🚀</span>
-            <span className="btn-text">아카라이브 헬퍼</span>
-        </button>
+        <Button 
+            type="primary" 
+            icon={<CopyOutlined />} 
+            onClick={handleCopyHtml} 
+            title="HTML을 클립보드에 복사"
+            className="action-bar-btn"
+        >
+            복사
+        </Button>
+        <Button 
+            type="default" 
+            icon={<SaveOutlined />} 
+            onClick={handleSaveHtml} 
+            title="HTML 파일로 저장"
+            className="action-bar-btn"
+        >
+            HTML 저장
+        </Button>
+        <Button 
+            type="primary"
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', color: '#fff' }} 
+            icon={<PictureOutlined />} 
+            onClick={handleSaveAsImage} 
+            title="이미지 파일로 저장"
+            className="action-bar-btn"
+        >
+            이미지 저장
+        </Button>
+        <Button 
+            type="default" 
+            icon={<RocketOutlined />} 
+            onClick={onOpenArcaHelper} 
+            title="아카라이브 업로드 도우미"
+            className="action-bar-btn"
+        >
+            아카라이브 헬퍼
+        </Button>
+        
         <div style={{flex: 1}} className="action-spacer"></div>
-        <button className="desktop-btn desktop-btn-secondary" onClick={onSaveLogData} title="로그 데이터를 JSON으로 저장" data-mobile-label="저장">
-            <span className="btn-icon">📦</span>
-            <span className="btn-text">저장</span>
-        </button>
-        <button className="desktop-btn desktop-btn-secondary" onClick={onLoadLogData} title="저장된 로그 데이터 불러오기" data-mobile-label="불러오기">
-            <span className="btn-icon">📂</span>
-            <span className="btn-text">불러오기</span>
-        </button>
+        
+        <Button 
+            type="default" 
+            icon={<DownloadOutlined />} 
+            onClick={onSaveLogData} 
+            title="로그 데이터를 JSON으로 저장"
+            className="action-bar-btn"
+        >
+            저장
+        </Button>
+        <Button 
+            type="default" 
+            icon={<UploadOutlined />} 
+            onClick={onLoadLogData} 
+            title="저장된 로그 데이터 불러오기"
+            className="action-bar-btn"
+        >
+            불러오기
+        </Button>
         {settings.isEditable && (
-            <button 
-                className="desktop-btn desktop-btn-danger"
+            <Button 
+                danger
+                type="primary"
+                icon={<DeleteOutlined />}
                 onClick={onDeleteSelected}
                 disabled={!hasSelection}
                 title={!hasSelection ? '삭제할 메시지를 선택하세요' : '선택한 메시지 삭제'}
-                style={{opacity: !hasSelection ? 0.5 : 1, cursor: !hasSelection ? 'not-allowed' : 'pointer'}}
-                data-mobile-label="삭제"
+                className="action-bar-btn"
             >
-                <span className="btn-icon">🗑️</span>
-                <span className="btn-text">삭제</span>
-            </button>
+                삭제
+            </Button>
         )}
     </>
   );

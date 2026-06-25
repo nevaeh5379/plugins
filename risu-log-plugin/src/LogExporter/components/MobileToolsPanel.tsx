@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Collapse, Select, Segmented, Switch, InputNumber, Alert } from 'antd';
 
 interface MobileToolsPanelProps {
   settings: any;
@@ -18,141 +19,126 @@ const MobileToolsPanel: React.FC<MobileToolsPanelProps> = ({ settings, onSetting
     }
   }, [settings.imageResolution, settings.maxImageHeight, maxAllowedHeight, onSettingChange]);
 
-  return (
-    <div className="mobile-settings-container">
-      {/* 미리보기 옵션 */}
-      <div className="mobile-card">
-        <div className="mobile-card-header">
-          <span className="mobile-card-icon">👁️</span>
-          <span className="mobile-card-title">미리보기 옵션</span>
-        </div>
-        <div className="mobile-card-content">
-          <div className="mobile-field">
-            <label className="mobile-field-label">글자 크기</label>
-            <input 
-              type="number" 
-              className="mobile-input-number" 
+  const collapseItems = [
+    {
+      key: 'preview-options',
+      label: '미리보기 옵션',
+      children: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>글자 크기 (px)</span>
+            <InputNumber 
               value={settings.previewFontSize || 16} 
-              onChange={(e) => onSettingChange('previewFontSize', Number(e.target.value))} 
-              min="10" 
-              max="32"
+              onChange={(val) => onSettingChange('previewFontSize', val)} 
+              min={10} 
+              max={32}
+              style={{ width: '100%' }}
             />
           </div>
-          <div className="mobile-field">
-            <label className="mobile-field-label">너비 (px)</label>
-            <input 
-              type="number" 
-              className="mobile-input-number" 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>너비 (px)</span>
+            <InputNumber 
               value={settings.previewWidth || 800} 
-              onChange={(e) => onSettingChange('previewWidth', Number(e.target.value))} 
-              min="320" 
-              max="1920" 
-              step="10"
+              onChange={(val) => onSettingChange('previewWidth', val)} 
+              min={320} 
+              max={1920} 
+              step={10}
+              style={{ width: '100%' }}
             />
           </div>
         </div>
-      </div>
-
-      {/* 이미지 내보내기 */}
-      <div className="mobile-card">
-        <div className="mobile-card-header">
-          <span className="mobile-card-icon">📷</span>
-          <span className="mobile-card-title">이미지 내보내기</span>
-        </div>
-        {imageSizeWarning && (
-          <div style={{ color: 'var(--text-warning)', padding: '12px 16px', fontSize: '0.9em', background: 'rgba(224, 175, 104, 0.1)', borderBottom: '1px solid var(--border-color-light)' }}>
-            {imageSizeWarning}
-          </div>
-        )}
-        <div className="mobile-card-content">
-          <div className="mobile-field">
-            <label className="mobile-field-label">해상도</label>
-            <div className="mobile-chip-scroll">
-              <button 
-                className={`mobile-chip ${settings.imageResolution === '1' || !settings.imageResolution ? 'active' : ''}`}
-                onClick={() => onSettingChange('imageResolution', '1')}
-              >
-                ⚡ 1x
-              </button>
-              <button 
-                className={`mobile-chip ${settings.imageResolution === '2' ? 'active' : ''}`}
-                onClick={() => onSettingChange('imageResolution', '2')}
-              >
-                🔥 2x
-              </button>
-              <button 
-                className={`mobile-chip ${settings.imageResolution === '3' ? 'active' : ''}`}
-                onClick={() => onSettingChange('imageResolution', '3')}
-              >
-                💎 3x
-              </button>
-            </div>
+      )
+    },
+    {
+      key: 'image-export',
+      label: '이미지 내보내기',
+      children: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {imageSizeWarning && (
+            <Alert 
+              message={imageSizeWarning} 
+              type="warning" 
+              showIcon 
+              style={{ fontSize: '0.85em', marginBottom: '4px' }}
+            />
+          )}
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>해상도</span>
+            <Segmented 
+              value={settings.imageResolution || '1'}
+              onChange={(val) => onSettingChange('imageResolution', val)}
+              options={[
+                { label: '1x', value: '1' },
+                { label: '2x', value: '2' },
+                { label: '3x', value: '3' },
+              ]}
+              block
+            />
           </div>
 
-          <div className="mobile-field">
-            <label className="mobile-field-label">라이브러리</label>
-            <select 
-              className="mobile-select" 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>라이브러리</span>
+            <Select 
               value={settings.imageLibrary || 'html-to-image'} 
-              onChange={(e) => onSettingChange('imageLibrary', e.target.value)}
+              onChange={(val) => onSettingChange('imageLibrary', val)}
+              style={{ width: '100%' }}
             >
-              <option value="html-to-image">html-to-image</option>
-              <option value="html2canvas">html2canvas</option>
-              <option value="dom-to-image">dom-to-image-more</option>
-            </select>
+              <Select.Option value="html-to-image">html-to-image</Select.Option>
+              <Select.Option value="html2canvas">html2canvas</Select.Option>
+              <Select.Option value="dom-to-image">dom-to-image-more</Select.Option>
+            </Select>
           </div>
 
-          <div className="mobile-field">
-            <label className="mobile-field-label">이미지 분할</label>
-            <select 
-              className="mobile-select" 
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>이미지 분할</span>
+            <Select 
               value={settings.splitImage || 'none'} 
-              onChange={(e) => onSettingChange('splitImage', e.target.value)}
+              onChange={(val) => onSettingChange('splitImage', val)}
+              style={{ width: '100%' }}
             >
-              <option value="none">분할 안함</option>
-              <option value="chunk">청크 단위 (1개 파일로 병합)</option>
-              <option value="message">메시지 단위 (여러 파일)</option>
-            </select>
+              <Select.Option value="none">분할 안함</Select.Option>
+              <Select.Option value="chunk">청크 단위 (병합)</Select.Option>
+              <Select.Option value="message">메시지 단위 (여러 파일)</Select.Option>
+            </Select>
           </div>
             
-            {settings.splitImage && settings.splitImage !== 'none' && (
-              <div className="mobile-field">
-                <label className="mobile-field-label">최대 높이 (px)</label>
-                <input 
-                  type="number" 
-                  className="mobile-input-number" 
-                  value={settings.maxImageHeight || 10000} 
-                  onChange={(e) => onSettingChange('maxImageHeight', parseInt(e.target.value, 10))} 
-                  min="1000" 
-                  max={maxAllowedHeight} 
-                  step="1000"
-                />
-              </div>
-            )}
-
-          <div className="mobile-toggle-list">
-            <div className="mobile-toggle-item">
-              <span className="mobile-toggle-label">Raw HTML 보기</span>
-              <div 
-                className={`mobile-switch ${settings.rawHtmlView === true ? 'active' : ''}`}
-                onClick={() => onSettingChange('rawHtmlView', settings.rawHtmlView !== true)}
-              >
-                <div className="mobile-switch-thumb"></div>
-              </div>
+          {settings.splitImage && settings.splitImage !== 'none' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '12px', borderLeft: '2px solid var(--border-color)' }}>
+              <span>최대 높이 (px)</span>
+              <InputNumber 
+                value={settings.maxImageHeight || 10000} 
+                onChange={(val) => onSettingChange('maxImageHeight', val || 10000)} 
+                min={1000} 
+                max={maxAllowedHeight} 
+                step={1000}
+                style={{ width: '100%' }}
+              />
             </div>
+          )}
 
-            <div className="mobile-toggle-item">
-              <span className="mobile-toggle-label">✍️ 로그 편집</span>
-              <div 
-                className={`mobile-switch ${settings.isEditable === true ? 'active' : ''}`}
-                onClick={() => onSettingChange('isEditable', settings.isEditable !== true)}
-              >
-                <div className="mobile-switch-thumb"></div>
-              </div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+            <span>Raw HTML 보기</span>
+            <Switch checked={settings.rawHtmlView === true} onChange={(val) => onSettingChange('rawHtmlView', val)} />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>로그 편집</span>
+            <Switch checked={settings.isEditable === true} onChange={(val) => onSettingChange('isEditable', val)} />
           </div>
         </div>
-      </div>
+      )
+    }
+  ];
+
+  return (
+    <div className="mobile-settings-container" style={{ padding: '8px 4px' }}>
+      <Collapse 
+        items={collapseItems} 
+        defaultActiveKey={['preview-options', 'image-export']} 
+        expandIconPosition="end"
+        style={{ border: 'none', background: 'transparent' }}
+      />
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Modal, Select, Input, Button, Tag, Divider } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 
 interface PluginSettingsModalProps {
   isOpen: boolean;
@@ -15,8 +17,6 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
 }) => {
   const [newProfileClass, setNewProfileClass] = useState('');
   const [newParticipantNameClass, setNewParticipantNameClass] = useState('');
-
-  if (!isOpen) return null;
 
   const handleAddProfileClass = () => {
     if (newProfileClass && !globalSettings.profileClasses?.includes(newProfileClass)) {
@@ -45,94 +45,87 @@ const PluginSettingsModal: React.FC<PluginSettingsModalProps> = ({
   };
 
   return (
-    <div className="plugin-settings-backdrop" onClick={onClose}>
-      <div className="plugin-settings-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="plugin-settings-header">
-          <h2>⚙️ 플러그인 설정</h2>
-          <button className="close-btn" onClick={onClose}>&times;</button>
-        </div>
-        
-        <div className="plugin-settings-content">
-          {/* UI 테마 설정 */}
-          <section className="settings-section">
-            <h3>🎨 UI 테마</h3>
-            <div className="setting-item">
-              <label>모달 테마</label>
-              <select 
-                className="setting-select" 
-                value={globalSettings.uiTheme || 'dark'} 
-                onChange={(e) => onGlobalSettingChange('uiTheme', e.target.value)}
-              >
-                <option value="dark">다크 모던</option>
-                <option value="classic">클래식 다크</option>
-                <option value="light">라이트</option>
-              </select>
-            </div>
-          </section>
-
-          {/* 커스텀 선택자 */}
-          <section className="settings-section">
-            <h3>✍️ 커스텀 선택자</h3>
-            
-            <div className="custom-selector-group">
-              <label>프로필 이미지 클래스</label>
-              <p className="setting-description">프로필 이미지를 찾기 위한 CSS 클래스를 추가하세요</p>
-              <div className="input-group">
-                <input 
-                  type="text" 
-                  className="setting-input" 
-                  value={newProfileClass} 
-                  onChange={(e) => setNewProfileClass(e.target.value)}
-                  placeholder=".avatar, .profile-img"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddProfileClass()}
-                />
-                <button className="add-btn" onClick={handleAddProfileClass}>추가</button>
-              </div>
-              {globalSettings.profileClasses && globalSettings.profileClasses.length > 0 && (
-                <div className="class-list">
-                  {globalSettings.profileClasses.map((cls: string) => (
-                    <div key={cls} className="class-item">
-                      <code>{cls}</code>
-                      <button onClick={() => handleRemoveProfileClass(cls)} className="remove-btn">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="custom-selector-group">
-              <label>참가자 이름 클래스</label>
-              <p className="setting-description">참가자 이름을 찾기 위한 CSS 클래스를 추가하세요</p>
-              <div className="input-group">
-                <input 
-                  type="text" 
-                  className="setting-input" 
-                  value={newParticipantNameClass} 
-                  onChange={(e) => setNewParticipantNameClass(e.target.value)}
-                  placeholder=".username, .name"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddParticipantNameClass()}
-                />
-                <button className="add-btn" onClick={handleAddParticipantNameClass}>추가</button>
-              </div>
-              {globalSettings.participantNameClasses && globalSettings.participantNameClasses.length > 0 && (
-                <div className="class-list">
-                  {globalSettings.participantNameClasses.map((cls: string) => (
-                    <div key={cls} className="class-item">
-                      <code>{cls}</code>
-                      <button onClick={() => handleRemoveParticipantNameClass(cls)} className="remove-btn">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+    <Modal
+      title="플러그인 설정"
+      open={isOpen}
+      onCancel={onClose}
+      footer={[
+        <Button key="close" onClick={onClose}>
+          닫기
+        </Button>
+      ]}
+      width={550}
+    >
+      <div className="plugin-settings-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '12px 0' }}>
+        {/* UI 테마 설정 */}
+        <div className="settings-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '1.05em' }}>UI 테마</span>
+          <div className="setting-item" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ minWidth: '80px' }}>모달 테마</span>
+            <Select 
+              value={globalSettings.uiTheme || 'dark'} 
+              onChange={(val) => onGlobalSettingChange('uiTheme', val)}
+              style={{ flex: 1 }}
+            >
+              <Select.Option value="dark">다크 모던</Select.Option>
+              <Select.Option value="classic">클래식 다크</Select.Option>
+              <Select.Option value="light">라이트</Select.Option>
+            </Select>
+          </div>
         </div>
 
-        <div className="plugin-settings-footer">
-          <button className="btn-secondary" onClick={onClose}>닫기</button>
+        <Divider style={{ margin: '12px 0' }} />
+
+        {/* 커스텀 선택자 */}
+        <div className="settings-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '1.05em' }}>커스텀 선택자</span>
+          
+          <div className="custom-selector-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span style={{ fontWeight: '500' }}>프로필 이미지 클래스</span>
+            <span className="setting-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>프로필 이미지를 찾기 위한 CSS 클래스를 추가하세요</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Input 
+                value={newProfileClass} 
+                onChange={(e) => setNewProfileClass(e.target.value)}
+                placeholder="예: .avatar, .profile-img"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddProfileClass()}
+                style={{ flex: 1 }}
+              />
+              <Button icon={<PlusOutlined />} onClick={handleAddProfileClass}>추가</Button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+              {globalSettings.profileClasses?.map((cls: string) => (
+                <Tag key={cls} closable onClose={() => handleRemoveProfileClass(cls)} style={{ fontFamily: 'monospace' }}>
+                  {cls}
+                </Tag>
+              ))}
+            </div>
+          </div>
+
+          <div className="custom-selector-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span style={{ fontWeight: '500' }}>참가자 이름 클래스</span>
+            <span className="setting-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>참가자 이름을 찾기 위한 CSS 클래스를 추가하세요</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Input 
+                value={newParticipantNameClass} 
+                onChange={(e) => setNewParticipantNameClass(e.target.value)}
+                placeholder="예: .username, .name"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddParticipantNameClass()}
+                style={{ flex: 1 }}
+              />
+              <Button icon={<PlusOutlined />} onClick={handleAddParticipantNameClass}>추가</Button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+              {globalSettings.participantNameClasses?.map((cls: string) => (
+                <Tag key={cls} closable onClose={() => handleRemoveParticipantNameClass(cls)} style={{ fontFamily: 'monospace' }}>
+                  {cls}
+                </Tag>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.2.5",
     "@types/html2canvas": "^0.5.35",
+    "antd": "^6.4.5",
     "browser-image-compression": "^2.0.2",
     "dom-to-image-more": "^3.7.2",
     "fast-png": "^7.0.1",
