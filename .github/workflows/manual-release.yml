@@ -18,16 +18,8 @@ on:
         options:
           - stable
           - beta
-      version_source:
-        description: 'How to determine the version'
-        required: true
-        type: choice
-        default: 'package_json'
-        options:
-          - package_json
-          - custom
       custom_version:
-        description: 'Custom version string (only if version_source is custom, e.g. 1.0.0-beta.1)'
+        description: 'Custom version string (optional, e.g. 1.1.0. Leave empty to use package.json version)'
         required: false
         type: string
 
@@ -64,7 +56,7 @@ jobs:
         working-directory: ${{ github.event.inputs.plugin }}
         run: |
           VERSION="${{ github.event.inputs.custom_version }}"
-          if [ "${{ github.event.inputs.version_source }}" = "package_json" ] || [ -z "$VERSION" ]; then
+          if [ -z "$VERSION" ]; then
             VERSION=$(jq -r .version package.json)
           fi
 
