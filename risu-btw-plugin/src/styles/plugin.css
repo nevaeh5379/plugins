@@ -717,3 +717,36 @@ button.btw-btn-sm {
   border-radius: 2px;
 }
 
+/* Model Badge & Endpoint Config Styling */
+.btw-msg-model-badge {
+  font-size: 0.68rem;
+  background: var(--btw-bg-msg-user);
+  border: var(--btw-border);
+  color: var(--btw-fg-muted);
+  border-radius: 4px;
+  padding: 0.05rem 0.25rem;
+  margin-left: 0.4rem;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.btw-endpoint-selector-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.btw-endpoint-selector-row select {
+  flex: 1;
+}
+
+.btw-endpoint-selector-row button {
+  height: var(--btw-control-height);
+  padding: 0 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+

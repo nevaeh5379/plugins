@@ -14,26 +14,48 @@ interface OocMessage {
   role: 'user' | 'ai' | 'system'
   content: string
   timestamp: number
+  model?: string
+}
+
+interface CustomEndpoint {
+  id: string
+  name: string
+  apiUrl: string
+  apiKey: string
+  model: string
 }
 
 interface PluginConfig {
   provider: 'risu' | 'custom'
-  customApiUrl: string
-  customApiKey: string
-  customModel: string
+  customEndpoints: CustomEndpoint[]
+  activeEndpointId: string
   customModelMode: 'model' | 'otherAx'
   systemPrompt: string
   contextDepth: 'none' | '1' | '5' | '10' | 'full'
   includeLore: boolean
   renderMarkdown: boolean
   streamResponse: boolean
+
+  // Legacy configuration parameters
+  customApiUrl?: string
+  customApiKey?: string
+  customModel?: string
 }
+
+const DEFAULT_ENDPOINTS: CustomEndpoint[] = [
+  {
+    id: 'openai-default',
+    name: 'OpenAI (Default)',
+    apiUrl: 'https://api.openai.com/v1',
+    apiKey: '',
+    model: 'gpt-4o-mini'
+  }
+]
 
 const DEFAULT_CONFIG: PluginConfig = {
   provider: 'risu',
-  customApiUrl: 'https://api.openai.com/v1',
-  customApiKey: '',
-  customModel: 'gpt-4o-mini',
+  customEndpoints: DEFAULT_ENDPOINTS,
+  activeEndpointId: 'openai-default',
   customModelMode: 'model',
   systemPrompt: 'You are a BTW (Out-of-Character) Assistant. Answer the user\'s questions about the story, character, or world settings. Answer concisely as an assistant, not in roleplay.',
   contextDepth: '5',
@@ -156,6 +178,11 @@ export const App: React.FC = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   
+  // Model fetching states
+  const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({})
+  const [fetchingModels, setFetchingModels] = useState<Record<string, boolean>>({})
+  const [customInputMode, setCustomInputMode] = useState<Record<string, boolean>>({})
+  
   // Context states
   const [characterId, setCharacterId] = useState<string>('default')
   const [characterName, setCharacterName] = useState<string>('Character')
@@ -250,7 +277,32 @@ export const App: React.FC = () => {
 
         // --- SAFE GLOBAL STATE UPDATES ---
         if (savedConfig) {
-          setConfig(prev => ({ ...prev, ...savedConfig }))
+          let migratedEndpoints = savedConfig.customEndpoints || []
+          let activeEpId = savedConfig.activeEndpointId || ''
+
+          if (migratedEndpoints.length === 0) {
+            if (savedConfig.customApiUrl) {
+              const legacyEp: CustomEndpoint = {
+                id: 'legacy-migrated',
+                name: '기존 설정',
+                apiUrl: savedConfig.customApiUrl,
+                apiKey: savedConfig.customApiKey || '',
+                model: savedConfig.customModel || 'gpt-4o-mini'
+              }
+              migratedEndpoints = [legacyEp]
+              activeEpId = 'legacy-migrated'
+            } else {
+              migratedEndpoints = [...DEFAULT_ENDPOINTS]
+              activeEpId = DEFAULT_ENDPOINTS[0].id
+            }
+          }
+
+          setConfig(prev => ({
+            ...prev,
+            ...savedConfig,
+            customEndpoints: migratedEndpoints,
+            activeEndpointId: activeEpId
+          }))
         }
         setCharacterId(charId)
         setCharacterName(char.name || 'Character')
@@ -277,8 +329,9 @@ export const App: React.FC = () => {
       }
     } catch (e) {
       console.error('[BTW Plugin] Load data error:', e)
+      triggerToast('데이터를 불러오지 못했습니다.')
     }
-  }, [])
+  }, [triggerToast])
 
   // Save config settings
   const saveConfig = async (newConfig: PluginConfig) => {
@@ -290,6 +343,84 @@ export const App: React.FC = () => {
       triggerToast('설정이 저장되었습니다.')
     } catch (e) {
       console.error('[BTW Plugin] Save config error:', e)
+      triggerToast('설정 저장에 실패했습니다.')
+    }
+  }
+
+  // Manage multiple custom endpoints
+  const handleAddEndpoint = () => {
+    const newEp: CustomEndpoint = {
+      id: `ep_${Date.now()}`,
+      name: `새 API 설정 ${(config.customEndpoints || []).length + 1}`,
+      apiUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      model: 'gpt-4o-mini'
+    }
+    const updated = [...(config.customEndpoints || []), newEp]
+    saveConfig({
+      ...config,
+      customEndpoints: updated,
+      activeEndpointId: newEp.id
+    })
+  }
+
+  const handleDeleteEndpoint = (epId: string) => {
+    if ((config.customEndpoints || []).length <= 1) {
+      triggerToast('최소 한 개의 API 설정은 유지되어야 합니다.')
+      return
+    }
+    const updated = (config.customEndpoints || []).filter(e => e.id !== epId)
+    const nextActiveId = updated[0].id
+    saveConfig({
+      ...config,
+      customEndpoints: updated,
+      activeEndpointId: nextActiveId
+    })
+  }
+
+  const handleUpdateActiveEndpoint = (fields: Partial<CustomEndpoint>) => {
+    const updated = (config.customEndpoints || []).map(e => 
+      e.id === config.activeEndpointId ? { ...e, ...fields } : e
+    )
+    setConfig({
+      ...config,
+      customEndpoints: updated
+    })
+  }
+
+  // Fetch available models list from API endpoint
+  const handleFetchModels = async (endpoint: CustomEndpoint) => {
+    if (!endpoint.apiUrl) {
+      triggerToast('API Base URL을 입력해주세요.')
+      return
+    }
+    setFetchingModels(prev => ({ ...prev, [endpoint.id]: true }))
+    try {
+      const headers: Record<string, any> = { 'Content-Type': 'application/json' }
+      if (endpoint.apiKey) {
+        const secretKey = `btw_custom_auth_${endpoint.id}`
+        await api.saveSecretHeader(secretKey, 'Bearer ', endpoint.apiKey)
+        headers['Authorization'] = { secretHeader: secretKey }
+      }
+      const fetchUrl = `${endpoint.apiUrl.replace(/\/$/, '')}/models`
+      const res = await api.nativeFetch(fetchUrl, { method: 'GET', headers })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const json = await res.json()
+      const models: string[] = json.data?.map((m: any) => m.id) || []
+      if (models.length === 0) {
+        triggerToast('불러온 모델 목록이 비어있습니다.')
+      } else {
+        setFetchedModels(prev => ({ ...prev, [endpoint.id]: models }))
+        setCustomInputMode(prev => ({ ...prev, [endpoint.id]: false }))
+        triggerToast(`${models.length}개의 모델을 불러왔습니다.`)
+      }
+    } catch (e: any) {
+      console.error('[BTW Plugin] Fetch models error:', e)
+      triggerToast(`모델 목록 로드 실패: ${e.message || e}`)
+    } finally {
+      setFetchingModels(prev => ({ ...prev, [endpoint.id]: false }))
     }
   }
 
@@ -308,6 +439,7 @@ export const App: React.FC = () => {
       setMessages(threadMsgs)
     } catch (e) {
       console.error('[BTW Plugin] Select thread error:', e)
+      triggerToast('대화방 전환에 실패했습니다.')
     }
   }
 
@@ -344,9 +476,10 @@ export const App: React.FC = () => {
       return newThreadId
     } catch (e) {
       console.error('[BTW Plugin] Create new thread error:', e)
+      triggerToast('새 대화방 생성에 실패했습니다.')
       return ''
     }
-  }, [characterId, chatIndex])
+  }, [characterId, chatIndex, triggerToast])
 
   // Keep a ref to the latest handleCreateNewThread to avoid re-triggering useEffect
   const handleCreateNewThreadRef = useRef(handleCreateNewThread)
@@ -384,6 +517,7 @@ export const App: React.FC = () => {
       triggerToast('대화방이 삭제되었습니다.')
     } catch (e) {
       console.error('[BTW Plugin] Delete thread error:', e)
+      triggerToast('대화방 삭제에 실패했습니다.')
     }
   }
 
@@ -396,6 +530,7 @@ export const App: React.FC = () => {
       await storage.setItem(oocKey, msgs)
     } catch (e) {
       console.error('[BTW Plugin] Save thread messages error:', e)
+      triggerToast('대화 저장에 실패했습니다.')
     }
   }
 
@@ -839,7 +974,8 @@ export const App: React.FC = () => {
       try {
         const arr = JSON.parse(args[0] || '[]')
         return String(Array.isArray(arr) ? arr.length : 0)
-      } catch {
+      } catch (e) {
+        console.warn(`[BTW Plugin] CBS macro 'arraylength' JSON parse failed:`, e, 'Input:', args[0])
         return '0'
       }
     }
@@ -852,7 +988,8 @@ export const App: React.FC = () => {
           return val !== undefined ? (typeof val === 'object' ? JSON.stringify(val) : String(val)) : 'null'
         }
         return 'null'
-      } catch {
+      } catch (e) {
+        console.warn(`[BTW Plugin] CBS macro 'arrayelement' JSON parse failed:`, e, 'Input:', args[0])
         return 'null'
       }
     }
@@ -872,7 +1009,8 @@ export const App: React.FC = () => {
         const key = args[1] || ''
         const val = obj[key]
         return val !== undefined ? (typeof val === 'object' ? JSON.stringify(val) : String(val)) : 'null'
-      } catch {
+      } catch (e) {
+        console.warn(`[BTW Plugin] CBS macro 'dictelement' JSON parse failed:`, e, 'Input:', args[0])
         return 'null'
       }
     }
@@ -1275,6 +1413,20 @@ ${loreText}`
   // Helper to execute LLM API call and update state/storage
   const executeLLMCall = async (aiMsgId: string, currentThreadMsgs: OocMessage[], activeId: string) => {
     let aiContent = ''
+    let modelName = ''
+
+    if (configRef.current.provider === 'risu') {
+      const mode = configRef.current.customModelMode === 'otherAx' ? '보조 모델' : '메인 모델'
+      modelName = `RisuAI (${mode})`
+    } else {
+      const activeEp = configRef.current.customEndpoints?.find(e => e.id === configRef.current.activeEndpointId)
+      if (activeEp) {
+        modelName = `${activeEp.name} (${activeEp.model})`
+      } else {
+        modelName = configRef.current.customModel || 'Custom API'
+      }
+    }
+
     try {
       const { systemPromptContent, historyContextMsgs } = await assembleContext()
 
@@ -1330,7 +1482,7 @@ ${loreText}`
 
         if (response.type === 'success' && typeof response.result === 'string') {
           aiContent = response.result
-          updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId)
+          updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true, modelName)
         } else if (response.type === 'streaming') {
           const reader = response.result.getReader()
           const streamEnabled = configRef.current.streamResponse ?? true
@@ -1341,11 +1493,11 @@ ${loreText}`
               if (value && typeof value['0'] === 'string') {
                 aiContent = value['0']
                 if (streamEnabled) {
-                  updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false)
+                  updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, false, modelName)
                 }
               }
             }
-            updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
+            updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true, modelName)
           } finally {
             reader.releaseLock()
           }
@@ -1355,7 +1507,12 @@ ${loreText}`
 
       } else {
         // --- Option 2: Custom OpenAI Compatible API ---
-        if (!configRef.current.customApiUrl) {
+        const activeEp = configRef.current.customEndpoints?.find(e => e.id === configRef.current.activeEndpointId)
+        if (!activeEp) {
+          throw new Error('활성화된 외부 API 설정이 없습니다.')
+        }
+
+        if (!activeEp.apiUrl) {
           throw new Error('외부 API Base URL이 구성되지 않았습니다.')
         }
 
@@ -1363,16 +1520,17 @@ ${loreText}`
           'Content-Type': 'application/json'
         }
 
-        if (configRef.current.customApiKey) {
-          await api.saveSecretHeader('btw_custom_auth', 'Bearer ', configRef.current.customApiKey)
-          headers['Authorization'] = { secretHeader: 'btw_custom_auth' }
+        if (activeEp.apiKey) {
+          const secretKey = `btw_custom_auth_${activeEp.id}`
+          await api.saveSecretHeader(secretKey, 'Bearer ', activeEp.apiKey)
+          headers['Authorization'] = { secretHeader: secretKey }
         }
 
-        const fetchUrl = `${configRef.current.customApiUrl.replace(/\/$/, '')}/chat/completions`
+        const fetchUrl = `${activeEp.apiUrl.replace(/\/$/, '')}/chat/completions`
         const streamEnabled = configRef.current.streamResponse ?? true
 
         const body = {
-          model: configRef.current.customModel,
+          model: activeEp.model,
           messages: messagesToSend,
           stream: streamEnabled
         }
@@ -1412,22 +1570,22 @@ ${loreText}`
                   const dataStr = trimmed.slice(6)
                   if (dataStr === '[DONE]') break
                   try {
-                    const json = JSON.parse(dataStr)
-                    const delta = json.choices?.[0]?.delta
-                    const chunkText = delta?.content || ''
-                    const reasoningText = delta?.reasoning_content || ''
+                     const json = JSON.parse(dataStr)
+                     const delta = json.choices?.[0]?.delta
+                     const chunkText = delta?.content || ''
+                     const reasoningText = delta?.reasoning_content || ''
 
-                    if (reasoningText) {
-                      aiReasoning += reasoningText
-                      const formattedContent = `<think>${aiReasoning}`
-                      updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false)
-                    } else if (chunkText) {
-                      aiContent += chunkText
-                      const formattedContent = aiReasoning
-                        ? `<think>${aiReasoning}</think>\n${aiContent}`
-                        : aiContent
-                      updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false)
-                    }
+                     if (reasoningText) {
+                       aiReasoning += reasoningText
+                       const formattedContent = `<think>${aiReasoning}`
+                       updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false, modelName)
+                     } else if (chunkText) {
+                       aiContent += chunkText
+                       const formattedContent = aiReasoning
+                         ? `<think>${aiReasoning}</think>\n${aiContent}`
+                         : aiContent
+                       updateAiMessage(aiMsgId, formattedContent, currentThreadMsgs, activeId, false, modelName)
+                     }
                   } catch (e) {
                     // ignore JSON parse error
                   }
@@ -1437,7 +1595,7 @@ ${loreText}`
             const finalContent = aiReasoning
               ? `<think>${aiReasoning}</think>\n${aiContent}`
               : aiContent
-            updateAiMessage(aiMsgId, finalContent, currentThreadMsgs, activeId, true)
+            updateAiMessage(aiMsgId, finalContent, currentThreadMsgs, activeId, true, modelName)
           } finally {
             reader.releaseLock()
           }
@@ -1449,14 +1607,14 @@ ${loreText}`
             throw new Error('API로부터 응답 내용을 받지 못했습니다.')
           }
           aiContent = reasoning ? `<think>${reasoning}</think>\n${content}` : content
-          updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true)
+          updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true, modelName)
         }
       }
 
     } catch (e: any) {
       console.error('[BTW Plugin] Generation error:', e)
       aiContent = `⚠️ 오류가 발생했습니다: ${e.message || e}`
-      updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId)
+      updateAiMessage(aiMsgId, aiContent, currentThreadMsgs, activeId, true, modelName)
     } finally {
       updateLoading(false)
     }
@@ -1536,13 +1694,13 @@ ${loreText}`
   }
 
   // Update AI response message state and storage
-  const updateAiMessage = (msgId: string, content: string, previousMsgs: OocMessage[], threadId: string, save = true) => {
+  const updateAiMessage = (msgId: string, content: string, previousMsgs: OocMessage[], threadId: string, save = true, modelName?: string) => {
     setMessages(prev => {
-      const updated = prev.map(m => m.id === msgId ? { ...m, content } : m)
+      const updated = prev.map(m => m.id === msgId ? { ...m, content, model: modelName || m.model } : m)
       if (save) {
-        const fullMsgs = previousMsgs.map(pm => pm.id === msgId ? { ...pm, content } : pm)
+        const fullMsgs = previousMsgs.map(pm => pm.id === msgId ? { ...pm, content, model: modelName || pm.model } : pm)
         const exists = fullMsgs.some(fm => fm.id === msgId)
-        const finalMsgs = exists ? fullMsgs : [...previousMsgs, { id: msgId, role: 'ai' as const, content, timestamp: Date.now() }]
+        const finalMsgs = exists ? fullMsgs : [...previousMsgs, { id: msgId, role: 'ai' as const, content, timestamp: Date.now(), model: modelName }]
         saveThreadMessages(threadId, finalMsgs)
       }
       return updated
@@ -1673,35 +1831,158 @@ ${loreText}`
             ) : (
               <>
                 <div className="btw-form-group">
-                  <label>API Base URL</label>
-                  <input 
-                    type="text" 
-                    value={config.customApiUrl}
-                    onChange={(e) => setConfig({ ...config, customApiUrl: e.target.value })}
-                    onBlur={() => saveConfig(config)}
-                    placeholder="https://api.openai.com/v1"
-                  />
+                  <label>외부 API 설정 선택</label>
+                  <div className="btw-endpoint-selector-row">
+                    <select
+                      value={config.activeEndpointId}
+                      onChange={(e) => saveConfig({ ...config, activeEndpointId: e.target.value })}
+                    >
+                      {(config.customEndpoints || []).map(ep => (
+                        <option key={ep.id} value={ep.id}>{ep.name}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={handleAddEndpoint}
+                      title="API 설정 추가"
+                      type="button"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <button 
+                      className="danger"
+                      onClick={() => handleDeleteEndpoint(config.activeEndpointId)}
+                      disabled={(config.customEndpoints || []).length <= 1}
+                      title="API 설정 삭제"
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="btw-form-group">
-                  <label>API Key</label>
-                  <input 
-                    type="password" 
-                    value={config.customApiKey}
-                    onChange={(e) => setConfig({ ...config, customApiKey: e.target.value })}
-                    onBlur={() => saveConfig(config)}
-                    placeholder="sk-..."
-                  />
-                </div>
-                <div className="btw-form-group">
-                  <label>모델명</label>
-                  <input 
-                    type="text" 
-                    value={config.customModel}
-                    onChange={(e) => setConfig({ ...config, customModel: e.target.value })}
-                    onBlur={() => saveConfig(config)}
-                    placeholder="gpt-4o-mini"
-                  />
-                </div>
+
+                {(() => {
+                  const activeEp = (config.customEndpoints || []).find(e => e.id === config.activeEndpointId)
+                  if (!activeEp) return null
+                  return (
+                    <>
+                      <div className="btw-form-group">
+                        <label>설정 이름</label>
+                        <input 
+                          type="text" 
+                          value={activeEp.name}
+                          onChange={(e) => handleUpdateActiveEndpoint({ name: e.target.value })}
+                          onBlur={() => saveConfig(config)}
+                          placeholder="예: OpenAI, OpenRouter 등"
+                        />
+                      </div>
+                      <div className="btw-form-group">
+                        <label>API Base URL</label>
+                        <input 
+                          type="text" 
+                          value={activeEp.apiUrl}
+                          onChange={(e) => handleUpdateActiveEndpoint({ apiUrl: e.target.value })}
+                          onBlur={() => saveConfig(config)}
+                          placeholder="https://api.openai.com/v1"
+                        />
+                      </div>
+                      <div className="btw-form-group">
+                        <label>API Key</label>
+                        <input 
+                          type="password" 
+                          value={activeEp.apiKey}
+                          onChange={(e) => handleUpdateActiveEndpoint({ apiKey: e.target.value })}
+                          onBlur={() => saveConfig(config)}
+                          placeholder="sk-..."
+                        />
+                      </div>
+                      <div className="btw-form-group">
+                        {((fetchedModels[activeEp.id] || []).length > 0 && !customInputMode[activeEp.id]) ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
+                              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                <button
+                                  type="button"
+                                  className="btw-btn-sm"
+                                  style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                  onClick={() => handleFetchModels(activeEp)}
+                                  disabled={fetchingModels[activeEp.id]}
+                                >
+                                  {fetchingModels[activeEp.id] ? '불러오는 중...' : '다시 가져오기'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btw-btn-sm"
+                                  style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                  onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))}
+                                >
+                                  직접 입력
+                                </button>
+                              </div>
+                            </div>
+                            <select
+                              value={activeEp.model}
+                              onChange={(e) => {
+                                if (e.target.value === '__custom__') {
+                                  setCustomInputMode(prev => ({ ...prev, [activeEp.id]: true }))
+                                } else {
+                                  handleUpdateActiveEndpoint({ model: e.target.value })
+                                  const updatedEndpoints = (config.customEndpoints || []).map(ep =>
+                                    ep.id === activeEp.id ? { ...ep, model: e.target.value } : ep
+                                  )
+                                  saveConfig({ ...config, customEndpoints: updatedEndpoints })
+                                }
+                              }}
+                            >
+                              {!(fetchedModels[activeEp.id] || []).includes(activeEp.model) && activeEp.model && (
+                                <option value={activeEp.model}>{activeEp.model} (현재 선택)</option>
+                              )}
+                              {(fetchedModels[activeEp.id] || []).map(m => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                              <option value="__custom__">[ 직접 입력... ]</option>
+                            </select>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>모델명</span>
+                              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                {(fetchedModels[activeEp.id] || []).length > 0 ? (
+                                  <button
+                                    type="button"
+                                    className="btw-btn-sm"
+                                    style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                    onClick={() => setCustomInputMode(prev => ({ ...prev, [activeEp.id]: false }))}
+                                  >
+                                    목록에서 선택
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btw-btn-sm"
+                                    style={{ height: '1.25rem', padding: '0 0.35rem', fontSize: '0.7rem' }}
+                                    onClick={() => handleFetchModels(activeEp)}
+                                    disabled={fetchingModels[activeEp.id]}
+                                  >
+                                    {fetchingModels[activeEp.id] ? '불러오는 중...' : '목록 가져오기'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <input 
+                              type="text" 
+                              value={activeEp.model}
+                              onChange={(e) => handleUpdateActiveEndpoint({ model: e.target.value })}
+                              onBlur={() => saveConfig(config)}
+                              placeholder="gpt-4o-mini"
+                            />
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
               </>
             )}
 
@@ -1791,6 +2072,11 @@ ${loreText}`
                 <div key={m.id} className={`btw-msg-row ${m.role}`}>
                   <div className="btw-msg-meta">
                     {m.role === 'user' ? '나' : `${characterName}`}
+                    {m.role === 'ai' && m.model && (
+                      <span className="btw-msg-model-badge">
+                        {m.model}
+                      </span>
+                    )}
                   </div>
                   {editingMessageId === m.id ? (
                     <div className="btw-msg-content">
