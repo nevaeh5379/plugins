@@ -4,10 +4,13 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 import { readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
+const version = pkg.version || '1.0.0'
+
 const PLUGIN_HEADER = `//@name risu_btw_plugin
 //@display-name Risu BTW Plugin
 //@api 3.0
-//@version 1.0.0
+//@version ${version}
 
 `
 

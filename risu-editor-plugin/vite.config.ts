@@ -4,10 +4,13 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 import { readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
+const version = pkg.version || '1.0.0'
+
 const PLUGIN_HEADER = `//@name risu_editor
 //@display-name Risu Editor
 //@api 3.0
-//@version 1.0.0
+//@version ${version}
 //@link https://github.com/kwaroran/RisuAI RisuAI
 
 `

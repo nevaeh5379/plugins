@@ -59,10 +59,6 @@ jobs:
             pnpm install --no-frozen-lockfile --dangerously-allow-all-builds
           fi
 
-      - name: Build
-        working-directory: ${{ github.event.inputs.plugin }}
-        run: pnpm build
-
       - name: Generate version and tag
         id: versioning
         working-directory: ${{ github.event.inputs.plugin }}
@@ -72,16 +68,23 @@ jobs:
             VERSION=$(jq -r .version package.json)
           fi
 
-          TAG="${{ github.event.inputs.plugin }}@v${VERSION}"
-          
-          # If beta release and version doesn't already contain a prerelease suffix, add beta tag
+          # If beta release and version doesn't already contain a prerelease suffix, add beta suffix to VERSION
           if [ "${{ github.event.inputs.release_type }}" = "beta" ] && [[ ! "$VERSION" =~ - ]]; then
-            TAG="${TAG}-beta"
+            VERSION="${VERSION}-beta"
           fi
+
+          TAG="${{ github.event.inputs.plugin }}@v${VERSION}"
+
+          # Update package.json version
+          jq --arg ver "$VERSION" '.version = $ver' package.json > package.json.tmp && mv package.json.tmp package.json
 
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "Generated tag: ${TAG}"
+
+      - name: Build
+        working-directory: ${{ github.event.inputs.plugin }}
+        run: pnpm build
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
