@@ -90,6 +90,51 @@ export const generateTextLog = async (nodes: HTMLElement[], charName: string, se
     return text;
 };
 
+async function getParentPageStyles(): Promise<string[]> {
+    const cssTexts: string[] = [];
+    try {
+        const rootDoc = await Risuai.getRootDocument();
+        if (rootDoc) {
+            // Collect parent <style> blocks
+            const styleEls = await rootDoc.querySelectorAll('style');
+            const styleList = await Risuai.unwarpSafeArray(styleEls);
+            for (const el of styleList) {
+                try {
+                    const html = await el.getInnerHTML();
+                    if (html && html.trim()) {
+                        cssTexts.push(html);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            // Collect parent <link rel="stylesheet"> blocks
+            const linkEls = await rootDoc.querySelectorAll('link[rel="stylesheet"]');
+            const linkList = await Risuai.unwarpSafeArray(linkEls);
+            for (const el of linkList) {
+                try {
+                    const outerHTML = await el.getOuterHTML();
+                    const match = outerHTML.match(/href\s*=\s*["']?([^"'\s>]+)/);
+                    if (match && match[1]) {
+                        const href = match[1];
+                        const res = await Risuai.nativeFetch(href, { method: 'GET' } as any);
+                        if (res.ok) {
+                            const text = await res.text();
+                            if (text && text.trim()) {
+                                cssTexts.push(text);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[log plugin] Failed to fetch link stylesheet:', e);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[log plugin] getParentPageStyles failed:', e);
+    }
+    return cssTexts;
+}
+
 async function generateForceHoverCss(): Promise<string> {
     const newRules = new Set<string>();
     const hoverRegex = /:hover/g;
@@ -146,86 +191,113 @@ async function generateForceHoverCss(): Promise<string> {
 }
 
 export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any) => {
-    const getComprehensivePageCSS = async () => {
-        const cssTexts = new Set<string>();
-        for (const sheet of Array.from(document.styleSheets)) {
-            try {
-                const rules = sheet.cssRules;
-                for (const rule of Array.from(rules)) {
-                    cssTexts.add(rule.cssText);
-                }
-            } catch (e) {
-                console.warn(`Could not read styles from stylesheet: ${sheet.href}`, e);
-            }
-        }
-        document.querySelectorAll('style').forEach(styleElement => {
-            if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
-                cssTexts.add(styleElement.textContent);
-            }
-        });
-        return Array.from(cssTexts).join('\n');
+    // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
+    const parentStyles = await getParentPageStyles();
+    
+    // 2. Inject them into the current document's head
+    const tempStyleEls: HTMLStyleElement[] = [];
+    for (const cssText of parentStyles) {
+        try {
+            const styleEl = document.createElement('style');
+            styleEl.setAttribute('data-temp-parent-style', 'true');
+            styleEl.textContent = cssText;
+            document.head.appendChild(styleEl);
+            tempStyleEls.push(styleEl);
+        } catch (e) { /* ignore */ }
     }
+    
+    try {
+        const getComprehensivePageCSS = async () => {
+            const cssTexts = new Set<string>();
+            for (const sheet of Array.from(document.styleSheets)) {
+                try {
+                    const rules = sheet.cssRules;
+                    for (const rule of Array.from(rules)) {
+                        cssTexts.add(rule.cssText);
+                    }
+                } catch (e) {
+                    // ignore CORS
+                }
+            }
+            document.querySelectorAll('style').forEach(styleElement => {
+                if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
+                    cssTexts.add(styleElement.textContent);
+                }
+            });
+            return Array.from(cssTexts).join('\n');
+        };
 
-    const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
-        const clonedNode = node.cloneNode(true) as HTMLElement;
-        if (settings.embedImages !== false) {
-            for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
-                if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
-                    try {
-                        img.src = await imageUrlToBlob(img.src);
-                    } catch (e) {
-                        console.warn(`Blob conversion error for ${img.src}:`, e);
+        const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
+            const clonedNode = node.cloneNode(true) as HTMLElement;
+            
+            // Remove RisuAI's utility buttons, model badges, and custom injected buttons
+            clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
+
+            if (settings.embedImages !== false) {
+                for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
+                    if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+                        try {
+                            img.src = await imageUrlToBlob(img.src);
+                        } catch (e) {
+                            console.warn(`Blob conversion error for ${img.src}:`, e);
+                        }
                     }
                 }
             }
-        }
-        
-        if (settings.replacementRules && settings.replacementRules.length > 0) {
-            // Apply replacements to the message content within the cloned node
-            const messageEl = clonedNode.querySelector('.prose, .chattext');
-            if (messageEl) {
-                applyReplacements(messageEl as HTMLElement, settings.replacementRules);
+            
+            if (settings.replacementRules && settings.replacementRules.length > 0) {
+                // Apply replacements to the message content within the cloned node
+                const messageEl = clonedNode.querySelector('.prose, .chattext');
+                if (messageEl) {
+                    applyReplacements(messageEl as HTMLElement, settings.replacementRules);
+                }
             }
-        }
-        
-        return clonedNode.outerHTML;
-    }));
+            
+            return clonedNode.outerHTML;
+        }));
 
-    let fullCss = await getComprehensivePageCSS();
-    let extraCss = '';
-    if (settings.expandHover) {
-        extraCss += await generateForceHoverCss();
-    }
-    if (settings.disableAnimations) {
+        let fullCss = await getComprehensivePageCSS();
+        let extraCss = '';
+        if (settings.expandHover) {
+            extraCss += await generateForceHoverCss();
+        }
+        if (settings.disableAnimations) {
+            extraCss += `
+                *, *::before, *::after {
+                    animation: none !important;
+                    transition: none !important;
+                }
+            `;
+        }
+
+        // Force font size inheritance for HTML preview
         extraCss += `
-            *, *::before, *::after {
-                animation: none !important;
-                transition: none !important;
+            .prose, .chattext {
+                font-size: 1em !important;
+                line-height: inherit;
             }
         `;
-    }
 
-    // Force font size inheritance for HTML preview
-    extraCss += `
-        .prose, .chattext {
-            font-size: 1em !important;
-            line-height: inherit;
-        }
-    `;
+        const wrapperClass = settings.expandHover ? 'class="expand-hover-globally"' : '';
+        const wrapperStyle = `
+            margin: 16px auto;
+            max-width: ${settings.previewWidth || 800}px;
+            font-size: ${settings.previewFontSize || 16}px;
+        `;
 
-    const wrapperClass = settings.expandHover ? 'class="expand-hover-globally"' : '';
-    const wrapperStyle = `
-        margin: 16px auto;
-        max-width: ${settings.previewWidth || 800}px;
-        font-size: ${settings.previewFontSize || 16}px;
-    `;
-
-    return `
-        <style>${fullCss}\n${extraCss}</style>
-        <div ${wrapperClass}>
-            <div id="log-html-preview-container" style="${wrapperStyle}">
-                ${clonedNodesHtml.join('')}
+        return `
+            <style>${fullCss}\n${extraCss}</style>
+            <div ${wrapperClass}>
+                <div id="log-html-preview-container" style="${wrapperStyle}">
+                    ${clonedNodesHtml.join('')}
+                </div>
             </div>
-        </div>
-    `;
+        `;
+    } finally {
+        // 3. Remove temporary style elements
+        for (const el of tempStyleEls) {
+            el.remove();
+        }
+    }
 };
+
