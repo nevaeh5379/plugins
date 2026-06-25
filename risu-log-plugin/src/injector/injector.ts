@@ -88,6 +88,25 @@ async function hasBtnGroup(target: SafeElement): Promise<boolean> {
   }
 }
 
+// 클릭 이벤트가 실제 엘리먼트 영역 내에서 발생했는지 검사하는 헬퍼 함수
+async function isClickInside(element: SafeElement, e: any): Promise<boolean> {
+  if (!e || typeof e.clientX !== 'number' || typeof e.clientY !== 'number') {
+    return false
+  }
+  try {
+    const rect = await element.getBoundingClientRect()
+    return (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    )
+  } catch (err) {
+    console.error('[log plugin] isClickInside error:', err)
+    return false
+  }
+}
+
 // 메시지별 버튼 그룹을 하나의 SafeElement로 생성
 async function createMsgBtnGroup(
   rootDoc: SafeDocument,
@@ -104,6 +123,7 @@ async function createMsgBtnGroup(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/><path d="m16 12 4 4 4-4"/></svg>'
   )
   await fromHereBtn.addEventListener('click', async (e: any) => {
+    if (!(await isClickInside(fromHereBtn, e))) return
     e.preventDefault?.()
     e.stopPropagation?.()
     await clearRange(rootDoc)
@@ -117,6 +137,7 @@ async function createMsgBtnGroup(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
   )
   await onlyThisBtn.addEventListener('click', async (e: any) => {
+    if (!(await isClickInside(onlyThisBtn, e))) return
     e.preventDefault?.()
     e.stopPropagation?.()
     await clearRange(rootDoc)
@@ -130,6 +151,7 @@ async function createMsgBtnGroup(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8H3"/><path d="M21 16H3"/><path d="M7 12v8"/><path d="M7 4v4"/><path d="M17 12v8"/><path d="M17 4v4"/></svg>'
   )
   await rangeBtn.addEventListener('click', async (e: any) => {
+    if (!(await isClickInside(rangeBtn, e))) return
     e.preventDefault?.()
     e.stopPropagation?.()
     if (!rangeSelection.active) {
