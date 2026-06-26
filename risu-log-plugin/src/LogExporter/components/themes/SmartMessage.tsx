@@ -6,7 +6,8 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const SmartMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules } = props;
+  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules, fontSize } = props;
+  const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
   const messageHtml = useMessageProcessor(originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -84,7 +85,7 @@ const SmartMessage: React.FC<MessageProps> = (props) => {
             <span style={{ 
                 color: color.nameColor, 
                 fontWeight: 600, 
-                fontSize: '0.85em', 
+                fontSize: `calc(${baseSize} * 0.94)`, 
                 marginBottom: '4px',
                 marginLeft: '4px',
                 opacity: 0.9 
@@ -108,7 +109,7 @@ const SmartMessage: React.FC<MessageProps> = (props) => {
                     color: color.text, 
                     lineHeight: 1.7, 
                     wordWrap: 'break-word',
-                    fontSize: '0.95em'
+                    fontSize: baseSize
                 }} 
                 contentEditable={isEditable} 
                 onBlur={handleBlur} 

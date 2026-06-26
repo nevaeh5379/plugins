@@ -5,7 +5,8 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const LogMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, replacementRules } = props;
+  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, replacementRules, fontSize } = props;
+  const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
   const messageHtml = useMessageProcessor(originalMessageEl, false, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
 
@@ -41,18 +42,18 @@ const LogMessage: React.FC<MessageProps> = (props) => {
       position: 'relative', display: 'flex', alignItems: 'flex-start', gap: '8px',
       padding: '8px 12px', background: logBg, border: `1px solid ${color.border}`,
       marginBottom: '2px', fontFamily: 'Courier New, SF Mono, Monaco, Inconsolata, Fira Code, monospace',
-      fontSize: '0.9em', transition: 'all 0.2s ease'
+      fontSize: baseSize, transition: 'all 0.2s ease'
     }}>
-      <div style={{ color: color.textSecondary, fontSize: '0.8em', width: '35px', flexShrink: 0, textAlign: 'right', paddingRight: '8px', borderRight: `1px solid ${color.border}`, opacity: 0.6 }}>
+      <div style={{ color: color.textSecondary, fontSize: `calc(${baseSize} * 0.88)`, width: '35px', flexShrink: 0, textAlign: 'right', paddingRight: '8px', borderRight: `1px solid ${color.border}`, opacity: 0.6 }}>
         {lineNumber}
       </div>
-      <div style={{ color: color.nameColor, fontSize: '0.9em', width: '15px', flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }}>
+      <div style={{ color: color.nameColor, fontSize: `calc(${baseSize} * 0.94)`, width: '15px', flexShrink: 0, textAlign: 'center', fontWeight: 'bold' }}>
         {statusIcon}
       </div>
-      <div style={{ color: color.nameColor, fontWeight: 'bold', width: '80px', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '0.85em' }}>
+      <div style={{ color: color.nameColor, fontWeight: 'bold', width: '80px', flexShrink: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: `calc(${baseSize} * 0.94)` }}>
         [{name.toUpperCase()}]
       </div>
-      <div ref={contentRef} style={{ color: color.text, flex: 1, lineHeight: 1.4, wordWrap: 'break-word' }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+      <div ref={contentRef} style={{ color: color.text, flex: 1, lineHeight: 1.4, wordWrap: 'break-word', fontSize: baseSize }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
       {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} title="메시지 삭제">&times;</button>}
     </div>
   );

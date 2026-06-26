@@ -108,6 +108,7 @@ export interface MessageProps {
   isForExport?: boolean;
   onRendered?: () => void;
   replacementRules?: ReplacementRule[];
+  fontSize?: number;
 }
 
 export type LogNode = HTMLElement;

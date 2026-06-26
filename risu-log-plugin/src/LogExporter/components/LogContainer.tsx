@@ -171,6 +171,7 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
             isForExport={isForExport}
             onRendered={() => handleMessageRendered(index)}
             replacementRules={props.replacementRules}
+            fontSize={fontSize}
           />
         ))}
       </main>

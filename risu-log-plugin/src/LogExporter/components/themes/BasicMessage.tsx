@@ -6,7 +6,8 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const BasicMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, showBubble, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules } = props;
+  const { node, index, charInfoName, color, showBubble, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules, fontSize } = props;
+  const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
   const messageHtml = useMessageProcessor(originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -49,11 +50,11 @@ const BasicMessage: React.FC<MessageProps> = (props) => {
       {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} title="메시지 삭제">&times;</button>}
       <Avatar avatarSrc={avatarSrc} name={name} isUser={isUser} isForArca={isForArca} showAvatar={showAvatar} baseStyle={avatarBaseStyle} marginStyle={avatarMarginStyle} isForExport={isForExport} />
       <div style={{ flex: 1 }}>
-        <strong style={{ color: color.nameColor, fontWeight: 600, fontSize: '0.95em', display: 'block', marginBottom: '8px', textAlign: isUser ? 'right' : 'left' }}>{name}</strong>
+        <strong style={{ color: color.nameColor, fontWeight: 600, fontSize: `calc(${baseSize} * 0.94)`, display: 'block', marginBottom: '8px', textAlign: isUser ? 'right' : 'left' }}>{name}</strong>
         {showBubble ? (
-          <div ref={contentRef} style={{ backgroundColor: cardBgColor, borderRadius: '16px', padding: '14px 18px', boxShadow: color.shadow, border: `1px solid ${color.border}`, color: color.text, lineHeight: 1.8, wordWrap: 'break-word', position: 'relative' }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+          <div ref={contentRef} style={{ backgroundColor: cardBgColor, borderRadius: '16px', padding: '14px 18px', boxShadow: color.shadow, border: `1px solid ${color.border}`, color: color.text, lineHeight: 1.8, wordWrap: 'break-word', position: 'relative', fontSize: baseSize }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
         ) : (
-          <div ref={contentRef} style={{ color: color.text, lineHeight: 1.8, wordWrap: 'break-word', padding: '0 4px' }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+          <div ref={contentRef} style={{ color: color.text, lineHeight: 1.8, wordWrap: 'break-word', padding: '0 4px', fontSize: baseSize }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
         )}
       </div>
     </div>

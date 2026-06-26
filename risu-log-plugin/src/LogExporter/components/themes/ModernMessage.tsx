@@ -6,7 +6,8 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const ModernMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules } = props;
+  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, isForExport, replacementRules, fontSize } = props;
+  const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
   const messageHtml = useMessageProcessor(originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -53,8 +54,8 @@ const ModernMessage: React.FC<MessageProps> = (props) => {
         {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} title="메시지 삭제">&times;</button>}
       </div>
       <div style={{ flex: 1, borderRadius: '8px', background: modernCardBg, boxShadow: color.shadow, overflow: 'hidden' }}>
-        <strong style={{ color: color.nameColor, fontWeight: 600, fontSize: '0.9em', display: 'block', padding: '10px 14px', backgroundColor: 'rgba(0,0,0,0.15)', textAlign: isUser ? 'right' : 'left' }}>{name}</strong>
-        <div ref={contentRef} style={{ padding: '14px', color: color.text, lineHeight: 1.8, wordWrap: 'break-word' }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+        <strong style={{ color: color.nameColor, fontWeight: 600, fontSize: `calc(${baseSize} * 0.94)`, display: 'block', padding: '10px 14px', backgroundColor: 'rgba(0,0,0,0.15)', textAlign: isUser ? 'right' : 'left' }}>{name}</strong>
+        <div ref={contentRef} style={{ padding: '14px', color: color.text, lineHeight: 1.8, wordWrap: 'break-word', fontSize: baseSize }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
       </div>
     </div>
   );

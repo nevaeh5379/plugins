@@ -5,7 +5,8 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const SimpleMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, replacementRules } = props;
+  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, replacementRules, fontSize } = props;
+  const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
   const messageHtml = useMessageProcessor(originalMessageEl, props.embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ const SimpleMessage: React.FC<MessageProps> = (props) => {
         <div style={{ 
             color: color.nameColor, 
             fontWeight: 'bold', 
-            fontSize: '0.9em', 
+            fontSize: `calc(${baseSize} * 0.94)`, 
             marginBottom: '0.2em',
             opacity: 0.8
         }}>
@@ -53,7 +54,7 @@ const SimpleMessage: React.FC<MessageProps> = (props) => {
             style={{ 
                 color: color.text, 
                 lineHeight: 1.6,
-                fontSize: '1em' 
+                fontSize: baseSize 
             }} 
             contentEditable={isEditable} 
             onBlur={handleBlur} 
