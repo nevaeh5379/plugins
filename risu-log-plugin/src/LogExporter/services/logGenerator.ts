@@ -319,6 +319,9 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
         return Array.from(cssTexts).join('\n');
     };
 
+    const scaleMode = settings.htmlScaleMode || 'font';
+    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
+
     const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
         const clonedNode = node.cloneNode(true) as HTMLElement;
         
@@ -403,15 +406,39 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
                 applyReplacements(messageEl as HTMLElement, settings.replacementRules);
             }
         }
-        
+
+        // Scale inline styles for full scaling mode
+        if (scaleMode === 'full' && scaleFactor !== 1.0) {
+            const scaleUnits = (styleAttr: string | null) => {
+                if (!styleAttr) return '';
+                return styleAttr.replace(/url\([^)]*\)|(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match: string, p1: string, p2: string) => {
+                    if (match.startsWith('url')) {
+                        return match;
+                    }
+                    const val = parseFloat(p1);
+                    if (p2 === 'px' && Math.abs(val) <= 1) return match;
+                    const scaledVal = val * scaleFactor;
+                    return `${Number(scaledVal.toFixed(4))}${p2}`;
+                });
+            };
+
+            const rootStyle = clonedNode.getAttribute('style');
+            if (rootStyle) {
+                clonedNode.setAttribute('style', scaleUnits(rootStyle));
+            }
+            clonedNode.querySelectorAll('[style]').forEach(el => {
+                const styleAttr = el.getAttribute('style');
+                if (styleAttr) {
+                    el.setAttribute('style', scaleUnits(styleAttr));
+                }
+            });
+        }
+    
         return clonedNode.outerHTML;
     }));
 
     let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
     
-    const scaleMode = settings.htmlScaleMode || 'font';
-    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
-
     let extraCss = '';
     if (settings.expandHover) {
         extraCss += await generateForceHoverCss();
@@ -425,27 +452,46 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
         `;
     }
 
-    if (scaleMode === 'font') {
-        // Apply CSS zoom only to the message content elements (prose/chattext) to scale only text
+    if (scaleMode === 'font' && scaleFactor !== 1.0) {
         extraCss += `
             .prose, .chattext {
-                zoom: ${scaleFactor} !important;
+                font-size: ${scaleFactor}em !important;
             }
         `;
     }
 
+    // Scale CSS stylesheets for full scaling mode
+    if (scaleMode === 'full' && scaleFactor !== 1.0) {
+        const scaleUnits = (css: string) => {
+            // Replace px and rem only inside innermost curly braces { ... } to avoid mangling class selectors like .w-\[100px\]
+            return css.replace(/\{([^{}]+)\}/g, (_match: string, declarationBlock: string) => {
+                const scaledBlock = declarationBlock.replace(/url\([^)]*\)|(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (unitMatch: string, p1: string, p2: string) => {
+                    if (unitMatch.startsWith('url')) {
+                        return unitMatch;
+                    }
+                    const val = parseFloat(p1);
+                    if (p2 === 'px' && Math.abs(val) <= 1) return unitMatch;
+                    const scaledVal = val * scaleFactor;
+                    return `${Number(scaledVal.toFixed(4))}${p2}`;
+                });
+                return `{${scaledBlock}}`;
+            });
+        };
+        fullCss = scaleUnits(fullCss);
+        extraCss = scaleUnits(extraCss);
+    }
+
     const wrapperClassAttr = settings.expandHover ? 'class="expand-hover-globally"' : '';
-    // If full scale mode, apply zoom to the entire container wrapperStyle
     const wrapperStyle = `
-        margin: 16px auto;
-        max-width: ${settings.previewWidth || 800}px;
-        ${scaleMode === 'full' ? `zoom: ${scaleFactor};` : ''}
+    max-width: ${settings.previewWidth || 800}px;
     `;
 
     return `
         <style>${fullCss}\n${extraCss}</style>
         <div id="log-html-preview-container" ${wrapperClassAttr} style="${wrapperStyle}">
+        <div id="log-html-scaler">
             ${clonedNodesHtml.join('')}
+            </div>
         </div>
     `;
 };
