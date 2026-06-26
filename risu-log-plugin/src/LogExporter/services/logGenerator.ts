@@ -322,6 +322,96 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
     const scaleMode = settings.htmlScaleMode || 'font';
     const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
 
+    const scaleValue = (val: string): string => {
+        return val.replace(/(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match, p1, p2) => {
+            const num = parseFloat(p1);
+            if (p2 === 'px' && Math.abs(num) <= 1) return match;
+            return `${Number((num * scaleFactor).toFixed(4))}${p2}`;
+        });
+    };
+
+    const scaleInlineStyles = (node: HTMLElement) => {
+        const processElement = (el: HTMLElement) => {
+            if (!el.style) return;
+            for (let i = 0; i < el.style.length; i++) {
+                const prop = el.style[i];
+                if (prop === 'background-image' || prop === 'background') continue;
+                const val = el.style.getPropertyValue(prop);
+                if (val) {
+                    const newVal = scaleValue(val);
+                    if (newVal !== val) {
+                        el.style.setProperty(prop, newVal, el.style.getPropertyPriority(prop));
+                    }
+                }
+            }
+        };
+
+        processElement(node);
+        node.querySelectorAll('*').forEach(el => processElement(el as HTMLElement));
+    };
+
+    const scaleStylesheetCSSOM = (cssText: string): string => {
+        const tempStyle = document.createElement('style');
+        tempStyle.textContent = cssText;
+        document.head.appendChild(tempStyle);
+        
+        const sheet = tempStyle.sheet;
+        if (!sheet) {
+            document.head.removeChild(tempStyle);
+            return cssText;
+        }
+
+        const processRules = (rules: CSSRuleList) => {
+            for (let i = 0; i < rules.length; i++) {
+                const rule = rules[i];
+                if (rule instanceof CSSStyleRule) {
+                    const style = rule.style;
+                    for (let j = 0; j < style.length; j++) {
+                        const prop = style[j];
+                        if (prop === 'background-image' || prop === 'background') continue;
+                        const val = style.getPropertyValue(prop);
+                        if (val) {
+                            const newVal = scaleValue(val);
+                            if (newVal !== val) {
+                                style.setProperty(prop, newVal, style.getPropertyPriority(prop));
+                            }
+                        }
+                    }
+                } else if (rule instanceof CSSMediaRule) {
+                    processRules(rule.cssRules);
+                } else if (rule instanceof CSSKeyframesRule) {
+                    for (let j = 0; j < rule.cssRules.length; j++) {
+                        const kfRule = rule.cssRules[j];
+                        if (kfRule instanceof CSSKeyframeRule) {
+                            const style = kfRule.style;
+                            for (let k = 0; k < style.length; k++) {
+                                const prop = style[k];
+                                const val = style.getPropertyValue(prop);
+                                if (val) {
+                                    const newVal = scaleValue(val);
+                                    if (newVal !== val) {
+                                        style.setProperty(prop, newVal, style.getPropertyPriority(prop));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        try {
+            processRules(sheet.cssRules);
+            const result = Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
+            document.head.removeChild(tempStyle);
+            return result;
+        } catch (e) {
+            console.error('[log plugin] scaleStylesheetCSSOM error:', e);
+            document.head.removeChild(tempStyle);
+            return cssText;
+        }
+    };
+
     const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
         const clonedNode = node.cloneNode(true) as HTMLElement;
         
@@ -409,29 +499,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
 
         // Scale inline styles for full scaling mode
         if (scaleMode === 'full' && scaleFactor !== 1.0) {
-            const scaleUnits = (styleAttr: string | null) => {
-                if (!styleAttr) return '';
-                return styleAttr.replace(/url\([^)]*\)|(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match: string, p1: string, p2: string) => {
-                    if (match.startsWith('url')) {
-                        return match;
-                    }
-                    const val = parseFloat(p1);
-                    if (p2 === 'px' && Math.abs(val) <= 1) return match;
-                    const scaledVal = val * scaleFactor;
-                    return `${Number(scaledVal.toFixed(4))}${p2}`;
-                });
-            };
-
-            const rootStyle = clonedNode.getAttribute('style');
-            if (rootStyle) {
-                clonedNode.setAttribute('style', scaleUnits(rootStyle));
-            }
-            clonedNode.querySelectorAll('[style]').forEach(el => {
-                const styleAttr = el.getAttribute('style');
-                if (styleAttr) {
-                    el.setAttribute('style', scaleUnits(styleAttr));
-                }
-            });
+            scaleInlineStyles(clonedNode);
         }
     
         return clonedNode.outerHTML;
@@ -462,23 +530,8 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
 
     // Scale CSS stylesheets for full scaling mode
     if (scaleMode === 'full' && scaleFactor !== 1.0) {
-        const scaleUnits = (css: string) => {
-            // Replace px and rem only inside innermost curly braces { ... } to avoid mangling class selectors like .w-\[100px\]
-            return css.replace(/\{([^{}]+)\}/g, (_match: string, declarationBlock: string) => {
-                const scaledBlock = declarationBlock.replace(/url\([^)]*\)|(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (unitMatch: string, p1: string, p2: string) => {
-                    if (unitMatch.startsWith('url')) {
-                        return unitMatch;
-                    }
-                    const val = parseFloat(p1);
-                    if (p2 === 'px' && Math.abs(val) <= 1) return unitMatch;
-                    const scaledVal = val * scaleFactor;
-                    return `${Number(scaledVal.toFixed(4))}${p2}`;
-                });
-                return `{${scaledBlock}}`;
-            });
-        };
-        fullCss = scaleUnits(fullCss);
-        extraCss = scaleUnits(extraCss);
+        fullCss = scaleStylesheetCSSOM(fullCss);
+        extraCss = scaleStylesheetCSSOM(extraCss);
     }
 
     const wrapperClassAttr = settings.expandHover ? 'class="expand-hover-globally"' : '';
