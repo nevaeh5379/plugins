@@ -45,8 +45,15 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({ settings, onSettingChange }) =>
             </div>
             <div className="desktop-section-body">
                 <div className="desktop-option-row">
-                    <span className="desktop-option-label">글자 크기</span>
-                    <input type="number" className="desktop-input" data-setting-key="previewFontSize" value={settings.previewFontSize || 16} onChange={(e) => onSettingChange('previewFontSize', e.target.value)} min="10" max="32" style={{width: '80px'}} />
+                    <span className="desktop-option-label">스케일 배율</span>
+                    <input type="number" className="desktop-input" data-setting-key="htmlScaleFactor" value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0} onChange={(e) => onSettingChange('htmlScaleFactor', Number(e.target.value))} min="0.5" max="3.0" step="0.1" style={{width: '80px'}} />
+                </div>
+                <div className="desktop-option-row">
+                    <span className="desktop-option-label">스케일 모드</span>
+                    <select className="desktop-select" data-setting-key="htmlScaleMode" value={settings.htmlScaleMode || 'font'} onChange={(e) => onSettingChange('htmlScaleMode', e.target.value)}>
+                        <option value="font">글자만 스케일</option>
+                        <option value="full">HTML 전체 스케일</option>
+                    </select>
                 </div>
                 <div className="desktop-option-row">
                     <span className="desktop-option-label">너비 (px)</span>

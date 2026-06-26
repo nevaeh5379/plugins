@@ -408,6 +408,10 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
     }));
 
     let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
+    
+    const scaleMode = settings.htmlScaleMode || 'font';
+    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
+
     let extraCss = '';
     if (settings.expandHover) {
         extraCss += await generateForceHoverCss();
@@ -421,27 +425,27 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
         `;
     }
 
-    // Force font size inheritance for HTML preview
-    extraCss += `
-        .prose, .chattext {
-            font-size: 1em !important;
-            line-height: inherit;
-        }
-    `;
+    if (scaleMode === 'font') {
+        // Apply CSS zoom only to the message content elements (prose/chattext) to scale only text
+        extraCss += `
+            .prose, .chattext {
+                zoom: ${scaleFactor} !important;
+            }
+        `;
+    }
 
-    const wrapperClass = settings.expandHover ? 'class="expand-hover-globally"' : '';
+    const wrapperClassAttr = settings.expandHover ? 'class="expand-hover-globally"' : '';
+    // If full scale mode, apply zoom to the entire container wrapperStyle
     const wrapperStyle = `
         margin: 16px auto;
         max-width: ${settings.previewWidth || 800}px;
-        font-size: ${settings.previewFontSize || 16}px;
+        ${scaleMode === 'full' ? `zoom: ${scaleFactor};` : ''}
     `;
 
     return `
         <style>${fullCss}\n${extraCss}</style>
-        <div ${wrapperClass}>
-            <div id="log-html-preview-container" style="${wrapperStyle}">
-                ${clonedNodesHtml.join('')}
-            </div>
+        <div id="log-html-preview-container" ${wrapperClassAttr} style="${wrapperStyle}">
+            ${clonedNodesHtml.join('')}
         </div>
     `;
 };

@@ -54,6 +54,8 @@ interface Settings {
   imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
   imageFormat?: 'png' | 'jpeg' | 'webp';
   previewFontSize?: number;
+  htmlScaleFactor?: number;
+  htmlScaleMode?: 'font' | 'full';
   previewWidth?: number;
   rawHtmlView?: boolean;
   showArcaHelper?: boolean;
@@ -151,6 +153,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         imageLibrary: 'html-to-image',
         imageFormat: 'png',
         previewFontSize: 16,
+        htmlScaleFactor: 1.0,
+        htmlScaleMode: 'font',
         previewWidth: 800,
         rawHtmlView: false,
         isEditable: false,
@@ -405,7 +409,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         showBubble: savedSettings.showBubble,
         embedImagesAsBlob: true,
         globalSettings: globalSettings,
-        fontSize: savedSettings.previewFontSize,
+        fontSize: savedSettings.htmlScaleFactor !== undefined ? 16 * savedSettings.htmlScaleFactor : savedSettings.previewFontSize,
         containerWidth: savedSettings.previewWidth,
         imageScale: savedSettings.imageScale,
         isEditable: savedSettings.isEditable,

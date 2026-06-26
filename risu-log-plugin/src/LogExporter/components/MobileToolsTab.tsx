@@ -16,15 +16,27 @@ const MobileToolsTab: React.FC<MobileToolsTabProps> = ({ settings, onSettingChan
         </div>
         <div className="mobile-card-content">
           <div className="mobile-field">
-            <label className="mobile-field-label">글자 크기</label>
+            <label className="mobile-field-label">스케일 배율</label>
             <input 
               type="number" 
               className="mobile-input-number" 
-              value={settings.previewFontSize || 16} 
-              onChange={(e) => onSettingChange('previewFontSize', Number(e.target.value))} 
-              min="10" 
-              max="32" 
+              value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0} 
+              onChange={(e) => onSettingChange('htmlScaleFactor', Number(e.target.value))} 
+              min="0.5" 
+              max="3.0" 
+              step="0.1" 
             />
+          </div>
+          <div className="mobile-field">
+            <label className="mobile-field-label">스케일 모드</label>
+            <select 
+              className="mobile-select" 
+              value={settings.htmlScaleMode || 'font'} 
+              onChange={(e) => onSettingChange('htmlScaleMode', e.target.value)}
+            >
+              <option value="font">글자만 스케일</option>
+              <option value="full">HTML 전체 스케일</option>
+            </select>
           </div>
           <div className="mobile-field">
             <label className="mobile-field-label">너비</label>

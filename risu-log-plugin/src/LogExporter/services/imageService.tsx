@@ -576,7 +576,7 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                         embedImagesAsBlob: true,
                         globalSettings: loadGlobalSettings(),
                         onReady: onReady,
-                        fontSize: Number(htmlOptions.previewFontSize),
+                        fontSize: htmlOptions.htmlScaleFactor !== undefined ? 16 * Number(htmlOptions.htmlScaleFactor) : Number(htmlOptions.previewFontSize || 16),
                         containerWidth: htmlOptions.previewWidth,
                         imageScale: Number(htmlOptions.imageScale),
                         isForImageExport: true,

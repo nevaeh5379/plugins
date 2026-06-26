@@ -41,15 +41,28 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>미리보기</h4>
         
         <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>글자 크기</span>
+          <span className="option-label" style={{ fontWeight: '500' }}>스케일 배율</span>
           <InputNumber 
-            value={settings.previewFontSize || 16} 
-            onChange={(val) => onSettingChange('previewFontSize', val)} 
-            min={10} 
-            max={32}
-            addonAfter="px"
+            value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0} 
+            onChange={(val) => onSettingChange('htmlScaleFactor', val)} 
+            min={0.5} 
+            max={3.0}
+            step={0.1}
+            addonAfter="배"
             style={{ width: '100%' }}
           />
+        </div>
+
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
+          <span className="option-label" style={{ fontWeight: '500' }}>스케일 모드</span>
+          <Select 
+            value={settings.htmlScaleMode || 'font'} 
+            onChange={(val) => onSettingChange('htmlScaleMode', val)}
+            style={{ width: '100%' }}
+          >
+            <option value="font">글자만 스케일</option>
+            <option value="full">HTML 전체 스케일 (레이아웃 포함)</option>
+          </Select>
         </div>
 
         <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>

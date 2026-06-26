@@ -26,14 +26,26 @@ const MobileToolsPanel: React.FC<MobileToolsPanelProps> = ({ settings, onSetting
       children: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span>글자 크기 (px)</span>
+            <span>스케일 배율 (배)</span>
             <InputNumber 
-              value={settings.previewFontSize || 16} 
-              onChange={(val) => onSettingChange('previewFontSize', val)} 
-              min={10} 
-              max={32}
+              value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0} 
+              onChange={(val) => onSettingChange('htmlScaleFactor', val)} 
+              min={0.5} 
+              max={3.0}
+              step={0.1}
               style={{ width: '100%' }}
             />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span>스케일 모드</span>
+            <Select 
+              value={settings.htmlScaleMode || 'font'} 
+              onChange={(val) => onSettingChange('htmlScaleMode', val)}
+              style={{ width: '100%' }}
+            >
+              <Select.Option value="font">글자만 스케일</Select.Option>
+              <Select.Option value="full">HTML 전체 스케일</Select.Option>
+            </Select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <span>너비 (px)</span>
