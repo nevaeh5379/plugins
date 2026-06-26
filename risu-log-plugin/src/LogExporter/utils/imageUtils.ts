@@ -19,6 +19,37 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function fetchToBlobNative(url: string): Promise<Blob> {
+  const isTauriAsset = url.startsWith('asset://') || url.includes('asset.localhost');
+  if (isTauriAsset) {
+    try {
+      const decoded = decodeURIComponent(url);
+      let loc = '';
+      const assetsIdx = decoded.indexOf('assets/');
+      if (assetsIdx !== -1) {
+        loc = decoded.substring(assetsIdx);
+      } else {
+        loc = decoded.replace(/^(asset:\/\/localhost\/|https:\/\/asset\.localhost\/|http:\/\/asset\.localhost\/|asset:\/\/)/, '');
+      }
+      console.log('[log plugin] Tauri asset URL detected. Extracted loc:', loc);
+      const data = await Risuai.readImage(loc);
+      if (data) {
+        let mimeType = 'image/png';
+        if (loc.endsWith('.jpg') || loc.endsWith('.jpeg')) {
+          mimeType = 'image/jpeg';
+        } else if (loc.endsWith('.webp')) {
+          mimeType = 'image/webp';
+        } else if (loc.endsWith('.gif')) {
+          mimeType = 'image/gif';
+        }
+        return new Blob([data], { type: mimeType });
+      }
+      throw new Error(`readImage returned empty data for Tauri asset: ${loc}`);
+    } catch (e) {
+      console.error('[log plugin] Failed to readImage for Tauri asset:', e);
+      throw e;
+    }
+  }
+
   const swImgMatch = url.match(/\/sw\/img\/([0-9a-fA-F]+)/);
   if (swImgMatch && swImgMatch[1]) {
     try {
@@ -42,7 +73,8 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
       }
       throw new Error(`readImage returned empty data for ${loc}`);
     } catch (e) {
-      console.warn('[log plugin] Failed to readImage for SW URL, falling back:', e);
+      console.error('[log plugin] Failed to readImage for SW URL:', e);
+      throw e;
     }
   }
 
@@ -102,8 +134,8 @@ export const imageUrlToBlob = async (url: string): Promise<string> => {
     dataUrlCache.set(url, dataUrl)
     return dataUrl
   } catch (error) {
-    console.warn('[log plugin] imageUrlToBlob nativeFetch failed, using original:', url, error)
-    return url
+    console.error('[log plugin] imageUrlToBlob failed:', url, error)
+    throw error;
   }
 }
 

@@ -40,7 +40,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
       <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>미리보기</h4>
         
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>글자 크기</span>
           <InputNumber 
             value={settings.previewFontSize || 16} 
@@ -52,7 +52,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>너비</span>
           <InputNumber 
             value={settings.previewWidth || 800} 
@@ -81,7 +81,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         )}
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>해상도</span>
           <Select 
             value={settings.imageResolution || '1'} 
@@ -101,7 +101,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           </Select>
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>라이브러리</span>
           <Select 
             value={settings.imageLibrary || 'html-to-image'} 
@@ -114,7 +114,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           </Select>
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>포맷</span>
           <Select 
             value={settings.imageFormat || 'png'} 
@@ -127,7 +127,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           </Select>
         </div>
         
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>이미지 분할</span>
           <Select 
             value={settings.splitImage || 'none'} 
@@ -141,7 +141,7 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         </div>
         
         {settings.splitImage && settings.splitImage !== 'none' && (
-          <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)' }}>
+          <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', alignItems: 'stretch' }}>
             <span className="option-label" style={{ fontWeight: '500' }}>최대 높이</span>
             <InputNumber 
               value={settings.maxImageHeight || 10000} 

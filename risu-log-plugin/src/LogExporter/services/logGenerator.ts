@@ -190,114 +190,259 @@ async function generateForceHoverCss(): Promise<string> {
     return Array.from(newRules).join('\n');
 }
 
-export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any) => {
+export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, avatarMap?: Map<string, string> | Record<string, string>) => {
     // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
     const parentStyles = await getParentPageStyles();
     
-    // 2. Inject them into the current document's head
-    const tempStyleEls: HTMLStyleElement[] = [];
-    for (const cssText of parentStyles) {
+    const getThemeCssVariables = async () => {
+        let colors: any = null;
         try {
-            const styleEl = document.createElement('style');
-            styleEl.setAttribute('data-temp-parent-style', 'true');
-            styleEl.textContent = cssText;
-            document.head.appendChild(styleEl);
-            tempStyleEls.push(styleEl);
-        } catch (e) { /* ignore */ }
-    }
-    
-    try {
-        const getComprehensivePageCSS = async () => {
-            const cssTexts = new Set<string>();
-            for (const sheet of Array.from(document.styleSheets)) {
-                try {
-                    const rules = sheet.cssRules;
-                    for (const rule of Array.from(rules)) {
-                        cssTexts.add(rule.cssText);
+            const res = await Risuai.getColorScheme();
+            if (res && res.scheme) {
+                colors = res.scheme;
+            }
+        } catch (e) {
+            console.warn('[log plugin] Failed to getColorScheme:', e);
+        }
+
+        let textColors: Record<string, string> = {};
+        try {
+            const rootDoc = await Risuai.getRootDocument();
+            if (rootDoc) {
+                const vars = [
+                    '--FontColorStandard',
+                    '--FontColorItalic',
+                    '--FontColorBold',
+                    '--FontColorItalicBold',
+                    '--FontColorQuote1',
+                    '--FontColorQuote2',
+                    '--risu-font-family'
+                ];
+                for (const v of vars) {
+                    const val = await rootDoc.getStyle(v);
+                    if (val) {
+                        textColors[v] = val;
                     }
-                } catch (e) {
-                    // ignore CORS
                 }
             }
-            document.querySelectorAll('style').forEach(styleElement => {
-                if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
-                    cssTexts.add(styleElement.textContent);
+        } catch (e) {
+            console.warn('[log plugin] Failed to get rootDoc style variables:', e);
+        }
+
+        let cssText = ':root, :host {\n';
+        if (colors) {
+            cssText += `  --risu-theme-textcolor: ${colors.textcolor};\n`;
+            cssText += `  --risu-theme-textcolor2: ${colors.textcolor2};\n`;
+            cssText += `  --risu-theme-bgcolor: ${colors.bgcolor};\n`;
+            cssText += `  --risu-theme-darkbg: ${colors.darkbg};\n`;
+            cssText += `  --risu-theme-borderc: ${colors.borderc};\n`;
+            cssText += `  --risu-theme-darkborderc: ${colors.darkBorderc || colors.darkborderc || '#4b5563'};\n`;
+            cssText += `  --risu-theme-selected: ${colors.selected};\n`;
+            cssText += `  --risu-theme-darkbutton: ${colors.darkbutton};\n`;
+            cssText += `  --risu-theme-draculared: ${colors.draculared};\n`;
+
+            cssText += `  --color-textcolor: ${colors.textcolor};\n`;
+            cssText += `  --color-textcolor2: ${colors.textcolor2};\n`;
+            cssText += `  --color-bgcolor: ${colors.bgcolor};\n`;
+            cssText += `  --color-darkbg: ${colors.darkbg};\n`;
+            cssText += `  --color-borderc: ${colors.borderc};\n`;
+            cssText += `  --color-darkborderc: ${colors.darkBorderc || colors.darkborderc || '#4b5563'};\n`;
+            cssText += `  --color-selected: ${colors.selected};\n`;
+            cssText += `  --color-draculared: ${colors.draculared};\n`;
+            cssText += `  --color-darkbutton: ${colors.darkbutton};\n`;
+        }
+
+        for (const [k, v] of Object.entries(textColors)) {
+            cssText += `  ${k}: ${v};\n`;
+        }
+
+        if (!colors && Object.keys(textColors).length === 0) {
+            const root = document.documentElement;
+            const body = document.body;
+            const computedRoot = window.getComputedStyle(root);
+            const computedBody = window.getComputedStyle(body);
+            const variables = [
+                '--risu-theme-textcolor',
+                '--risu-theme-textcolor2',
+                '--risu-theme-bgcolor',
+                '--risu-theme-darkbg',
+                '--risu-theme-borderc',
+                '--risu-theme-darkborderc',
+                '--risu-theme-selected',
+                '--risu-theme-darkbutton',
+                '--risu-theme-draculared',
+                '--color-textcolor',
+                '--color-textcolor2',
+                '--color-bgcolor',
+                '--color-darkbg',
+                '--color-borderc',
+                '--color-darkborderc',
+                '--color-selected',
+                '--color-draculared',
+                '--color-darkbutton',
+                '--FontColorStandard',
+                '--FontColorItalic',
+                '--FontColorBold',
+                '--FontColorItalicBold',
+                '--FontColorQuote1',
+                '--FontColorQuote2',
+                '--risu-font-family'
+            ];
+            for (const v of variables) {
+                const val = root.style.getPropertyValue(v) || body.style.getPropertyValue(v) || computedRoot.getPropertyValue(v) || computedBody.getPropertyValue(v);
+                if (val) {
+                    cssText += `  ${v}: ${val};\n`;
                 }
-            });
-            return Array.from(cssTexts).join('\n');
-        };
+            }
+        }
+        cssText += '}\n';
+        return cssText;
+    };
 
-        const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
-            const clonedNode = node.cloneNode(true) as HTMLElement;
-            
-            // Remove RisuAI's utility buttons, model badges, and custom injected buttons
-            clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
+    const getComprehensivePageCSS = async () => {
+        const cssTexts = new Set<string>();
+        for (const sheet of Array.from(document.styleSheets)) {
+            try {
+                const rules = sheet.cssRules;
+                for (const rule of Array.from(rules)) {
+                    cssTexts.add(rule.cssText);
+                }
+            } catch (e) {
+                // ignore CORS
+            }
+        }
+        document.querySelectorAll('style').forEach(styleElement => {
+            if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
+                cssTexts.add(styleElement.textContent);
+            }
+        });
+        return Array.from(cssTexts).join('\n');
+    };
 
-            if (settings.embedImages !== false) {
-                for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
-                    if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
-                        try {
-                            img.src = await imageUrlToBlob(img.src);
-                        } catch (e) {
-                            console.warn(`Blob conversion error for ${img.src}:`, e);
+    const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
+        const clonedNode = node.cloneNode(true) as HTMLElement;
+        
+        // Remove RisuAI's utility buttons, model badges, and custom injected buttons
+        clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
+
+        // 이름 폰트 색상 강제 지정 (CSS 우선순위 이슈 및 테마 클래스 누락 방지)
+        clonedNode.querySelectorAll('.text-textcolor, .text-textcolor span').forEach(el => {
+            (el as HTMLElement).style.setProperty('color', 'var(--risu-theme-textcolor)', 'important');
+        });
+
+        // 아바타 이미지 강제 치환 (샌드박스 파일 접근/보안 에러 방지)
+        const globalSettings = loadGlobalSettings();
+        const name = getNameFromNode(clonedNode, globalSettings, '');
+        if (name && avatarMap) {
+            let avatarDataUrl = '';
+            if (avatarMap instanceof Map) {
+                avatarDataUrl = avatarMap.get(name) || avatarMap.get(name.trim()) || '';
+            } else {
+                avatarDataUrl = avatarMap[name] || avatarMap[name.trim()] || '';
+            }
+
+            if (avatarDataUrl) {
+                // 본문 바깥 영역의 <img> 태그 교체
+                clonedNode.querySelectorAll('img').forEach(img => {
+                    if (!img.closest('.prose, .chattext')) {
+                        (img as HTMLImageElement).src = avatarDataUrl;
+                    }
+                });
+
+                // 본문 바깥 영역의 background-image 스타일 요소 교체
+                clonedNode.querySelectorAll<HTMLElement>('[style*="background"]').forEach(el => {
+                    if (!el.closest('.prose, .chattext')) {
+                        const styleAttr = el.getAttribute('style');
+                        if (styleAttr) {
+                            const newStyle = styleAttr.replace(/url\(['"]?.*?['"]?\)/g, `url('${avatarDataUrl}')`)
+                                                     .replace(/url\(&quot;.*?&quot;\)/g, `url('${avatarDataUrl}')`);
+                            el.setAttribute('style', newStyle);
+                        }
+                    }
+                });
+            }
+        }
+
+        if (settings.embedImages !== false) {
+            for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
+                if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+                    try {
+                        img.src = await imageUrlToBlob(img.src);
+                    } catch (e) {
+                        console.warn(`Blob conversion error for ${img.src}:`, e);
+                    }
+                }
+            }
+
+            // 가상 DOM 에서 style 속성 파서 한계를 우회하기 위해 getAttribute/setAttribute를 활용한 속성 문자열 파싱
+            for (const el of Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'))) {
+                const styleAttr = el.getAttribute('style');
+                if (styleAttr) {
+                    const urlMatch = styleAttr.match(/url\(['"]?(.*?)['"]?\)/) || styleAttr.match(/url\(&quot;(.*?)&quot;\)/);
+                    if (urlMatch && urlMatch[1]) {
+                        const originalUrl = urlMatch[1];
+                        if (!originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
+                            try {
+                                const dataUrl = await imageUrlToBlob(originalUrl);
+                                const newStyle = styleAttr.replace(originalUrl, dataUrl);
+                                el.setAttribute('style', newStyle);
+                                console.log('[log plugin] Successfully replaced background url in style attribute:', originalUrl.substring(0, 50));
+                            } catch (e) {
+                                console.warn(`Background image blob conversion error for ${originalUrl}:`, e);
+                            }
                         }
                     }
                 }
             }
-            
-            if (settings.replacementRules && settings.replacementRules.length > 0) {
-                // Apply replacements to the message content within the cloned node
-                const messageEl = clonedNode.querySelector('.prose, .chattext');
-                if (messageEl) {
-                    applyReplacements(messageEl as HTMLElement, settings.replacementRules);
-                }
+        }
+        
+        if (settings.replacementRules && settings.replacementRules.length > 0) {
+            // Apply replacements to the message content within the cloned node
+            const messageEl = clonedNode.querySelector('.prose, .chattext');
+            if (messageEl) {
+                applyReplacements(messageEl as HTMLElement, settings.replacementRules);
             }
-            
-            return clonedNode.outerHTML;
-        }));
-
-        let fullCss = await getComprehensivePageCSS();
-        let extraCss = '';
-        if (settings.expandHover) {
-            extraCss += await generateForceHoverCss();
         }
-        if (settings.disableAnimations) {
-            extraCss += `
-                *, *::before, *::after {
-                    animation: none !important;
-                    transition: none !important;
-                }
-            `;
-        }
+        
+        return clonedNode.outerHTML;
+    }));
 
-        // Force font size inheritance for HTML preview
-        extraCss += `
-            .prose, .chattext {
-                font-size: 1em !important;
-                line-height: inherit;
-            }
-        `;
-
-        const wrapperClass = settings.expandHover ? 'class="expand-hover-globally"' : '';
-        const wrapperStyle = `
-            margin: 16px auto;
-            max-width: ${settings.previewWidth || 800}px;
-            font-size: ${settings.previewFontSize || 16}px;
-        `;
-
-        return `
-            <style>${fullCss}\n${extraCss}</style>
-            <div ${wrapperClass}>
-                <div id="log-html-preview-container" style="${wrapperStyle}">
-                    ${clonedNodesHtml.join('')}
-                </div>
-            </div>
-        `;
-    } finally {
-        // 3. Remove temporary style elements
-        for (const el of tempStyleEls) {
-            el.remove();
-        }
+    let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
+    let extraCss = '';
+    if (settings.expandHover) {
+        extraCss += await generateForceHoverCss();
     }
+    if (settings.disableAnimations) {
+        extraCss += `
+            *, *::before, *::after {
+                animation: none !important;
+                transition: none !important;
+            }
+        `;
+    }
+
+    // Force font size inheritance for HTML preview
+    extraCss += `
+        .prose, .chattext {
+            font-size: 1em !important;
+            line-height: inherit;
+        }
+    `;
+
+    const wrapperClass = settings.expandHover ? 'class="expand-hover-globally"' : '';
+    const wrapperStyle = `
+        margin: 16px auto;
+        max-width: ${settings.previewWidth || 800}px;
+        font-size: ${settings.previewFontSize || 16}px;
+    `;
+
+    return `
+        <style>${fullCss}\n${extraCss}</style>
+        <div ${wrapperClass}>
+            <div id="log-html-preview-container" style="${wrapperStyle}">
+                ${clonedNodesHtml.join('')}
+            </div>
+        </div>
+    `;
 };
 

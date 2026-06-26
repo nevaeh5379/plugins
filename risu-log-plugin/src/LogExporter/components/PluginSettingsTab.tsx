@@ -47,7 +47,7 @@ const PluginSettingsTab: React.FC<PluginSettingsTabProps> = ({
     <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', overflowY: 'auto', padding: '20px' }}>
       <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>UI 테마</h4>
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>모달 테마</span>
           <select 
             value={uiTheme} 
@@ -76,7 +76,7 @@ const PluginSettingsTab: React.FC<PluginSettingsTabProps> = ({
       <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>커스텀 선택자</h4>
         
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>프로필 이미지 클래스</span>
           <span className="option-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>프로필 이미지를 찾기 위한 CSS 클래스를 추가하세요</span>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -141,7 +141,7 @@ const PluginSettingsTab: React.FC<PluginSettingsTabProps> = ({
           </div>
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
           <span className="option-label" style={{ fontWeight: '500' }}>참가자 이름 클래스</span>
           <span className="option-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>참가자 이름을 찾기 위한 CSS 클래스를 추가하세요</span>
           <div style={{ display: 'flex', gap: '8px' }}>

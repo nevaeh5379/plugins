@@ -124,6 +124,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     const [character, setCharacter] = useState<RisuCharacter | null>(null);
     const [participants, setParticipants] = useState<Set<string>>(new Set());
     const [uiClasses, setUiClasses] = useState<UIClassInfo[]>([]);
+    const [preCollectedAvatarMap, setPreCollectedAvatarMap] = useState<Map<string, string>>(new Map());
 
     const defaultSettings: Settings = {
         format: 'basic',
@@ -313,7 +314,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
             setError(null);
             try {
                 // v3.0: processChatLog이 SafeElement[] 반환 → outerHTML로 직렬화 후 iframe 내 HTMLElement로 재구성
-                const { charName, chatName, charAvatarUrl, messageNodes: safeNodes, character } = await processChatLog(undefined, options);
+                const { charName, chatName, charAvatarUrl, messageNodes: safeNodes, character, avatarMap } = await processChatLog(undefined, options);
                 const htmlStrings = await serializeNodes(safeNodes);
                 const nodes = parseHtmlToElements(htmlStrings);
 
@@ -322,6 +323,14 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                 setCharAvatarUrl(charAvatarUrl);
                 setMessageNodes(nodes);
                 setCharacter(character);
+
+                const mapObj = new Map<string, string>();
+                if (avatarMap) {
+                    Object.entries(avatarMap).forEach(([k, v]) => {
+                        mapObj.set(k, String(v));
+                    });
+                }
+                setPreCollectedAvatarMap(mapObj);
 
                 const allCharSettings = await loadAllCharSettings();
                 const charSettings = character ? allCharSettings[String(character.chaId)] || {} : {};
@@ -403,6 +412,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         onMessageUpdate: handleMessageUpdate,
         replacementRules: savedSettings.replacementRules,
         disableAnimations: savedSettings.disableAnimations,
+        preCollectedAvatarMap: preCollectedAvatarMap,
     }), [
         finalNodes,
         charName, chatName, charAvatarUrl,
@@ -455,7 +465,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         if (savedSettings.format === 'basic' || !savedSettings.format) {
             return await getLogHtml({...logContainerProps, nodes: nodesForExport, isEditable: false, embedImagesAsBlob: true });
         } else if (savedSettings.format === 'html') {
-            const htmlLog = await generateHtmlPreview(nodesForExport, savedSettings);
+            const htmlLog = await generateHtmlPreview(nodesForExport, savedSettings, preCollectedAvatarMap);
             return htmlLog.replace('</style>', `
               .x-risu-asset-table,
               .x-risu-asset-table table {

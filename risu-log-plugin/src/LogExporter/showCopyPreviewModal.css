@@ -240,11 +240,94 @@
         grid-row: 2;
         background: var(--bg-secondary);
         border-top: 1px solid var(--border-color);
-        padding: 16px 24px;
+        padding: 12px 24px;
         display: flex;
-        gap: 12px;
+        gap: 10px;
         align-items: center;
         flex-wrap: wrap;
+    }
+
+    /* 액션바 내의 모든 버튼 공통 모던화 */
+    .desktop-action-bar .action-bar-btn {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 34px !important;
+        padding: 4px 14px !important;
+        box-shadow: none !important;
+    }
+
+    /* 버튼 호버 시 상승 효과 및 세련된 쉐도우 */
+    .desktop-action-bar .action-bar-btn:not(:disabled):hover {
+        transform: translateY(-1.5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    /* 이미지 저장 버튼 (Primary - Green, 우측 보더 및 보더 반경 제거) */
+    .desktop-action-bar .btn-save-img {
+        background-color: #98c379 !important;
+        border-color: #98c379 !important;
+        color: var(--bg-primary) !important;
+        border-top-right-radius: 0px !important;
+        border-bottom-right-radius: 0px !important;
+        border-right: none !important;
+    }
+    .desktop-action-bar .btn-save-img:hover {
+        background-color: #a3cc85 !important;
+        border-color: #a3cc85 !important;
+    }
+ 
+    /* 더보기 버튼 (Dropdown Trigger, 이미지 저장 버튼과 동일한 Solid 녹색 적용) */
+    .desktop-action-bar .btn-more {
+        background-color: #98c379 !important;
+        border-color: #98c379 !important;
+        color: var(--bg-primary) !important;
+        border-top-left-radius: 0px !important;
+        border-bottom-left-radius: 0px !important;
+        border-left: 1px solid rgba(0, 0, 0, 0.15) !important; /* 스플릿 구분선 */
+        width: 32px !important;
+        padding: 0 !important;
+    }
+    .desktop-action-bar .btn-more:hover {
+        background-color: #a3cc85 !important;
+        border-color: #a3cc85 !important;
+        color: var(--bg-primary) !important;
+    }
+
+    /* 보조 버튼들 (백업, 복원) */
+    .desktop-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete) {
+        background-color: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+    .desktop-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete):hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border-color: var(--accent-primary) !important;
+        color: var(--accent-primary) !important;
+    }
+
+    /* 구분선 */
+    .desktop-action-bar .action-bar-divider {
+        background-color: var(--border-color) !important;
+        opacity: 0.6;
+        height: 18px !important;
+        width: 1px !important;
+        margin: 0 4px !important;
+    }
+
+    /* 삭제 버튼 */
+    .desktop-action-bar .btn-delete {
+        background-color: rgba(244, 63, 94, 0.15) !important;
+        border: 1px solid rgba(244, 63, 94, 0.3) !important;
+        color: #f43f5e !important;
+    }
+    .desktop-action-bar .btn-delete:not(:disabled):hover {
+        background-color: #f43f5e !important;
+        border-color: #f43f5e !important;
+        color: #fff !important;
     }
     
     .desktop-section {
@@ -709,13 +792,13 @@
 
 /* 탭 컨텐츠 */
 .tab-content {
-    padding: 20px;
+    padding: 16px;
     overflow-y: auto;
     height: 100%;
 }
 
 .tab-section {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .tab-section:last-child {
@@ -726,7 +809,7 @@
     font-size: 1em;
     font-weight: 600;
     color: var(--text-title);
-    margin: 0 0 12px 0;
+    margin: 0 0 10px 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -735,7 +818,7 @@
 .section-description {
     font-size: 0.85em;
     color: var(--text-secondary);
-    margin: -8px 0 12px 0;
+    margin: -8px 0 10px 0;
 }
 
 /* 옵션 행 */
@@ -743,7 +826,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 0;
+    padding: 8px 0;
     gap: 16px;
     border-bottom: 1px solid var(--border-color-light);
 }
@@ -3312,4 +3395,145 @@
         justify-content: center;
     }
 }
+
+/* ========================================
+   Ant Design Components Premium Dark Tuning
+   ======================================== */
+[data-theme="dark"] .ant-select,
+[data-theme="classic"] .ant-select {
+    text-align: left !important;
+}
+
+[data-theme="dark"] .ant-select-selector,
+[data-theme="classic"] .ant-select-selector {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+[data-theme="dark"] .ant-select-focused .ant-select-selector,
+[data-theme="classic"] .ant-select-focused .ant-select-selector {
+    border-color: var(--accent-primary) !important;
+    box-shadow: 0 0 0 2px rgba(97, 175, 239, 0.2) !important;
+}
+
+[data-theme="dark"] .ant-select-dropdown,
+[data-theme="classic"] .ant-select-dropdown {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .ant-select-item,
+[data-theme="classic"] .ant-select-item {
+    color: var(--text-secondary) !important;
+    transition: background-color 0.15s !important;
+    border-radius: 4px !important;
+    margin: 2px 4px !important;
+}
+
+[data-theme="dark"] .ant-select-item-option-selected,
+[data-theme="classic"] .ant-select-item-option-selected {
+    background-color: rgba(97, 175, 239, 0.15) !important;
+    color: var(--accent-primary) !important;
+    font-weight: 500 !important;
+}
+
+[data-theme="dark"] .ant-select-item-option-active,
+[data-theme="classic"] .ant-select-item-option-active {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-segmented,
+[data-theme="classic"] .ant-segmented {
+    background-color: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    padding: 2px !important;
+}
+
+[data-theme="dark"] .ant-segmented-item,
+[data-theme="classic"] .ant-segmented-item {
+    color: var(--text-secondary) !important;
+    transition: color 0.2s !important;
+}
+
+[data-theme="dark"] .ant-segmented-item-selected,
+[data-theme="classic"] .ant-segmented-item-selected {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--accent-primary) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="dark"] .ant-switch,
+[data-theme="classic"] .ant-switch {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .ant-switch-checked,
+[data-theme="classic"] .ant-switch-checked {
+    background-color: var(--accent-primary) !important;
+}
+
+[data-theme="dark"] .ant-input-number,
+[data-theme="dark"] .ant-input,
+[data-theme="classic"] .ant-input-number,
+[data-theme="classic"] .ant-input {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-input-number-handler-wrap,
+[data-theme="classic"] .ant-input-number-handler-wrap {
+    background-color: var(--bg-tertiary) !important;
+    border-left: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ant-input-number-group-addon,
+[data-theme="classic"] .ant-input-number-group-addon {
+    background-color: var(--bg-tertiary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+    border-radius: 0 8px 8px 0 !important;
+}
+
+/* Ant Design Dropdown Menu Premium Dark Tuning */
+[data-theme="dark"] .ant-dropdown-menu,
+[data-theme="classic"] .ant-dropdown-menu {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    padding: 4px !important;
+}
+
+[data-theme="dark"] .ant-dropdown-menu-item,
+[data-theme="classic"] .ant-dropdown-menu-item {
+    color: var(--text-secondary) !important;
+    border-radius: 4px !important;
+    padding: 6px 12px !important;
+    margin: 2px 0 !important;
+    transition: all 0.15s !important;
+}
+
+[data-theme="dark"] .ant-dropdown-menu-item:hover,
+[data-theme="classic"] .ant-dropdown-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-dropdown-menu-item .anticon,
+[data-theme="classic"] .ant-dropdown-menu-item .anticon {
+    color: var(--accent-primary) !important;
+    margin-right: 8px !important;
+}
+
+
 

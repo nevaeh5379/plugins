@@ -72,6 +72,7 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
         }
       });
     } else {
+      setAvatarMap(preCollectedAvatarMap);
       setIsAvatarReady(true);
     }
     return () => { isMounted = false; };

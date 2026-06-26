@@ -55,7 +55,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
           <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h4 className="tab-section-title" style={{ margin: '0 0 4px 0', fontSize: '1.1em', fontWeight: 'bold' }}>스타일</h4>
             
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
               <span className="option-label" style={{ fontWeight: '500' }}>테마</span>
               <Select 
                 value={settings.theme || 'basic'} 
@@ -68,7 +68,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
               </Select>
             </div>
 
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
               <span className="option-label" style={{ fontWeight: '500' }}>색상</span>
               <Select 
                 value={settings.color || 'dark'} 
@@ -81,7 +81,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
               </Select>
             </div>
 
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
               <span className="option-label" style={{ fontWeight: '500' }}>헤더 레이아웃</span>
               <Select 
                 value={settings.headerLayout || 'default'} 
@@ -122,7 +122,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
             {settings.showHeader !== false && (
               <div style={{ margin: '8px 0', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <Toggle settingKey="showHeaderIcon" label="헤더 아이콘" description="헤더 프로필 이미지 표시" value={settings.showHeaderIcon} />
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                   <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>헤더 태그</span>
                   <Input 
                     value={settings.headerTags || ''} 
@@ -132,7 +132,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
                 </div>
                 {settings.headerLayout === 'banner' && (
                   <>
-                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                       <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>배너 이미지 URL</span>
                       <Input 
                         value={settings.headerBannerUrl || ''} 
@@ -141,7 +141,7 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
                       />
                     </div>
                     <Toggle settingKey="headerBannerBlur" label="블러 효과" description="배너 이미지에 블러 효과 적용" value={settings.headerBannerBlur} />
-                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                       <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>이미지 정렬</span>
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%' }}>
                         <Slider 
@@ -170,15 +170,15 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
             <Toggle settingKey="showFooter" label="푸터" description="하단 정보 표시" value={settings.showFooter} />
             {settings.showFooter !== false && (
               <div style={{ margin: '8px 0', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                   <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (왼쪽)</span>
                   <Input value={settings.footerLeft || ''} onChange={(e) => onSettingChange('footerLeft', e.target.value)} />
                 </div>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                   <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (중앙)</span>
                   <Input value={settings.footerCenter || ''} onChange={(e) => onSettingChange('footerCenter', e.target.value)} />
                 </div>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
                   <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (오른쪽)</span>
                   <Input value={settings.footerRight || ''} onChange={(e) => onSettingChange('footerRight', e.target.value)} />
                 </div>
