@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import type { UIClassInfo } from '../utils/domUtils';
 import { Tag, Checkbox, Divider, List } from 'antd';

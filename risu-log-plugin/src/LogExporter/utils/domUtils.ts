@@ -1,8 +1,8 @@
 // src/LogExporter/utils/domUtils.ts
-import type { ReplacementRule } from '../../types';
+import type { ReplacementRule, GlobalSettings } from '../../types';
 
 // Assuming global settings are loaded and passed in.
-export const getNameFromNode = (node: HTMLElement, globalSettings: any, charName = 'Assistant'): string => {
+export const getNameFromNode = (node: HTMLElement, globalSettings: GlobalSettings, charName = 'Assistant'): string => {
     const escapeSelector = (selector: string) => {
         return selector.replace(/[!"#$%&'()*+,./:;<=>?@[\]^`{|}~]/g, '\$&');
     };
@@ -131,7 +131,7 @@ export function collectUIClasses(nodes: HTMLElement[]): UIClassInfo[] {
     return result;
 }
 
-export function filterWithCustomClasses(node: HTMLElement, selectedClasses: string[], globalSettings: any): HTMLElement {
+export function filterWithCustomClasses(node: HTMLElement, selectedClasses: string[], globalSettings: GlobalSettings): HTMLElement {
     const tempEl = node.cloneNode(true) as HTMLElement;
     const profileClasses = globalSettings.profileClasses || [];
 

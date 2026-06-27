@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect } from 'react';
 import { Select, Switch, InputNumber, Alert, Divider } from 'antd';
 

@@ -1,5 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { toBlob } from 'html-to-image';
 import domtoimage from 'dom-to-image-more';
+import type { ColorPalette } from '../../types';
+import type { LogExportSettings } from '../../types';
 import JSZip from 'jszip';
 import { createRoot } from 'react-dom/client';
 import LogContainer from '../components/LogContainer';
@@ -312,7 +315,7 @@ const splitAndSaveAsSeparateFiles = async (
     }
 };
 
-export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'png' | 'jpeg' | 'webp', charName: string, chatName: string, options: any, backgroundColor?: string) => {
+export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'png' | 'jpeg' | 'webp', charName: string, chatName: string, options: LogExportSettings, backgroundColor?: string) => {
     try {
         const { 
             imageResolution: initialImageResolution = 1, 
@@ -552,14 +555,15 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                 onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
                 await new Promise(resolve => setTimeout(resolve, 50));
 
+                const globalSettings = await loadGlobalSettings();
                 await new Promise<void>(resolve => {
                     const onReady = () => resolve();
                     const props = {
                         nodes: chunkNodes,
                         charInfo: { name: charName, chatName: chatName, avatarUrl: resolvedAvatarUrl },
-                        selectedThemeKey: htmlOptions.theme,
-                        selectedColorKey: htmlOptions.color,
-                        color: htmlOptions.color,
+                        selectedThemeKey: htmlOptions.theme as import("../../types").ThemeKey | undefined,
+                        selectedColorKey: htmlOptions.color as import("../../types").ColorKey | undefined,
+                        color: htmlOptions.color as ColorPalette | undefined,
                         showAvatar: htmlOptions.showAvatar,
                         showHeader: htmlOptions.showHeader,
                         showHeaderIcon: htmlOptions.showHeaderIcon,
@@ -574,7 +578,7 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                         footerRight: htmlOptions.footerRight,
                         showBubble: htmlOptions.showBubble,
                         embedImagesAsBlob: true,
-                        globalSettings: loadGlobalSettings(),
+                        globalSettings: globalSettings,
                         onReady: onReady,
                         fontSize: htmlOptions.htmlScaleFactor !== undefined ? 16 * Number(htmlOptions.htmlScaleFactor) : Number(htmlOptions.previewFontSize || 16),
                         containerWidth: htmlOptions.previewWidth,
@@ -719,7 +723,7 @@ export const downloadImagesAsZip = async (
         };
 
         if (sequentialNaming) {
-            const globalSettings = loadGlobalSettings();
+            const globalSettings = await loadGlobalSettings();
             const baseHtml = await getLogHtml({
                 nodes: nodes,
                 charInfo: charInfo,
@@ -734,7 +738,7 @@ export const downloadImagesAsZip = async (
             tempDiv.innerHTML = baseHtml;
             tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
         } else {
-             const globalSettings = loadGlobalSettings();
+             const globalSettings = await loadGlobalSettings();
              const tempDiv = document.createElement('div');
             const html = await getLogHtml({
                 nodes: nodes,

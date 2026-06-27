@@ -4,7 +4,10 @@
 // 캐릭터 정보, 채팅 메시지 데이터, 메시지 DOM 노드를 수집합니다.
 
 import type { RisuCharacter, RisuChat } from '../types/risuai'
+import type { Persona } from '../types'
 import { getAllMessageNodes } from './messageScanner'
+
+
 
 export interface ChatLogData {
   charName: string
@@ -135,6 +138,14 @@ export async function processChatLog(
  * 메인 DOM에서 캐릭터 및 유저(페르소나) 등의 아바타 이미지를 수집하여
  * 이름 -> Base64 data URL 형태의 맵을 생성합니다.
  */
+
+
+
+
+
+
+
+
 async function collectAvatarsMain(
   nodes: SafeElement[],
   charName: string
@@ -159,19 +170,19 @@ async function collectAvatarsMain(
       // 바인딩된 페르소나 체크
       const charIdx = await Risuai.getCurrentCharacterIndex()
       const chatIdx = await Risuai.getCurrentChatIndex()
-      const chat = await Risuai.getChatFromIndex(charIdx, chatIdx) as any
+      const chat = await Risuai.getChatFromIndex(charIdx, chatIdx) as RisuChat | null
       
-      let bindedPersona: any = null
+      let bindedPersona: Persona | null = null
       if (chat && chat.bindedPersona && db.personas) {
-        bindedPersona = db.personas.find((v: any) => v.id === chat.bindedPersona)
+        bindedPersona = db.personas?.find((v) => v.id === chat.bindedPersona) as Persona | undefined ?? null
       }
       
       if (bindedPersona) {
         userIcon = bindedPersona.icon
         username = bindedPersona.name
       } else {
-        userIcon = (db as any).userIcon || ''
-        username = (db as any).username || 'User'
+        userIcon = (db as Record<string, unknown>)['userIcon'] as string || ''
+        username = (db as Record<string, unknown>)['username'] as string || 'User'
       }
       
       if (userIcon) {

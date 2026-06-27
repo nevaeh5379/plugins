@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useCallback } from 'react';
 import { createZipFromMediaList } from '../../services/zipService';
 import { copyToClipboard } from '../services/fileService';

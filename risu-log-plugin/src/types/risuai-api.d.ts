@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Risuai Plugin API v3.0 Type Definitions
  *
@@ -108,9 +109,9 @@ interface MCPToolDef {
     /** Tool description */
     description: string;
     /** JSON schema for input validation */
-    inputSchema: any;
+    inputSchema: Record<string, unknown>;
     /** Annotations for the tool, can be used for documentation or metadata */
-    annotations?: any;
+    annotations?: Record<string, unknown>;
 }
 
 /**
@@ -287,13 +288,13 @@ interface RisuModule {
     /** Module description */
     description: string;
     /** Lorebook entries */
-    lorebook?: any[];
+    lorebook?: unknown[];
     /** Regex scripts */
-    regex?: any[];
+    regex?: unknown[];
     /** CommonJS code */
     cjs?: string;
     /** Trigger scripts */
-    trigger?: any[];
+    trigger?: unknown[];
     /** Module ID */
     id: string;
     /** Low level system access */
@@ -309,7 +310,7 @@ interface RisuModule {
     /** Custom module toggle */
     customModuleToggle?: string;
     /** MCP module configuration */
-    mcp?: any;
+    mcp?: Record<string, unknown>;
 }
 
 /**
@@ -336,7 +337,7 @@ interface Persona {
  */
 interface DatabaseSubset {
     /** Array of characters and group chats */
-    characters?: any[];
+    characters?: unknown[];
     /** Risuai modules */
     modules?: RisuModule[];
     /** Enabled module IDs */
@@ -350,7 +351,7 @@ interface DatabaseSubset {
     /** Plugin instances */
     plugins?: RisuPlugin[];
     /** Plugin custom storage object */
-    pluginCustomStorage?: {[key: string]: any};
+    pluginCustomStorage?: Record<string, unknown>;
     /** AI temperature setting (0-100) */
     temperature?: number;
     /** Ask before removing messages */
@@ -786,7 +787,7 @@ interface SafeElement {
      */
     addEventListener(
         type: string,
-        listener: (event: any) => void,
+        listener: (event: unknown) => void,
         options?: boolean | AddEventListenerOptions
     ): Promise<string>;
 
@@ -986,7 +987,7 @@ interface PluginStorage {
      * @param value - Value to store (any JSON-serializable value)
      * @returns Promise that resolves when item is stored
      */
-    setItem(key: string, value: any): Promise<void>;
+    setItem(key: string, value: unknown): Promise<void>;
 
     /**
      * Removes an item from storage
@@ -1266,17 +1267,17 @@ interface RisuaiPluginAPI {
      * await risuai.setCharacter(char);
      * ```
      */
-    setCharacter(character: any): Promise<void>;
+    setCharacter(character: unknown): Promise<void>;
 
     /**
      * @deprecated Use getCharacter() instead
      */
-    getChar(): Promise<any>;
+    getChar(): Promise<unknown>;
 
     /**
      * @deprecated Use setCharacter() instead
      */
-    setChar(character: any): Promise<void>;
+    setChar(character: unknown): Promise<void>;
 
         /**
      * Gets a character by index
@@ -1290,7 +1291,7 @@ interface RisuaiPluginAPI {
      * @param index - Character index
      * @param character - Character object to save
      */
-    setCharacterToIndex(index: number, character: any): Promise<void>;
+    setCharacterToIndex(index: number, character: unknown): Promise<void>;
 
     /**
      * Gets a chat by index
@@ -1307,7 +1308,7 @@ interface RisuaiPluginAPI {
      * @param chatIndex - Chat index
      * @param chat - Chat object to save
      */
-    setChatToIndex(characterIndex: number, chatIndex: number, chat: any): Promise<void>;
+    setChatToIndex(characterIndex: number, chatIndex: number, chat: unknown): Promise<void>;
 
     /**
      * Gets the current character index
@@ -1375,7 +1376,7 @@ interface RisuaiPluginAPI {
     /**
      * @deprecated Use getArgument() instead
      */
-    getArg(arg: string): any;
+    getArg(arg: string): unknown;
 
     /**
      * @deprecated Use setArgument() instead
@@ -1607,7 +1608,7 @@ interface RisuaiPluginAPI {
             description: string;
         },
         getToolList: () => Promise<MCPToolDef[]>,
-        callTool: (toolName: string, content: any) => Promise<MCPToolCallContent[]>
+        callTool: (toolName: string, content: Record<string, unknown>) => Promise<MCPToolCallContent[]>
     ): Promise<void>;
 
     /**
@@ -1819,7 +1820,7 @@ interface RisuaiPluginAPI {
      * ```
      */
     registerBodyIntercepter(
-        callback: (body: any, type: string) => any
+        callback: (body: unknown, type: string) => unknown
     ): Promise<{ id: string } | null>;
 
     /**
@@ -1847,7 +1848,7 @@ interface RisuaiPluginAPI {
      * @param data - Asset data
      * @returns Saved asset path
      */
-    saveAsset(data: any): Promise<string>;
+    saveAsset(data: unknown): Promise<string>;
 
     // ========== Plugin Management ==========
 
@@ -1932,7 +1933,7 @@ interface RisuaiPluginAPI {
      * @param message - The message payload to send
      * @remarks This API is subject to change. API might be changed, deprecated, or removed in the future without prior notice.
      */
-    postPluginChannelMessage(pluginName: string, channelName: string, message: any): Promise<void>;
+    postPluginChannelMessage(pluginName: string, channelName: string, message: unknown): Promise<void>;
 
     // ========== Model Requesters ==========
 
@@ -1952,11 +1953,11 @@ interface RisuaiPluginAPI {
      * @returns The model's response, which may be a string or a stream depending on the mode
      */
     runLLMModel(options: {
-        messages: any[];
+        messages: unknown[];
         staticModel?: string;
         mode: string;
         allowPlugins?: boolean;
-    }): Promise<any>;
+    }): Promise<unknown>;
 
     /**
      * Sends a chat message as if it were sent by the user, triggering the normal chat processing flow.

@@ -1,21 +1,23 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Segmented, Select, Switch, Input, Slider, InputNumber, Divider } from 'antd';
+import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 import { FileTextOutlined, CodeOutlined, FileMarkdownOutlined, AlignLeftOutlined } from '@ant-design/icons';
 
 interface ExportTabProps {
-  settings: any;
-  onSettingChange: (key: string, value: any) => void;
-  themes: any;
-  colors: any;
+  settings: LogExportSettings;
+  onSettingChange: (key: string, value: unknown) => void;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes, colors }) => {
   
-  const handleFormatChange = (format: any) => {
+  const handleFormatChange = (format: 'basic' | 'html' | 'markdown' | 'text') => {
     onSettingChange('format', format);
   };
 
-  const Toggle: React.FC<{ settingKey: string, label: string, value: any, defaultOn?: boolean, description?: string }> = ({ 
+  const Toggle: React.FC<{ settingKey: string, label: string, value: unknown, defaultOn?: boolean, description?: string }> = ({ 
     settingKey, label, value, defaultOn = true, description 
   }) => {
     const isChecked = defaultOn ? value !== false : value === true;

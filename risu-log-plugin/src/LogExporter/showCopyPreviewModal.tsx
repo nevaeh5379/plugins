@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import './showCopyPreviewModal.css';
@@ -63,11 +64,12 @@ interface Settings {
   maxImageHeight?: number;
   replacementRules?: ReplacementRule[];
   disableAnimations?: boolean;
+  [key: string]: unknown;
 }
 
 
 interface ShowCopyPreviewModalProps {
-  options?: any;
+  options?: Record<string, unknown>;
   onClose: () => void;
 }
 

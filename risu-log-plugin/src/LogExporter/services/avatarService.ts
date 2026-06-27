@@ -8,7 +8,7 @@ export const collectCharacterAvatars = async (
   nodes: Element[],
   charInfoName: string,
   isForArca: boolean,
-  globalSettings: any // Added
+  globalSettings: import('../../types').GlobalSettings
 ): Promise<Map<string, string>> => {
   const avatarMap = new Map<string, string>();
   const avatarPromises = new Map<string, Promise<string>>();

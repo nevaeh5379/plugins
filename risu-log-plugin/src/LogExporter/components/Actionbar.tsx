@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { copyToClipboard, saveAsFile } from '../services/fileService';
 import { saveAsImage } from '../services/imageService';

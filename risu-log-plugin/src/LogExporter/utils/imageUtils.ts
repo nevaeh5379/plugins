@@ -93,14 +93,14 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
   if (isSameOrigin) {
     try {
       console.log('[log plugin] Same-origin URL detected, fetching via risuFetch:', url);
-      const res = await (Risuai as any).risuFetch(url, {
+      const res = await ((Risuai as unknown) as { risuFetch: (url: string, options: Record<string, unknown>) => Promise<{ ok: boolean; data: unknown; headers?: Record<string, string>; status?: number }> }).risuFetch(url, {
         method: 'GET',
         plainFetchForce: true,
         rawResponse: true
-      } as any);
+      } as Record<string, unknown>);
       if (res && res.ok && res.data) {
         const mimeType = res.headers?.['content-type'] || 'image/png';
-        return new Blob([res.data], { type: mimeType });
+        return new Blob([res.data as BlobPart], { type: mimeType });
       }
       throw new Error(`risuFetch failed with status ${res?.status}`);
     } catch (e) {
@@ -108,7 +108,7 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
     }
   }
 
-  const res = await Risuai.nativeFetch(url, { method: 'GET' } as any)
+  const res = await Risuai.nativeFetch(url, { method: 'GET' } as Record<string, unknown>)
   if (!res.ok) throw new Error(`nativeFetch failed: ${res.status} ${res.statusText} for ${url}`)
   return await res.blob()
 }

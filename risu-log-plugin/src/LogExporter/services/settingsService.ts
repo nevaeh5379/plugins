@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // settingsService.ts — API v3.0 기반
 // localStorage → Risuai.pluginStorage / getLocalPluginStorage 로 마이그레이션
 // 모든 메서드가 async가 됩니다.
+import type { GlobalSettings } from '../../types'
 
 const CHAR_SETTINGS_KEY = 'logExporterCharacterSettings'
 const GLOBAL_SETTINGS_KEY = 'logExporterGlobalSettings'
@@ -24,7 +26,7 @@ export const loadAllCharSettings = async (): Promise<Record<string, any>> => {
 /**
  * 단일 캐릭터 설정을 저장합니다.
  */
-export const saveCharSettings = async (charId: string, settings: any): Promise<void> => {
+export const saveCharSettings = async (charId: string, settings: Record<string, unknown>): Promise<void> => {
   try {
     const all = await loadAllCharSettings()
     all[charId] = { ...(all[charId] || {}), ...settings }
@@ -37,7 +39,7 @@ export const saveCharSettings = async (charId: string, settings: any): Promise<v
 /**
  * 전역 설정을 불러옵니다.
  */
-export const loadGlobalSettings = async (): Promise<any> => {
+export const loadGlobalSettings = async (): Promise<GlobalSettings> => {
   try {
     const raw = await Risuai.pluginStorage.getItem(GLOBAL_SETTINGS_KEY)
     const parsed = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : {}
@@ -64,7 +66,7 @@ export const loadGlobalSettings = async (): Promise<any> => {
 /**
  * 전역 설정을 저장합니다.
  */
-export const saveGlobalSettings = async (newSettings: any): Promise<void> => {
+export const saveGlobalSettings = async (newSettings: Partial<GlobalSettings>): Promise<void> => {
   try {
     const existing = await loadGlobalSettings()
     const merged = { ...existing, ...newSettings }

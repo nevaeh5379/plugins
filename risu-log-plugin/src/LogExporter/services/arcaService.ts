@@ -1,7 +1,7 @@
 import { getLogHtml } from './htmlGenerator';
-import type { LogNode, ArcaImage } from '../../types';
+import type { LogNode, ArcaImage, LogExportSettings, CharInfo, GlobalSettings } from '../../types';
 
-export const generateArcaContent = async (nodes: LogNode[], settings: any, options: { convertWebM: boolean }, charInfo: any, globalSettings: any): Promise<{ html: string, images: ArcaImage[] }> => {
+export const generateArcaContent = async (nodes: LogNode[], settings: LogExportSettings, options: { convertWebM: boolean }, charInfo: CharInfo, globalSettings: GlobalSettings): Promise<{ html: string, images: ArcaImage[] }> => {
     // 1. 기본 테마와 다크 색상을 사용하여 깨끗한 HTML 생성
     const html = await getLogHtml({
         nodes,

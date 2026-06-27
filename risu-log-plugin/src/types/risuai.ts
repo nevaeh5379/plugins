@@ -16,15 +16,15 @@ export interface RisuChat {
   message: RisuMessage[];
   note: string;
   name: string;
-  localLore?: any[];
+  localLore?: unknown[];
   sdData?: string;
   supaMemoryData?: string;
-  hypaV2Data?: any;
-  hypaV3Data?: any;
+  hypaV2Data?: unknown;
+  hypaV3Data?: unknown;
   lastMemory?: string;
   suggestMessages?: string[];
   isStreaming?: boolean;
-  scriptstate?: any;
+  scriptstate?: unknown;
   modules?: string[];
   id?: string;
   bindedPersona?: string;
@@ -59,7 +59,7 @@ export interface RisuCharacter {
   largePortrait?: boolean;
   nickname?: string;
   hideChatIcon?: boolean;
-  [key: string]: any; // 기타 필드 허용
+  [key: string]: unknown; // 기타 필드 허용
 }
 
 // 그룹 채팅 객체

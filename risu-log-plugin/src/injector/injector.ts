@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // injector.ts — API v3.0 기반
 // 1. 채팅 단위 내보내기 버튼: main.tsx에서 registerButton으로 등록 (공식 API)
 // 2. 메시지별 버튼(이 메시지만/이 메시지부터/범위): getRootDocument + SafeMutationObserver로 주입
@@ -89,17 +90,18 @@ async function hasBtnGroup(target: SafeElement): Promise<boolean> {
 }
 
 // 클릭 이벤트가 실제 엘리먼트 영역 내에서 발생했는지 검사하는 헬퍼 함수
-async function isClickInside(element: SafeElement, e: any): Promise<boolean> {
-  if (!e || typeof e.clientX !== 'number' || typeof e.clientY !== 'number') {
+async function isClickInside(element: SafeElement, e: unknown): Promise<boolean> {
+  const mouseEvent = e as MouseEvent;
+  if (!mouseEvent || typeof mouseEvent.clientX !== 'number' || typeof mouseEvent.clientY !== 'number') {
     return false
   }
   try {
     const rect = await element.getBoundingClientRect()
     return (
-      e.clientX >= rect.left &&
-      e.clientX <= rect.right &&
-      e.clientY >= rect.top &&
-      e.clientY <= rect.bottom
+      mouseEvent.clientX >= rect.left &&
+      mouseEvent.clientX <= rect.right &&
+      mouseEvent.clientY >= rect.top &&
+      mouseEvent.clientY <= rect.bottom
     )
   } catch (err) {
     console.error('[log plugin] isClickInside error:', err)
@@ -122,10 +124,11 @@ async function createMsgBtnGroup(
   await fromHereBtn.setInnerHTML(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/><path d="m16 12 4 4 4-4"/></svg>'
   )
-  await fromHereBtn.addEventListener('click', async (e: any) => {
+  await fromHereBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(fromHereBtn, e))) return
-    e.preventDefault?.()
-    e.stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
+
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index })
   })
@@ -136,10 +139,11 @@ async function createMsgBtnGroup(
   await onlyThisBtn.setInnerHTML(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
   )
-  await onlyThisBtn.addEventListener('click', async (e: any) => {
+  await onlyThisBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(onlyThisBtn, e))) return
-    e.preventDefault?.()
-    e.stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
+
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index, singleMessage: true })
   })
@@ -150,10 +154,11 @@ async function createMsgBtnGroup(
   await rangeBtn.setInnerHTML(
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8H3"/><path d="M21 16H3"/><path d="M7 12v8"/><path d="M7 4v4"/><path d="M17 12v8"/><path d="M17 4v4"/></svg>'
   )
-  await rangeBtn.addEventListener('click', async (e: any) => {
+  await rangeBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(rangeBtn, e))) return
-    e.preventDefault?.()
-    e.stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
+
     if (!rangeSelection.active) {
       await clearRange(rootDoc)
       rangeSelection.active = true
@@ -230,7 +235,7 @@ export async function openExportModalForCurrentChat(): Promise<void> {
 // mutations 내용 검사 대신 단순 재주입 트리거(디바운스)로 회피합니다.
 let reinjectTimer: ReturnType<typeof setTimeout> | null = null
 
-async function onMutation(_mutations: any): Promise<void> {
+async function onMutation(_mutations: SafeClassArray<SafeMutationRecord>): Promise<void> {
   try {
     // 디바운스: 연속 DOM 변경 시 한 번만 재주입
     if (reinjectTimer) clearTimeout(reinjectTimer)

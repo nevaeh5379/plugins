@@ -219,7 +219,7 @@ export async function downloadImagesAsZip(
       tempDiv.querySelectorAll<HTMLImageElement | HTMLVideoElement>('img, video').forEach(el => addMediaToZip(el));
     } else {
       if (showAvatar) {
-        const globalSettings = loadGlobalSettings();
+        const globalSettings = await loadGlobalSettings();
         const avatarMap = await collectCharacterAvatars(nodes, charName, false, globalSettings);
         for (const avatarUrl of avatarMap.values()) {
           if (avatarUrl) {

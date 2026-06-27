@@ -1,17 +1,17 @@
 import { getNameFromNode, applyReplacements } from '../utils/domUtils';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { loadGlobalSettings } from './settingsService';
-
+import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 
 
 // This is a simplified version of the original generateBasicFormatLog function.
 // It will be expanded later.
-export const generateBasicLog = async (nodes: HTMLElement[], charName: string, chatName: string, charAvatarUrl: string, settings: any, themes: any, colors: any) => {
+export const generateBasicLog = async (nodes: HTMLElement[], charName: string, chatName: string, charAvatarUrl: string, settings: LogExportSettings, themes: Record<string, ThemeInfo>, colors: Record<string, ColorPalette>) => {
     let contentHtml = '';
-    const globalSettings = loadGlobalSettings();
+    const globalSettings = await loadGlobalSettings();
 
     const themeInfo = themes[settings.theme || 'basic'] || themes.basic;
-    const colorPalette = settings.theme === 'basic' ? (colors[settings.color || 'dark'] || colors.dark) : (themeInfo.color || colors.dark);
+    const colorPalette = settings.theme === 'basic' ? ((typeof settings.color === 'string' ? colors[settings.color || 'dark'] : colors.dark) || colors.dark) : (themeInfo.color || colors.dark);
 
     if (settings.showHeader !== false) {
         contentHtml += `
@@ -44,9 +44,9 @@ export const generateBasicLog = async (nodes: HTMLElement[], charName: string, c
     return `<div style="padding: 20px; background-color: ${colorPalette.background};">${contentHtml}</div>`;
 };
 
-export const generateMarkdownLog = async (nodes: HTMLElement[], charName: string, settings?: any) => {
+export const generateMarkdownLog = async (nodes: HTMLElement[], charName: string, settings?: LogExportSettings) => {
     let markdown = '';
-    const globalSettings = loadGlobalSettings();
+    const globalSettings = await loadGlobalSettings();
     for (const node of nodes) {
         const name = getNameFromNode(node, globalSettings, charName);
         const messageEl = node.querySelector('.prose, .chattext');
@@ -67,9 +67,9 @@ export const generateMarkdownLog = async (nodes: HTMLElement[], charName: string
     return markdown;
 };
 
-export const generateTextLog = async (nodes: HTMLElement[], charName: string, settings?: any) => {
+export const generateTextLog = async (nodes: HTMLElement[], charName: string, settings?: LogExportSettings) => {
     let text = '';
-    const globalSettings = loadGlobalSettings();
+    const globalSettings = await loadGlobalSettings();
     for (const node of nodes) {
         const name = getNameFromNode(node, globalSettings, charName);
         const messageEl = node.querySelector('.prose, .chattext');
@@ -116,7 +116,7 @@ async function getParentPageStyles(): Promise<string[]> {
                     const match = outerHTML.match(/href\s*=\s*["']?([^"'\s>]+)/);
                     if (match && match[1]) {
                         const href = match[1];
-                        const res = await Risuai.nativeFetch(href, { method: 'GET' } as any);
+                        const res = await Risuai.nativeFetch(href, { method: 'GET' } as Record<string, unknown>);
                         if (res.ok) {
                             const text = await res.text();
                             if (text && text.trim()) {
@@ -190,16 +190,16 @@ async function generateForceHoverCss(): Promise<string> {
     return Array.from(newRules).join('\n');
 }
 
-export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, avatarMap?: Map<string, string> | Record<string, string>) => {
+export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
     // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
     const parentStyles = await getParentPageStyles();
     
     const getThemeCssVariables = async () => {
-        let colors: any = null;
+        let colors: Record<string, string> = {};
         try {
             const res = await Risuai.getColorScheme();
             if (res && res.scheme) {
-                colors = res.scheme;
+                colors = res.scheme as unknown as Record<string, string>;
             }
         } catch (e) {
             console.warn('[log plugin] Failed to getColorScheme:', e);
@@ -424,7 +424,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: any, a
         });
 
         // 아바타 이미지 강제 치환 (샌드박스 파일 접근/보안 에러 방지)
-        const globalSettings = loadGlobalSettings();
+        const globalSettings = await loadGlobalSettings();
         const name = getNameFromNode(clonedNode, globalSettings, '');
         if (name && avatarMap) {
             let avatarDataUrl = '';

@@ -72,7 +72,7 @@ export interface LogContainerProps {
   preCollectedAvatarMap?: Map<string, string>;
   allowHtmlRendering?: boolean;
   onReady?: () => void;
-  globalSettings: any;
+  globalSettings: GlobalSettings;
   fontSize?: number;
   containerWidth?: number;
   imageScale?: number;
@@ -99,7 +99,7 @@ export interface MessageProps {
   isForArca: boolean;
   embedImagesAsBlob: boolean;
   allowHtmlRendering: boolean;
-  globalSettings: any;
+  globalSettings: GlobalSettings;
   imageScale?: number;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
@@ -134,4 +134,85 @@ export interface ReplacementRule {
   flags?: string;
   isRegex?: boolean;
   isEnabled?: boolean;
+}
+
+export interface LogExportSettings {
+  // Format
+  format?: 'basic' | 'html' | 'markdown' | 'text';
+  // Theme & Color
+  theme?: string;
+  color?: string | ColorPalette;
+  // Header
+  showHeader?: boolean;
+  showHeaderIcon?: boolean;
+  headerTags?: string;
+  headerLayout?: 'default' | 'compact' | 'banner';
+  headerBannerUrl?: string;
+  headerBannerBlur?: boolean;
+  headerBannerAlign?: number;
+  // Footer
+  showFooter?: boolean;
+  footerLeft?: string;
+  footerCenter?: string;
+  footerRight?: string;
+  // Display
+  showAvatar?: boolean;
+  showBubble?: boolean;
+  // Content
+  embedImages?: boolean;
+  replacementRules?: ReplacementRule[];
+  expandHover?: boolean;
+  disableAnimations?: boolean;
+  rawHtmlView?: boolean;
+  isEditable?: boolean;
+  // HTML scaling
+  htmlScaleMode?: 'font' | 'full';
+  htmlScaleFactor?: number;
+  previewFontSize?: number;
+  previewWidth?: number;
+  // Image export
+  imageScale?: number;
+  imageResolution?: number | 'auto';
+  imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
+  imageFormat?: 'png' | 'jpeg' | 'webp';
+  splitImage?: 'none' | 'chunk' | 'message';
+  maxImageHeight?: number;
+  customCss?: string;
+  customFilters?: Record<string, boolean>;
+  // Arca helper
+  convertWebM?: boolean;
+  // Callbacks (for image export)
+  onProgressStart?: (message: string, total: number) => void;
+  onProgressUpdate?: (update: { current?: number; message?: string }) => void;
+  onProgressEnd?: () => void;
+  // External data
+  charAvatarUrl?: string;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export interface Persona {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+export interface DatabaseResponse {
+  personas?: Persona[];
+  selectedPersona?: string;
+  userIcon?: string;
+  username?: string;
+  [key: string]: unknown;
 }
