@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import type { MessageProps } from '../../../types';
 import Avatar from '../Avatar';
@@ -26,36 +25,61 @@ const ModernMessage: React.FC<MessageProps> = (props) => {
 
   const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
     if (onMessageUpdate && e.currentTarget.innerHTML !== messageHtml) {
-        onMessageUpdate(index, e.currentTarget.innerHTML);
+      onMessageUpdate(index, e.currentTarget.innerHTML);
     }
   };
 
   const handleContentClick = (e: React.MouseEvent) => {
-    if (isEditable) {
-      e.stopPropagation();
-    }
+    if (isEditable) e.stopPropagation();
   };
 
   const avatarBaseStyle: React.CSSProperties = {
-    width:'48px',height:'48px',minWidth:'48px',borderRadius:'50%',boxShadow:color.shadow || 'none',border:`2px solid ${color.avatarBorder}`
+    width: '44px', height: '44px', minWidth: '44px',
+    borderRadius: '12px',
+    boxShadow: color.shadow || 'none',
+    border: `1px solid ${color.border}`,
   };
   const avatarMarginStyle: React.CSSProperties = {
-      margin: isUser ? '0 0 0 12px' : '0 12px 0 0'
+    margin: isUser ? '0 0 0 14px' : '0 14px 0 0',
   };
-  
-  const modernCardBg = isUser 
-    ? `linear-gradient(135deg, ${color.cardBgUser} 0%, #3a3e44 100%)`
-    : color.cardBg;
+
+  const cardBg = isUser ? color.cardBgUser : color.cardBg;
 
   return (
-    <div className="chat-message-container" style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '20px', gap: '16px', flexDirection: isUser ? 'row-reverse' : 'row' }}>
+    <div className="chat-message-container" style={{
+      display: 'flex', alignItems: 'flex-start',
+      marginBottom: '16px', gap: '14px',
+      flexDirection: isUser ? 'row-reverse' : 'row',
+    }}>
       <div style={{ position: 'relative' }}>
         <Avatar avatarSrc={avatarSrc} name={name} isUser={isUser} isForArca={isForArca} showAvatar={showAvatar} baseStyle={avatarBaseStyle} marginStyle={avatarMarginStyle} isForExport={isForExport} />
         {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} title="메시지 삭제">&times;</button>}
       </div>
-      <div style={{ flex: 1, borderRadius: '8px', background: modernCardBg, boxShadow: color.shadow, overflow: 'hidden' }}>
-        <strong style={{ color: color.nameColor, fontWeight: 600, fontSize: `calc(${baseSize} * 0.94)`, display: 'block', padding: '10px 14px', backgroundColor: 'rgba(0,0,0,0.15)', textAlign: isUser ? 'right' : 'left' }}>{name}</strong>
-        <div ref={contentRef} style={{ padding: '14px', color: color.text, lineHeight: 1.8, wordWrap: 'break-word', fontSize: baseSize }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+      <div style={{
+        flex: 1, minWidth: 0,
+        borderRadius: '10px',
+        background: cardBg,
+        boxShadow: color.shadow,
+        border: `1px solid ${color.border}`,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          color: color.nameColor, fontWeight: 600,
+          fontSize: `calc(${baseSize} * 0.88)`,
+          padding: '8px 14px',
+          borderBottom: `1px solid ${color.border}`,
+          textAlign: isUser ? 'right' : 'left',
+          opacity: 0.9,
+        }}>
+          {name}
+        </div>
+        <div ref={contentRef} style={{
+          padding: '12px 14px',
+          color: color.text,
+          lineHeight: 1.75,
+          wordWrap: 'break-word',
+          fontSize: baseSize,
+        }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
       </div>
     </div>
   );

@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { Segmented, Select, Switch, Input, Slider, InputNumber, Divider } from 'antd';
+import { Segmented, Select, Input, Slider, InputNumber, Divider, Typography } from 'antd';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 import { FileTextOutlined, CodeOutlined, FileMarkdownOutlined, AlignLeftOutlined } from '@ant-design/icons';
+import SettingToggle from './SettingToggle';
+
+const { Title, Text } = Typography;
 
 interface ExportTabProps {
   settings: LogExportSettings;
@@ -12,34 +15,14 @@ interface ExportTabProps {
 }
 
 const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes, colors }) => {
-  
-  const handleFormatChange = (format: 'basic' | 'html' | 'markdown' | 'text') => {
-    onSettingChange('format', format);
-  };
-
-  const Toggle: React.FC<{ settingKey: string, label: string, value: unknown, defaultOn?: boolean, description?: string }> = ({ 
-    settingKey, label, value, defaultOn = true, description 
-  }) => {
-    const isChecked = defaultOn ? value !== false : value === true;
-    return (
-      <div className="tab-option-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0' }}>
-        <div className="option-info" style={{ display: 'flex', flexDirection: 'column' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>{label}</span>
-          {description && <span className="option-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>{description}</span>}
-        </div>
-        <Switch checked={isChecked} onChange={(checked) => onSettingChange(settingKey, checked)} />
-      </div>
-    );
-  };
-
   return (
-    <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-content">
       {/* 출력 형식 */}
       <div className="tab-section">
-        <h4 className="tab-section-title" style={{ margin: '0 0 12px 0', fontSize: '1.1em', fontWeight: 'bold' }}>출력 형식</h4>
+        <Title level={5} className="tab-section-title">출력 형식</Title>
         <Segmented
           value={settings.format || 'basic'}
-          onChange={handleFormatChange}
+          onChange={(val) => onSettingChange('format', val)}
           options={[
             { label: '기본', value: 'basic', icon: <FileTextOutlined /> },
             { label: 'HTML', value: 'html', icon: <CodeOutlined /> },
@@ -53,57 +36,59 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
       {/* 기본 형식 설정 */}
       {(settings.format === 'basic' || !settings.format) && (
         <>
-          <Divider style={{ margin: '8px 0' }} />
-          <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h4 className="tab-section-title" style={{ margin: '0 0 4px 0', fontSize: '1.1em', fontWeight: 'bold' }}>스타일</h4>
-            
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-              <span className="option-label" style={{ fontWeight: '500' }}>테마</span>
-              <Select 
-                value={settings.theme || 'basic'} 
+          <Divider />
+
+          <div className="tab-section">
+            <Title level={5} className="tab-section-title">스타일</Title>
+
+            <div className="setting-field">
+              <Text className="setting-field-label">테마</Text>
+              <Select
+                value={settings.theme || 'basic'}
                 onChange={(val) => onSettingChange('theme', val)}
                 style={{ width: '100%' }}
               >
-                {Object.entries(themes).map(([key, theme]: [string, any]) => 
+                {Object.entries(themes).map(([key, theme]: [string, any]) =>
                   <Select.Option value={key} key={key}>{theme.name}</Select.Option>
                 )}
               </Select>
             </div>
 
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-              <span className="option-label" style={{ fontWeight: '500' }}>색상</span>
-              <Select 
-                value={settings.color || 'dark'} 
+            <div className="setting-field">
+              <Text className="setting-field-label">색상</Text>
+              <Select
+                value={settings.color || 'dark'}
                 onChange={(val) => onSettingChange('color', val)}
                 style={{ width: '100%' }}
               >
-                {Object.entries(colors).map(([key, color]: [string, any]) => 
+                {Object.entries(colors).map(([key, color]: [string, any]) =>
                   <Select.Option value={key} key={key}>{color.name}</Select.Option>
                 )}
               </Select>
             </div>
 
-            <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-              <span className="option-label" style={{ fontWeight: '500' }}>헤더 레이아웃</span>
-              <Select 
-                value={settings.headerLayout || 'default'} 
+            <div className="setting-field">
+              <Text className="setting-field-label">헤더 레이아웃</Text>
+              <Select
+                value={settings.headerLayout || 'default'}
                 onChange={(val) => onSettingChange('headerLayout', val)}
                 style={{ width: '100%' }}
-              >
-                <Select.Option value="default">기본</Select.Option>
-                <Select.Option value="compact">컴팩트</Select.Option>
-                <Select.Option value="banner">배너</Select.Option>
-                <Select.Option value="smart">스마트</Select.Option>
-                <Select.Option value="cover">커버</Select.Option>
-              </Select>
+                options={[
+                  { value: 'default', label: '기본' },
+                  { value: 'compact', label: '컴팩트' },
+                  { value: 'banner', label: '배너' },
+                  { value: 'smart', label: '스마트' },
+                  { value: 'cover', label: '커버' },
+                ]}
+              />
             </div>
           </div>
 
           {settings.theme === 'custom' && (
             <>
-              <Divider style={{ margin: '8px 0' }} />
-              <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>커스텀 CSS</h4>
+              <Divider />
+              <div className="tab-section">
+                <Title level={5} className="tab-section-title">커스텀 CSS</Title>
                 <Input.TextArea
                   value={settings.customCss || ''}
                   onChange={(e) => onSettingChange('customCss', e.target.value)}
@@ -114,43 +99,68 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
             </>
           )}
 
-          <Divider style={{ margin: '8px 0' }} />
-          <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <h4 className="tab-section-title" style={{ margin: '0 0 12px 0', fontSize: '1.1em', fontWeight: 'bold' }}>표시 옵션</h4>
-            <Toggle settingKey="showAvatar" label="아바타" description="프로필 이미지 표시" value={settings.showAvatar} />
-            <Toggle settingKey="showBubble" label="말풍선" description="메시지 말풍선 스타일" value={settings.showBubble} />
-            <Toggle settingKey="showHeader" label="헤더" description="상단 정보 표시" value={settings.showHeader} />
-            
+          <Divider />
+          <div className="tab-section">
+            <Title level={5} className="tab-section-title">표시 옵션</Title>
+            <SettingToggle
+              label="아바타"
+              description="프로필 이미지 표시"
+              checked={settings.showAvatar}
+              onChange={(v) => onSettingChange('showAvatar', v)}
+            />
+            <SettingToggle
+              label="말풍선"
+              description="메시지 말풍선 스타일"
+              checked={settings.showBubble}
+              onChange={(v) => onSettingChange('showBubble', v)}
+            />
+            <SettingToggle
+              label="헤더"
+              description="상단 정보 표시"
+              checked={settings.showHeader}
+              onChange={(v) => onSettingChange('showHeader', v)}
+            />
+
             {settings.showHeader !== false && (
-              <div style={{ margin: '8px 0', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <Toggle settingKey="showHeaderIcon" label="헤더 아이콘" description="헤더 프로필 이미지 표시" value={settings.showHeaderIcon} />
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                  <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>헤더 태그</span>
-                  <Input 
-                    value={settings.headerTags || ''} 
-                    onChange={(e) => onSettingChange('headerTags', e.target.value)} 
-                    placeholder="쉼표로 태그 구분" 
+              <div className="setting-subgroup">
+                <SettingToggle
+                  label="헤더 아이콘"
+                  description="헤더 프로필 이미지 표시"
+                  checked={settings.showHeaderIcon}
+                  onChange={(v) => onSettingChange('showHeaderIcon', v)}
+                />
+                <div className="setting-field">
+                  <Text className="setting-field-label">헤더 태그</Text>
+                  <Input
+                    value={settings.headerTags || ''}
+                    onChange={(e) => onSettingChange('headerTags', e.target.value)}
+                    placeholder="쉼표로 태그 구분"
                   />
                 </div>
                 {settings.headerLayout === 'banner' && (
                   <>
-                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                      <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>배너 이미지 URL</span>
-                      <Input 
-                        value={settings.headerBannerUrl || ''} 
-                        onChange={(e) => onSettingChange('headerBannerUrl', e.target.value)} 
-                        placeholder="https://..." 
+                    <div className="setting-field">
+                      <Text className="setting-field-label">배너 이미지 URL</Text>
+                      <Input
+                        value={settings.headerBannerUrl || ''}
+                        onChange={(e) => onSettingChange('headerBannerUrl', e.target.value)}
+                        placeholder="https://..."
                       />
                     </div>
-                    <Toggle settingKey="headerBannerBlur" label="블러 효과" description="배너 이미지에 블러 효과 적용" value={settings.headerBannerBlur} />
-                    <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                      <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>이미지 정렬</span>
-                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%' }}>
-                        <Slider 
-                          min={0} 
-                          max={100} 
-                          value={settings.headerBannerAlign || 50} 
-                          onChange={(val) => onSettingChange('headerBannerAlign', val)} 
+                    <SettingToggle
+                      label="블러 효과"
+                      description="배너 이미지에 블러 효과 적용"
+                      checked={settings.headerBannerBlur}
+                      onChange={(v) => onSettingChange('headerBannerBlur', v)}
+                    />
+                    <div className="setting-field">
+                      <Text className="setting-field-label">이미지 정렬</Text>
+                      <div className="setting-slider-row">
+                        <Slider
+                          min={0}
+                          max={100}
+                          value={settings.headerBannerAlign || 50}
+                          onChange={(val) => onSettingChange('headerBannerAlign', val)}
                           style={{ flex: 1 }}
                         />
                         <InputNumber
@@ -168,34 +178,39 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
                 )}
               </div>
             )}
-            
-            <Toggle settingKey="showFooter" label="푸터" description="하단 정보 표시" value={settings.showFooter} />
+
+            <SettingToggle
+              label="푸터"
+              description="하단 정보 표시"
+              checked={settings.showFooter}
+              onChange={(v) => onSettingChange('showFooter', v)}
+            />
             {settings.showFooter !== false && (
-              <div style={{ margin: '8px 0', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                  <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (왼쪽)</span>
+              <div className="setting-subgroup">
+                <div className="setting-field">
+                  <Text className="setting-field-label">푸터 (왼쪽)</Text>
                   <Input value={settings.footerLeft || ''} onChange={(e) => onSettingChange('footerLeft', e.target.value)} />
                 </div>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                  <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (중앙)</span>
+                <div className="setting-field">
+                  <Text className="setting-field-label">푸터 (중앙)</Text>
                   <Input value={settings.footerCenter || ''} onChange={(e) => onSettingChange('footerCenter', e.target.value)} />
                 </div>
-                <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                  <span className="option-label" style={{ fontWeight: '500', fontSize: '0.95em' }}>푸터 (오른쪽)</span>
+                <div className="setting-field">
+                  <Text className="setting-field-label">푸터 (오른쪽)</Text>
                   <Input value={settings.footerRight || ''} onChange={(e) => onSettingChange('footerRight', e.target.value)} />
                 </div>
               </div>
             )}
           </div>
 
-          <Divider style={{ margin: '8px 0' }} />
-          <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>이미지 크기</h4>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', width: '100%' }}>
-              <Slider 
-                min={1} 
-                max={100} 
-                value={settings.imageScale || 100} 
+          <Divider />
+          <div className="tab-section">
+            <Title level={5} className="tab-section-title">이미지 크기</Title>
+            <div className="setting-slider-row">
+              <Slider
+                min={1}
+                max={100}
+                value={settings.imageScale || 100}
                 onChange={(val) => onSettingChange('imageScale', val)}
                 style={{ flex: 1 }}
               />
@@ -216,11 +231,22 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
       {/* HTML 형식 설정 */}
       {settings.format === 'html' && (
         <>
-          <Divider style={{ margin: '8px 0' }} />
-          <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <h4 className="tab-section-title" style={{ margin: '0 0 12px 0', fontSize: '1.1em', fontWeight: 'bold' }}>HTML 옵션</h4>
-            <Toggle settingKey="embedImages" label="이미지 내장" description="이미지를 Base64로 포함" value={settings.embedImages} />
-            <Toggle settingKey="expandHover" label="호버 요소 펼치기" description="접힌 요소 자동 펼침" value={settings.expandHover} defaultOn={false} />
+          <Divider />
+          <div className="tab-section">
+            <Title level={5} className="tab-section-title">HTML 옵션</Title>
+            <SettingToggle
+              label="이미지 내장"
+              description="이미지를 Base64로 포함"
+              checked={settings.embedImages}
+              onChange={(v) => onSettingChange('embedImages', v)}
+            />
+            <SettingToggle
+              label="호버 요소 펼치기"
+              description="접힌 요소 자동 펼침"
+              checked={settings.expandHover}
+              defaultOn={false}
+              onChange={(v) => onSettingChange('expandHover', v)}
+            />
           </div>
         </>
       )}

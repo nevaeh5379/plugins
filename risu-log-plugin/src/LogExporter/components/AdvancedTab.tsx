@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect } from 'react';
-import { Select, Switch, InputNumber, Alert, Divider } from 'antd';
+import { Select, InputNumber, Alert, Divider, Typography } from 'antd';
+import SettingToggle from './SettingToggle';
+
+const { Title, Text } = Typography;
 
 interface AdvancedTabProps {
   settings: any;
@@ -20,33 +23,18 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
     }
   }, [settings.imageResolution, settings.maxImageHeight, maxAllowedHeight, onSettingChange]);
 
-  const Toggle: React.FC<{ settingKey: string, label: string, value: any, defaultOn?: boolean, description?: string }> = ({ 
-    settingKey, label, value, defaultOn = true, description 
-  }) => {
-    const isChecked = defaultOn ? value !== false : value === true;
-    return (
-      <div className="tab-option-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '12px 0' }}>
-        <div className="option-info" style={{ display: 'flex', flexDirection: 'column' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>{label}</span>
-          {description && <span className="option-description" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>{description}</span>}
-        </div>
-        <Switch checked={isChecked} onChange={(checked) => onSettingChange(settingKey, checked)} />
-      </div>
-    );
-  };
-
   return (
-    <div className="tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="tab-content">
       {/* 미리보기 */}
-      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>미리보기</h4>
-        
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>스케일 배율</span>
-          <InputNumber 
-            value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0} 
-            onChange={(val) => onSettingChange('htmlScaleFactor', val)} 
-            min={0.5} 
+      <div className="tab-section">
+        <Title level={5} className="tab-section-title">미리보기</Title>
+
+        <div className="setting-field">
+          <Text className="setting-field-label">스케일 배율</Text>
+          <InputNumber
+            value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0}
+            onChange={(val) => onSettingChange('htmlScaleFactor', val)}
+            min={0.5}
             max={3.0}
             step={0.1}
             addonAfter="배"
@@ -54,25 +42,26 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>스케일 모드</span>
-          <Select 
-            value={settings.htmlScaleMode || 'font'} 
+        <div className="setting-field">
+          <Text className="setting-field-label">스케일 모드</Text>
+          <Select
+            value={settings.htmlScaleMode || 'font'}
             onChange={(val) => onSettingChange('htmlScaleMode', val)}
             style={{ width: '100%' }}
-          >
-            <option value="font">글자만 스케일</option>
-            <option value="full">HTML 전체 스케일 (레이아웃 포함)</option>
-          </Select>
+            options={[
+              { value: 'font', label: '글자만 스케일' },
+              { value: 'full', label: 'HTML 전체 스케일 (레이아웃 포함)' },
+            ]}
+          />
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>너비</span>
-          <InputNumber 
-            value={settings.previewWidth || 800} 
-            onChange={(val) => onSettingChange('previewWidth', val)} 
-            min={320} 
-            max={1920} 
+        <div className="setting-field">
+          <Text className="setting-field-label">너비</Text>
+          <InputNumber
+            value={settings.previewWidth || 800}
+            onChange={(val) => onSettingChange('previewWidth', val)}
+            min={320}
+            max={1920}
             step={10}
             addonAfter="px"
             style={{ width: '100%' }}
@@ -80,121 +69,127 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         </div>
       </div>
 
-      <Divider style={{ margin: '8px 0' }} />
+      <Divider />
 
       {/* 이미지 내보내기 */}
-      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h4 className="tab-section-title" style={{ margin: 0, fontSize: '1.1em', fontWeight: 'bold' }}>이미지 내보내기</h4>
-        
+      <div className="tab-section">
+        <Title level={5} className="tab-section-title">이미지 내보내기</Title>
+
         {imageSizeWarning && (
-          <Alert 
-            message={imageSizeWarning} 
-            type="warning" 
-            showIcon 
+          <Alert
+            message={imageSizeWarning}
+            type="warning"
+            showIcon
             style={{ fontSize: '0.9em' }}
           />
         )}
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>해상도</span>
-          <Select 
-            value={settings.imageResolution || '1'} 
+        <div className="setting-field">
+          <Text className="setting-field-label">해상도</Text>
+          <Select
+            value={settings.imageResolution || '1'}
             onChange={(val) => onSettingChange('imageResolution', val)}
             style={{ width: '100%' }}
-          >
-            <option value="auto">자동</option>
-            <option value="1">1x</option>
-            <option value="2">2x</option>
-            <option value="3">3x</option>
-            <option value="4">4x</option>
-            <option value="8">8x</option>
-            <option value="16">16x</option>
-            <option value="32">32x</option>
-            <option value="64">64x</option>
-            <option value="128">128x</option>
-          </Select>
+            options={[
+              { value: 'auto', label: '자동' },
+              { value: '1', label: '1x' },
+              { value: '2', label: '2x' },
+              { value: '3', label: '3x' },
+              { value: '4', label: '4x' },
+              { value: '8', label: '8x' },
+              { value: '16', label: '16x' },
+              { value: '32', label: '32x' },
+              { value: '64', label: '64x' },
+              { value: '128', label: '128x' },
+            ]}
+          />
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>라이브러리</span>
-          <Select 
-            value={settings.imageLibrary || 'html-to-image'} 
+        <div className="setting-field">
+          <Text className="setting-field-label">라이브러리</Text>
+          <Select
+            value={settings.imageLibrary || 'html-to-image'}
             onChange={(val) => onSettingChange('imageLibrary', val)}
             style={{ width: '100%' }}
-          >
-            <Select.Option value="html-to-image">html-to-image (권장)</Select.Option>
-            <Select.Option value="snapdom">snapdom</Select.Option>
-            <Select.Option value="dom-to-image">dom-to-image-more</Select.Option>
-          </Select>
+            options={[
+              { value: 'html-to-image', label: 'html-to-image (권장)' },
+              { value: 'snapdom', label: 'snapdom' },
+              { value: 'dom-to-image', label: 'dom-to-image-more' },
+            ]}
+          />
         </div>
 
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>포맷</span>
-          <Select 
-            value={settings.imageFormat || 'png'} 
+        <div className="setting-field">
+          <Text className="setting-field-label">포맷</Text>
+          <Select
+            value={settings.imageFormat || 'png'}
             onChange={(val) => onSettingChange('imageFormat', val)}
             style={{ width: '100%' }}
-          >
-            <Select.Option value="png">PNG</Select.Option>
-            <Select.Option value="jpeg">JPEG</Select.Option>
-            <Select.Option value="webp">WebP</Select.Option>
-          </Select>
+            options={[
+              { value: 'png', label: 'PNG' },
+              { value: 'jpeg', label: 'JPEG' },
+              { value: 'webp', label: 'WebP' },
+            ]}
+          />
         </div>
-        
-        <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-          <span className="option-label" style={{ fontWeight: '500' }}>이미지 분할</span>
-          <Select 
-            value={settings.splitImage || 'none'} 
+
+        <div className="setting-field">
+          <Text className="setting-field-label">이미지 분할</Text>
+          <Select
+            value={settings.splitImage || 'none'}
             onChange={(val) => onSettingChange('splitImage', val)}
             style={{ width: '100%' }}
-          >
-            <Select.Option value="none">분할 안함</Select.Option>
-            <Select.Option value="chunk">청크 단위 (1개 파일로 병합)</Select.Option>
-            <Select.Option value="message">메시지 단위 (여러 파일)</Select.Option>
-          </Select>
+            options={[
+              { value: 'none', label: '분할 안함' },
+              { value: 'chunk', label: '청크 단위 (1개 파일로 병합)' },
+              { value: 'message', label: '메시지 단위 (여러 파일)' },
+            ]}
+          />
         </div>
-        
+
         {settings.splitImage && settings.splitImage !== 'none' && (
-          <div className="tab-option-row" style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '16px', borderLeft: '2px solid var(--border-color)', alignItems: 'stretch' }}>
-            <span className="option-label" style={{ fontWeight: '500' }}>최대 높이</span>
-            <InputNumber 
-              value={settings.maxImageHeight || 10000} 
-              onChange={(val) => onSettingChange('maxImageHeight', val || 10000)} 
-              min={1000} 
-              max={maxAllowedHeight} 
-              step={1000} 
-              addonAfter="px"
-              style={{ width: '100%' }}
-            />
+          <div className="setting-subgroup">
+            <div className="setting-field">
+              <Text className="setting-field-label">최대 높이</Text>
+              <InputNumber
+                value={settings.maxImageHeight || 10000}
+                onChange={(val) => onSettingChange('maxImageHeight', val || 10000)}
+                min={1000}
+                max={maxAllowedHeight}
+                step={1000}
+                addonAfter="px"
+                style={{ width: '100%' }}
+              />
+            </div>
           </div>
         )}
       </div>
 
-      <Divider style={{ margin: '8px 0' }} />
+      <Divider />
 
       {/* 개발자 도구 */}
-      <div className="tab-section" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <h4 className="tab-section-title" style={{ margin: '0 0 12px 0', fontSize: '1.1em', fontWeight: 'bold' }}>개발자 도구</h4>
-        <Toggle 
-          settingKey="rawHtmlView" 
-          label="Raw HTML 보기" 
+      <div className="tab-section">
+        <Title level={5} className="tab-section-title">개발자 도구</Title>
+        <SettingToggle
+          label="Raw HTML 보기"
           description="생성된 HTML 코드 직접 보기"
-          value={settings.rawHtmlView} 
-          defaultOn={false} 
+          checked={settings.rawHtmlView}
+          defaultOn={false}
+          onChange={(v) => onSettingChange('rawHtmlView', v)}
         />
-        <Toggle 
-          settingKey="isEditable" 
-          label="로그 편집 모드" 
+        <SettingToggle
+          label="로그 편집 모드"
           description="메시지 직접 수정 및 삭제"
-          value={settings.isEditable} 
-          defaultOn={false} 
+          checked={settings.isEditable}
+          defaultOn={false}
+          onChange={(v) => onSettingChange('isEditable', v)}
         />
-        <Toggle 
-          settingKey="disableAnimations" 
-          label="CSS 애니메이션 제외" 
+        <SettingToggle
+          label="CSS 애니메이션 제외"
           description="미리보기 및 저장 시 애니메이션 제거 (권장)"
-          value={settings.disableAnimations} 
-          defaultOn={true} 
+          checked={settings.disableAnimations}
+          defaultOn={true}
+          onChange={(v) => onSettingChange('disableAnimations', v)}
         />
       </div>
     </div>

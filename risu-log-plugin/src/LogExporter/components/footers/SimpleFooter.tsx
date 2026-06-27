@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { ColorPalette } from '../../../types';
 
@@ -12,16 +11,11 @@ interface FooterProps {
 const SimpleFooter: React.FC<FooterProps> = ({ color, footerLeft, footerCenter, footerRight }) => {
   return (
     <footer style={{
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '20px',
-        marginTop: '2em',
-        paddingTop: '1em',
-        borderTop: `1px dashed ${color.border}`,
-        fontSize: '0.75em',
-        color: color.text,
-        opacity: 0.5,
-        fontFamily: 'monospace'
+      display: 'flex', justifyContent: 'center', gap: '16px',
+      marginTop: '1.5em', paddingTop: '0.8em',
+      borderTop: `1px dashed ${color.border}`,
+      fontSize: '0.72em', color: color.textSecondary || color.text,
+      opacity: 0.5, fontFamily: 'monospace',
     }}>
       {footerLeft && <span>{footerLeft}</span>}
       {footerCenter && <span>{footerCenter}</span>}

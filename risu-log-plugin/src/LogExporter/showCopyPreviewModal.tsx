@@ -6,15 +6,10 @@ import { processChatLog, serializeNodes } from '../services/chatData';
 import { THEMES, COLORS } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
 import type { ThemeKey, ColorKey } from '../types';
-import { ConfigProvider, theme, Spin, Button, Tabs, message } from 'antd';
-import { SettingOutlined, ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
+import { ConfigProvider, theme, Spin, Button, Drawer, message } from 'antd';
+import { SettingOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 
-import PluginSettingsModal from './components/PluginSettingsModal';
-import ExportTab from './components/ExportTab';
-import FilterTab from './components/FilterTab';
-import AdvancedTab from './components/AdvancedTab';
-import ReplacementTab from './components/ReplacementTab';
-
+import SettingsTabs from './components/SettingsTabs';
 import PreviewPanel from './components/PreviewPanel';
 import ArcaHelperModal from './components/ArcaHelperModal';
 
@@ -169,8 +164,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     const [globalSettings, setGlobalSettings] = useState<any>({});
     const [otherFormatContent, setOtherFormatContent] = useState('');
     const [activeTab, setActiveTab] = useState('export');
+    const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
     const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [progress, setProgress] = useState({ active: false, message: '', current: 0, total: 0 });
     const [selectedIndices, setSelectedIndices] = useState(new Set<number>());
@@ -594,14 +589,16 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                             >
                                 {(isMobile || isTablet) ? null : '로그 편집'}
                             </Button>
-                            <Button 
-                                type="text"
-                                icon={<SettingOutlined />}
-                                onClick={() => setIsSettingsOpen(true)}
-                                style={{ color: 'var(--text-white)' }}
-                            >
-                                설정
-                            </Button>
+                            {(isMobile || isTablet) && (
+                                <Button 
+                                    type="text"
+                                    icon={<SettingOutlined />}
+                                    onClick={() => setIsSettingsDrawerOpen(true)}
+                                    style={{ color: 'var(--text-white)' }}
+                                >
+                                    설정
+                                </Button>
+                            )}
                         </div>
                         {isLoading ? (
                             <div className="desktop-modal-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '12px' }}>
@@ -652,80 +649,18 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                             <>
                                 <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 71px)', overflow: 'hidden' }}>
                                     <div className="desktop-settings-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
-                                        <Tabs
-                                            activeKey={activeTab}
-                                            onChange={setActiveTab}
-                                            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-                                            tabBarStyle={{ padding: '0 16px', margin: 0 }}
-                                            items={[
-                                                {
-                                                    key: 'export',
-                                                    label: (
-                                                        <span>
-                                                            <ExportOutlined />
-                                                            내보내기
-                                                        </span>
-                                                    ),
-                                                    children: (
-                                                        <ExportTab
-                                                            settings={savedSettings}
-                                                            onSettingChange={handleSettingChange}
-                                                            themes={THEMES}
-                                                            colors={COLORS}
-                                                        />
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'filter',
-                                                    label: (
-                                                        <span>
-                                                            <FilterOutlined />
-                                                            필터
-                                                        </span>
-                                                    ),
-                                                    children: (
-                                                        <FilterTab
-                                                            settings={savedSettings}
-                                                            onSettingChange={handleSettingChange}
-                                                            participants={participants}
-                                                            globalSettings={globalSettings}
-                                                            onGlobalSettingChange={handleGlobalSettingChange}
-                                                            uiClasses={uiClasses}
-                                                        />
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'replacement',
-                                                    label: (
-                                                        <span>
-                                                            <TranslationOutlined />
-                                                            단어 바꾸기
-                                                        </span>
-                                                    ),
-                                                    children: (
-                                                        <ReplacementTab
-                                                            rules={savedSettings.replacementRules || []}
-                                                            onRulesChange={(rules) => handleSettingChange('replacementRules', rules)}
-                                                        />
-                                                    ),
-                                                },
-                                                {
-                                                    key: 'advanced',
-                                                    label: (
-                                                        <span>
-                                                            <SlidersOutlined />
-                                                            고급
-                                                        </span>
-                                                    ),
-                                                    children: (
-                                                        <AdvancedTab
-                                                            settings={savedSettings}
-                                                            onSettingChange={handleSettingChange}
-                                                            imageSizeWarning={imageSizeWarning}
-                                                        />
-                                                    ),
-                                                },
-                                            ]}
+                                        <SettingsTabs
+                                            activeTab={activeTab}
+                                            onTabChange={setActiveTab}
+                                            settings={savedSettings}
+                                            onSettingChange={handleSettingChange}
+                                            themes={THEMES}
+                                            colors={COLORS}
+                                            participants={participants}
+                                            globalSettings={globalSettings}
+                                            onGlobalSettingChange={handleGlobalSettingChange}
+                                            uiClasses={uiClasses}
+                                            imageSizeWarning={imageSizeWarning}
                                         />
                                     </div>
                                     <div className="desktop-preview-panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -798,22 +733,29 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                     colorPalette={colorPalette}
                 />
             )}
-            {isSettingsOpen && (
-                <PluginSettingsModal
-                    isOpen={isSettingsOpen}
-                    onClose={() => setIsSettingsOpen(false)}
-                    globalSettings={globalSettings}
-                    onGlobalSettingChange={handleGlobalSettingChange}
-                    isMobile={isMobile}
+            <Drawer
+                title="설정"
+                placement="right"
+                open={isSettingsDrawerOpen}
+                onClose={() => setIsSettingsDrawerOpen(false)}
+                width="100%"
+                styles={{ body: { padding: 0, background: 'var(--bg-secondary)' } }}
+                getContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
+            >
+                <SettingsTabs
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
                     settings={savedSettings}
                     onSettingChange={handleSettingChange}
                     themes={THEMES}
                     colors={COLORS}
                     participants={participants}
+                    globalSettings={globalSettings}
+                    onGlobalSettingChange={handleGlobalSettingChange}
                     uiClasses={uiClasses}
                     imageSizeWarning={imageSizeWarning}
                 />
-            )}
+            </Drawer>
         </ConfigProvider>
     );
 };

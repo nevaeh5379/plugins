@@ -267,6 +267,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
       open={isOpen}
       onCancel={handleClose}
       width={650}
+      className="arca-helper-modal"
       transitionName=""
       maskTransitionName=""
       footer={[

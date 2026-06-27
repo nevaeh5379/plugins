@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState } from 'react';
+import { Button, Space } from 'antd';
 import LogContainer from './LogContainer';
 import type { LogContainerProps } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
@@ -122,11 +123,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
     <>
         {settings.isEditable && (
             <div className="desktop-preview-toolbar">
-                <div className="desktop-selection-controls">
-                    <button className="desktop-btn desktop-btn-xs desktop-btn-secondary" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</button>
-                    <button className="desktop-btn desktop-btn-xs desktop-btn-secondary" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</button>
-                    <button className="desktop-btn desktop-btn-xs desktop-btn-secondary" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</button>
-                </div>
+                <Space className="desktop-selection-controls" size={6}>
+                    <Button size="small" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</Button>
+                    <Button size="small" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</Button>
+                    <Button size="small" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</Button>
+                </Space>
             </div>
         )}
         <div className="desktop-preview-content" ref={previewContentRef}>

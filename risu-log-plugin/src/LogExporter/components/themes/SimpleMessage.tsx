@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import type { MessageProps } from '../../../types';
 import { useMessageProcessor } from '../../hooks/useMessageProcessor';
@@ -21,10 +20,10 @@ const SimpleMessage: React.FC<MessageProps> = (props) => {
 
   const isUser = node.classList.contains('justify-end');
   const name = getNameFromNode(node as HTMLElement, globalSettings, charInfoName);
-  
+
   const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
     if (onMessageUpdate && e.currentTarget.innerHTML !== messageHtml) {
-        onMessageUpdate(index, e.currentTarget.innerHTML);
+      onMessageUpdate(index, e.currentTarget.innerHTML);
     }
   };
 
@@ -32,36 +31,28 @@ const SimpleMessage: React.FC<MessageProps> = (props) => {
     if (isEditable) e.stopPropagation();
   };
 
-  // Simple 테마: 아바타 없음, 최소한의 스타일
   return (
-    <div className="chat-message-container" style={{ 
-        marginBottom: '1.5em', 
-        paddingLeft: isUser ? '2em' : '0', 
-        paddingRight: isUser ? '0' : '2em',
-        textAlign: isUser ? 'right' : 'left'
+    <div className="chat-message-container" style={{
+      marginBottom: '1.4em',
+      paddingLeft: isUser ? '1.5em' : '0',
+      paddingRight: isUser ? '0' : '1.5em',
+      borderLeft: isUser ? `2px solid ${color.border}` : 'none',
     }}>
-        <div style={{ 
-            color: color.nameColor, 
-            fontWeight: 'bold', 
-            fontSize: `calc(${baseSize} * 0.94)`, 
-            marginBottom: '0.2em',
-            opacity: 0.8
-        }}>
-            {name}
-        </div>
-        <div 
-            ref={contentRef} 
-            style={{ 
-                color: color.text, 
-                lineHeight: 1.6,
-                fontSize: baseSize 
-            }} 
-            contentEditable={isEditable} 
-            onBlur={handleBlur} 
-            onClick={handleContentClick} 
-            suppressContentEditableWarning={true} 
-        />
-        {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} style={{ float: isUser ? 'left' : 'right', opacity: 0.3 }}>&times;</button>}
+      <div style={{
+        color: color.nameColor,
+        fontWeight: 600,
+        fontSize: `calc(${baseSize} * 0.88)`,
+        marginBottom: '0.2em',
+        opacity: 0.7,
+      }}>
+        {name}
+      </div>
+      <div ref={contentRef} style={{
+        color: color.text,
+        lineHeight: 1.7,
+        fontSize: baseSize,
+      }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
+      {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} style={{ float: isUser ? 'left' : 'right', opacity: 0.3 }}>&times;</button>}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { ColorPalette } from '../../../types';
 
@@ -10,28 +9,18 @@ interface FooterProps {
 }
 
 const DefaultFooter: React.FC<FooterProps> = ({ color, footerLeft, footerCenter, footerRight }) => {
-  const footerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    textAlign: 'center',
-    marginTop: '3em',
-    paddingTop: '1.5em',
-    borderTop: `1px solid ${color.border}`,
-    fontSize: '0.8em',
-    color: color.text,
-    opacity: 0.7,
-  };
-
-  const partStyle: React.CSSProperties = {
-    flex: 1,
-  };
-
   return (
-    <footer style={footerStyle}>
-      <div style={{ ...partStyle, textAlign: 'left' }}>{footerLeft}</div>
-      <div style={{ ...partStyle, textAlign: 'center' }}>{footerCenter}</div>
-      <div style={{ ...partStyle, textAlign: 'right' }}>{footerRight}</div>
+    <footer style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      textAlign: 'center',
+      marginTop: '2.5em', paddingTop: '1.2em',
+      borderTop: `1px solid ${color.border}`,
+      fontSize: '0.78em', color: color.textSecondary || color.text,
+      opacity: 0.7,
+    }}>
+      <div style={{ flex: 1, textAlign: 'left' }}>{footerLeft}</div>
+      <div style={{ flex: 1, textAlign: 'center' }}>{footerCenter}</div>
+      <div style={{ flex: 1, textAlign: 'right' }}>{footerRight}</div>
     </footer>
   );
 };

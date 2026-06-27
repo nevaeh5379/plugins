@@ -17,42 +17,55 @@ const CompactHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesA
     const convertAvatar = async () => {
       if (embedImagesAsBlob && charInfo.avatarUrl) {
         try {
-            const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-            setAvatarSrc(blobUrl);
-        } catch (e) {
-            // ignore if conversion fails
-        }
+          const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
+          setAvatarSrc(blobUrl);
+        } catch { /* ignore */ }
       }
     };
     convertAvatar();
   }, [charInfo.avatarUrl, embedImagesAsBlob]);
 
-  const headerStyles: React.CSSProperties = {
-    textAlign: 'center',
-    paddingBottom: '1em',
-    marginBottom: '1.5em',
-    borderBottom: `1px solid ${color.border}`,
-  };
-
-  const tags = headerTags ? headerTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
+  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   return (
-    <header style={headerStyles}>
-      <div style={{textAlign:'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1em'}}>
+    <header style={{
+      paddingBottom: '0.8em',
+      marginBottom: '1.2em',
+      borderBottom: `1px solid ${color.border}`,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        justifyContent: 'center', gap: '12px',
+      }}>
         {showHeaderIcon !== false && (
-          <img src={avatarSrc} data-log-exporter-avatar="true" style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${color.avatarBorder}`, boxShadow: color.shadow }} />
+          <img src={avatarSrc} data-log-exporter-avatar="true" style={{
+            width: '44px', height: '44px', borderRadius: '50%',
+            objectFit: 'cover', border: `2px solid ${color.avatarBorder}`,
+            boxShadow: color.shadow,
+          }} />
         )}
-        <div style={{textAlign: 'left'}}>
-            <h1 style={{ color: color.nameColor, margin: '0', fontSize: '1.4em' }}>{charInfo.name}</h1>
-            <p style={{ color: color.text, opacity: 0.8, margin: '0', fontSize: '0.8em' }}>{charInfo.chatName}</p>
+        <div style={{ textAlign: 'left' }}>
+          <h1 style={{
+            color: color.nameColor, margin: 0,
+            fontSize: '1.3em', fontWeight: 700,
+          }}>{charInfo.name}</h1>
+          <p style={{
+            color: color.textSecondary || color.text, opacity: 0.7,
+            margin: 0, fontSize: '0.8em',
+          }}>{charInfo.chatName}</p>
         </div>
       </div>
       {tags.length > 0 && (
-        <div style={{ marginTop: '1em', display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-          {tags.map((tag, index) => (
-            <span key={index} style={{ background: color.cardBg, color: color.text, padding: '3px 8px', borderRadius: '10px', fontSize: '0.7em', border: `1px solid ${color.border}` }}>
-              {tag}
-            </span>
+        <div style={{
+          marginTop: '0.6em', display: 'flex',
+          justifyContent: 'center', gap: '5px', flexWrap: 'wrap',
+        }}>
+          {tags.map((tag, i) => (
+            <span key={i} style={{
+              background: color.cardBg, color: color.textSecondary || color.text,
+              padding: '2px 8px', borderRadius: '100px',
+              fontSize: '0.72em', border: `1px solid ${color.border}`,
+            }}>{tag}</span>
           ))}
         </div>
       )}

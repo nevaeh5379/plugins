@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AVATAR_ATTR } from './constants';
 
@@ -18,28 +17,33 @@ const Avatar: React.FC<AvatarProps> = ({ avatarSrc, name, isUser, isForArca, sho
 
   const fullStyle = { ...baseStyle, ...marginStyle };
 
+  const renderPlaceholder = () => {
+    const letter = isUser ? 'U' : name.charAt(0).toUpperCase();
+    return (
+      <div {...{ [AVATAR_ATTR]: '' }} style={{
+        ...fullStyle,
+        backgroundColor: '#3a3f4a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ color: '#c0c5cf', fontWeight: 600, fontSize: '1.1em' }}>{letter}</span>
+      </div>
+    );
+  };
+
   if (isForArca || isForExport) {
-    if (!avatarSrc) { // Render a placeholder if no avatar is available
-        const letter = isUser ? 'U' : name.charAt(0).toUpperCase();
-        return (
-          <div {...{ [AVATAR_ATTR]: '' }} style={{ ...fullStyle, backgroundColor: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.2em' }}>{letter}</span>
-          </div>
-        );
-    }
+    if (!avatarSrc) return renderPlaceholder();
     return <img {...{ [AVATAR_ATTR]: '' }} data-user={isUser} style={fullStyle} src={avatarSrc} />;
   }
 
   if (avatarSrc) {
-    return <div {...{ [AVATAR_ATTR]: '' }} style={{ ...fullStyle, backgroundImage: `url('${avatarSrc}')`, backgroundSize: 'cover', backgroundPosition: 'center' }} />;
-  } else {
-    const letter = isUser ? 'U' : name.charAt(0).toUpperCase();
-    return (
-      <div {...{ [AVATAR_ATTR]: '' }} style={{ ...fullStyle, backgroundColor: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.2em' }}>{letter}</span>
-      </div>
-    );
+    return <div {...{ [AVATAR_ATTR]: '' }} style={{
+      ...fullStyle,
+      backgroundImage: `url('${avatarSrc}')`,
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    }} />;
   }
+
+  return renderPlaceholder();
 };
 
 export default Avatar;

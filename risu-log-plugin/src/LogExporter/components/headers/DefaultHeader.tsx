@@ -17,44 +17,53 @@ const DefaultHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesA
     const convertAvatar = async () => {
       if (embedImagesAsBlob && charInfo.avatarUrl) {
         try {
-            const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-            setAvatarSrc(blobUrl);
-        } catch (e) {
-            // ignore if conversion fails
-        }
+          const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
+          setAvatarSrc(blobUrl);
+        } catch { /* ignore */ }
       }
     };
     convertAvatar();
   }, [charInfo.avatarUrl, embedImagesAsBlob]);
 
-  const headerStyles: React.CSSProperties = {
-    textAlign: 'center',
-    paddingBottom: '1.5em',
-    marginBottom: '2em',
-    borderBottom: `2px solid ${color.border}`,
-  };
-
-  const tags = headerTags ? headerTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
+  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   return (
-    <header style={headerStyles}>
-      <div style={{textAlign:'center'}}>
-        {showHeaderIcon !== false && (
-          <img src={avatarSrc} data-log-exporter-avatar="true" style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', margin: '0 auto 1em', display: 'block', border: `3px solid ${color.avatarBorder}`, boxShadow: color.shadow }} />
-        )}
-        <h1 style={{ color: color.nameColor, margin: '0 0 0.25em 0', fontSize: '1.8em', letterSpacing: '1px' }}>{charInfo.name}</h1>
-        <p style={{ color: color.text, opacity: 0.8, margin: 0, fontSize: '0.9em' }}>{charInfo.chatName}</p>
-        {tags.length > 0 && (
-          <div style={{ marginTop: '1em', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {tags.map((tag, index) => (
-              <span key={index} style={{ background: color.cardBg, color: color.text, padding: '4px 10px', borderRadius: '12px', fontSize: '0.8em', border: `1px solid ${color.border}` }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      
+    <header style={{
+      textAlign: 'center',
+      paddingBottom: '1.2em',
+      marginBottom: '1.8em',
+      borderBottom: `1px solid ${color.border}`,
+    }}>
+      {showHeaderIcon !== false && (
+        <img src={avatarSrc} data-log-exporter-avatar="true" style={{
+          width: '72px', height: '72px', borderRadius: '50%',
+          objectFit: 'cover', margin: '0 auto 0.8em', display: 'block',
+          border: `2px solid ${color.avatarBorder}`,
+          boxShadow: color.shadow,
+        }} />
+      )}
+      <h1 style={{
+        color: color.nameColor, margin: '0 0 0.2em 0',
+        fontSize: '1.6em', fontWeight: 700, letterSpacing: '-0.01em',
+      }}>{charInfo.name}</h1>
+      <p style={{
+        color: color.textSecondary || color.text, opacity: 0.8,
+        margin: 0, fontSize: '0.88em',
+      }}>{charInfo.chatName}</p>
+      {tags.length > 0 && (
+        <div style={{
+          marginTop: '0.8em', display: 'flex',
+          justifyContent: 'center', gap: '6px', flexWrap: 'wrap',
+        }}>
+          {tags.map((tag, i) => (
+            <span key={i} style={{
+              background: color.cardBg, color: color.textSecondary || color.text,
+              padding: '3px 10px', borderRadius: '100px',
+              fontSize: '0.78em', border: `1px solid ${color.border}`,
+            }}>{tag}</span>
+          ))}
+        </div>
+      )}
     </header>
   );
 };
