@@ -13,8 +13,11 @@ import {
   UploadOutlined,
   DeleteOutlined,
   EllipsisOutlined,
+  CheckSquareOutlined,
+  BorderOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
-
+ 
 interface ActionbarProps {
   charName: string;
   chatName: string;
@@ -32,9 +35,12 @@ interface ActionbarProps {
   onLoadLogData: () => void;
   onDeleteSelected?: () => void;
   hasSelection?: boolean;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  onInvertSelection?: () => void;
 }
-
-const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewContent, messageNodes, settings, backgroundColor, color, charAvatarUrl, onOpenArcaHelper, onProgressStart, onProgressUpdate, onProgressEnd, onSaveLogData, onLoadLogData, onDeleteSelected, hasSelection }) => {
+ 
+const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewContent, messageNodes, settings, backgroundColor, color, charAvatarUrl, onOpenArcaHelper, onProgressStart, onProgressUpdate, onProgressEnd, onSaveLogData, onLoadLogData, onDeleteSelected, hasSelection, onSelectAll, onDeselectAll, onInvertSelection }) => {
 
     const handleCopyHtml = async () => {
         const content = await getPreviewContent();
@@ -103,6 +109,39 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
             label: '아카라이브 헬퍼',
             icon: <RocketOutlined />,
         },
+        {
+            type: 'divider',
+        },
+        {
+            key: 'backup',
+            label: 'JSON 백업',
+            icon: <DownloadOutlined />,
+        },
+        {
+            key: 'restore',
+            label: 'JSON 복원',
+            icon: <UploadOutlined />,
+        },
+        ...(settings.isEditable ? [
+            {
+                type: 'divider' as const,
+            },
+            {
+                key: 'select-all',
+                label: '전체 선택',
+                icon: <CheckSquareOutlined />,
+            },
+            {
+                key: 'deselect-all',
+                label: '전체 해제',
+                icon: <BorderOutlined />,
+            },
+            {
+                key: 'invert-selection',
+                label: '선택 반전',
+                icon: <SwapOutlined />,
+            }
+        ] : [])
     ];
 
     const handleMenuClick: MenuProps['onClick'] = (info) => {
@@ -112,21 +151,31 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
             handleSaveHtml();
         } else if (info.key === 'arca') {
             if (onOpenArcaHelper) onOpenArcaHelper();
+        } else if (info.key === 'backup') {
+            onSaveLogData();
+        } else if (info.key === 'restore') {
+            onLoadLogData();
+        } else if (info.key === 'select-all') {
+            if (onSelectAll) onSelectAll();
+        } else if (info.key === 'deselect-all') {
+            if (onDeselectAll) onDeselectAll();
+        } else if (info.key === 'invert-selection') {
+            if (onInvertSelection) onInvertSelection();
         }
     };
 
   return (
-    <div className="action-bar-content" style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-        {/* 내보내기 액션 그룹 */}
-        <div className="action-bar-group export-group" style={{ display: 'flex', alignItems: 'center', gap: '0', flexWrap: 'wrap' }}>
+    <div className="action-bar-content">
+        {/* 내보내기 및 데이터 관리 액션 그룹 */}
+        <div className="action-bar-group export-group">
             <Button 
                 type="primary"
-                icon={<PictureOutlined />} 
+                icon={<PictureOutlined className="btn-icon" />} 
                 onClick={handleSaveAsImage} 
                 title="이미지 파일로 저장"
-                className="action-bar-btn btn-save-img"
+                className="action-bar-btn btn-save-img desktop-btn-primary"
             >
-                이미지 저장
+                <span className="btn-text">이미지 저장</span>
             </Button>
             <Dropdown 
                 menu={{ items: exportMenuItems, onClick: handleMenuClick }} 
@@ -135,53 +184,33 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
             >
                 <Button 
                     type="default" 
-                    icon={<EllipsisOutlined />} 
-                    title="기타 내보내기 옵션 (복사, HTML 저장, 아카라이브 헬퍼)"
-                    className="action-bar-btn btn-more"
+                    icon={<EllipsisOutlined className="btn-icon" />} 
+                    title="더보기 옵션 (복사, HTML 저장, 백업, 복원, 아카라이브 헬퍼)"
+                    className="action-bar-btn btn-more desktop-btn-secondary"
                 />
             </Dropdown>
         </div>
         
-        {/* 구분선 */}
-        <div className="action-bar-divider" style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
-        
-        {/* 데이터 백업/복원 그룹 */}
-        <div className="action-bar-group backup-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Button 
-                type="default" 
-                icon={<DownloadOutlined />} 
-                onClick={onSaveLogData} 
-                title="대화 내용 및 설정을 JSON 파일로 백업"
-                className="action-bar-btn btn-backup"
-            >
-                백업
-            </Button>
-            <Button 
-                type="default" 
-                icon={<UploadOutlined />} 
-                onClick={onLoadLogData} 
-                title="백업된 JSON 파일에서 대화 및 설정 복원"
-                className="action-bar-btn btn-restore"
-            >
-                복원
-            </Button>
-        </div>
+        {settings.isEditable && (
+            /* 구분선 */
+            <div className="action-bar-divider" style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)', margin: '0 4px' }}></div>
+        )}
         
         <div style={{flex: 1}} className="action-spacer"></div>
         
         {/* 편집 모드 액션 그룹 */}
         {settings.isEditable && (
-            <div className="action-bar-group edit-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="action-bar-group edit-group">
                 <Button 
                     danger
                     type="primary"
-                    icon={<DeleteOutlined />}
+                    icon={<DeleteOutlined className="btn-icon" />}
                     onClick={onDeleteSelected}
                     disabled={!hasSelection}
                     title={!hasSelection ? '삭제할 메시지를 선택하세요' : '선택한 메시지 삭제'}
-                    className="action-bar-btn btn-delete"
+                    className="action-bar-btn btn-delete desktop-btn-danger"
                 >
-                    삭제
+                    <span className="btn-text">삭제</span>
                 </Button>
             </div>
         )}

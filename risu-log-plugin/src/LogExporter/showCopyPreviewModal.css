@@ -156,6 +156,30 @@
     scrollbar-width: none !important;
 }
 
+/* 액션바 기본 레이아웃 */
+.action-bar-content {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.action-bar-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.action-bar-group.export-group {
+    gap: 0;
+}
+
+.action-bar-group.backup-group,
+.action-bar-group.edit-group {
+    gap: 8px;
+}
+
 /* 데스크톱 전용 스타일 */
 @media (min-width: 769px) {
     .log-exporter-modal {
@@ -170,7 +194,7 @@
     .log-exporter-modal-content {
         display: grid !important;
         grid-template-columns: 450px 1fr !important;
-        grid-template-rows: 1fr auto !important;
+        grid-template-rows: 1fr !important;
         gap: 0 !important;
         flex: 1 !important;
         padding: 0 !important;
@@ -235,20 +259,26 @@
         flex-direction: column;
     }
     
-    .desktop-action-bar {
-        grid-column: 1 / -1;
-        grid-row: 2;
-        background: var(--bg-secondary);
-        border-top: 1px solid var(--border-color);
-        padding: 12px 24px;
+    .desktop-floating-action-bar {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        z-index: 100;
+        background: rgba(26, 27, 38, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 8px 16px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         display: flex;
         gap: 10px;
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     /* 액션바 내의 모든 버튼 공통 모던화 */
-    .desktop-action-bar .action-bar-btn {
+    .desktop-floating-action-bar .action-bar-btn {
         border-radius: 8px !important;
         font-weight: 500 !important;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -261,13 +291,13 @@
     }
 
     /* 버튼 호버 시 상승 효과 및 세련된 쉐도우 */
-    .desktop-action-bar .action-bar-btn:not(:disabled):hover {
+    .desktop-floating-action-bar .action-bar-btn:not(:disabled):hover {
         transform: translateY(-1.5px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
     }
 
     /* 이미지 저장 버튼 (Primary - Green, 우측 보더 및 보더 반경 제거) */
-    .desktop-action-bar .btn-save-img {
+    .desktop-floating-action-bar .btn-save-img {
         background-color: #98c379 !important;
         border-color: #98c379 !important;
         color: var(--bg-primary) !important;
@@ -275,13 +305,13 @@
         border-bottom-right-radius: 0px !important;
         border-right: none !important;
     }
-    .desktop-action-bar .btn-save-img:hover {
+    .desktop-floating-action-bar .btn-save-img:hover {
         background-color: #a3cc85 !important;
         border-color: #a3cc85 !important;
     }
  
     /* 더보기 버튼 (Dropdown Trigger, 이미지 저장 버튼과 동일한 Solid 녹색 적용) */
-    .desktop-action-bar .btn-more {
+    .desktop-floating-action-bar .btn-more {
         background-color: #98c379 !important;
         border-color: #98c379 !important;
         color: var(--bg-primary) !important;
@@ -291,26 +321,26 @@
         width: 32px !important;
         padding: 0 !important;
     }
-    .desktop-action-bar .btn-more:hover {
+    .desktop-floating-action-bar .btn-more:hover {
         background-color: #a3cc85 !important;
         border-color: #a3cc85 !important;
         color: var(--bg-primary) !important;
     }
 
     /* 보조 버튼들 (백업, 복원) */
-    .desktop-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete) {
+    .desktop-floating-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete) {
         background-color: rgba(255, 255, 255, 0.04) !important;
         border: 1px solid var(--border-color) !important;
         color: var(--text-primary) !important;
     }
-    .desktop-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete):hover {
+    .desktop-floating-action-bar .action-bar-btn:not(.btn-save-img):not(.btn-more):not(.btn-delete):hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
         border-color: var(--accent-primary) !important;
         color: var(--accent-primary) !important;
     }
 
     /* 구분선 */
-    .desktop-action-bar .action-bar-divider {
+    .desktop-floating-action-bar .action-bar-divider {
         background-color: var(--border-color) !important;
         opacity: 0.6;
         height: 18px !important;
@@ -319,12 +349,12 @@
     }
 
     /* 삭제 버튼 */
-    .desktop-action-bar .btn-delete {
+    .desktop-floating-action-bar .btn-delete {
         background-color: rgba(244, 63, 94, 0.15) !important;
         border: 1px solid rgba(244, 63, 94, 0.3) !important;
         color: #f43f5e !important;
     }
-    .desktop-action-bar .btn-delete:not(:disabled):hover {
+    .desktop-floating-action-bar .btn-delete:not(:disabled):hover {
         background-color: #f43f5e !important;
         border-color: #f43f5e !important;
         color: #fff !important;
@@ -1562,11 +1592,15 @@
     
     .mobile-preview-tab {
         padding: 0;
+        padding-bottom: 110px; /* 하단 액션바 공간 확보 (독 스타일) */
     }
     .mobile-preview-tab .log-exporter-modal-preview {
         min-height: 100%;
         margin: 0;
         border-radius: 0;
+    }
+    .mobile-preview-tab .desktop-preview-toolbar {
+        display: none !important;
     }
     .mobile-settings-tab {
         padding: 0;
@@ -2176,7 +2210,49 @@
         box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(40px) saturate(180%);
         -webkit-backdrop-filter: blur(40px) saturate(180%);
-        animation: dockSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .mobile-action-bar .action-bar-content {
+        display: flex;
+        flex-wrap: nowrap;
+        width: max-content;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .mobile-action-bar .action-bar-group {
+        display: flex;
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+        align-items: center;
+    }
+    
+    /* 모바일에서 이미지 저장과 더보기 버튼을 하나의 그룹으로 연결 */
+    .mobile-action-bar .export-group button {
+        margin: 0 !important;
+    }
+    
+    .mobile-action-bar .btn-save-img {
+        border-top-right-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(97, 175, 239, 0.15) !important;
+        color: #61afef !important;
+    }
+    
+    .mobile-action-bar .btn-more {
+        border-top-left-radius: 0 !important;
+        border-bottom-left-radius: 0 !important;
+        border-left: none !important;
+        min-width: 44px !important;
+        width: 44px !important;
+        background: rgba(97, 175, 239, 0.15) !important;
+        color: #61afef !important;
+    }
+    
+    .mobile-action-bar .btn-save-img:hover,
+    .mobile-action-bar .btn-more:hover {
+        background: rgba(97, 175, 239, 0.25) !important;
     }
     
     @keyframes dockSlideUp {
@@ -2206,11 +2282,10 @@
         border-radius: 16px;
         font-size: 0.75em;
         font-weight: 600;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        border: none;
+        transition: none !important;
+        border: none !important;
+        box-shadow: none !important;
         cursor: pointer;
-        position: relative;
-        overflow: visible;
         -webkit-tap-highlight-color: transparent;
         display: flex;
         flex-direction: column;
@@ -2219,7 +2294,7 @@
         gap: 4px;
         white-space: nowrap;
         flex-shrink: 0;
-        background: rgba(97, 175, 239, 0.1);
+        background: rgba(97, 175, 239, 0.1) !important;
     }
     
     /* 버튼 타입별 스타일 */
@@ -2243,28 +2318,24 @@
         background: rgba(247, 118, 142, 0.15);
     }
     
-    .mobile-action-bar button:hover {
-        transform: translateY(-4px) scale(1.1);
-    }
-    
     .mobile-action-bar .desktop-btn-primary:hover {
-        background: rgba(97, 175, 239, 0.25);
+        background: rgba(97, 175, 239, 0.25) !important;
     }
     
     .mobile-action-bar .desktop-btn-secondary:hover {
-        background: rgba(150, 150, 150, 0.25);
+        background: rgba(150, 150, 150, 0.25) !important;
     }
     
     .mobile-action-bar .desktop-btn-success:hover {
-        background: rgba(158, 206, 106, 0.25);
+        background: rgba(158, 206, 106, 0.25) !important;
     }
     
     .mobile-action-bar .desktop-btn-warning:hover {
-        background: rgba(224, 175, 104, 0.25);
+        background: rgba(224, 175, 104, 0.25) !important;
     }
     
     .mobile-action-bar .desktop-btn-danger:hover {
-        background: rgba(247, 118, 142, 0.25);
+        background: rgba(247, 118, 142, 0.25) !important;
     }
     
     /* 모바일에서 텍스트 표시 */
@@ -2289,24 +2360,7 @@
         display: none;
     }
     
-    .mobile-action-bar button::before {
-        content: '';
-        position: absolute;
-        inset: -4px;
-        background: radial-gradient(circle, rgba(97, 175, 239, 0.3) 0%, transparent 70%);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        z-index: -1;
-        border-radius: 20px;
-    }
-    
-    .mobile-action-bar button:active::before {
-        opacity: 1;
-    }
-    
-    .mobile-action-bar button:active {
-        transform: translateY(-2px) scale(0.95);
-    }
+    /* glow animations and transform states removed */
     
     .log-exporter-left-panel,
     .log-exporter-right-panel {
@@ -2446,7 +2500,7 @@
     .desktop-preview-panel {
         display: flex !important;
     }
-    .desktop-action-bar {
+    .desktop-floating-action-bar {
         display: flex !important;
     }
     .log-exporter-modal-footer {
@@ -2460,7 +2514,7 @@
 @media (max-width: 768px) {
     .desktop-settings-panel,
     .desktop-preview-panel,
-    .desktop-action-bar {
+    .desktop-floating-action-bar {
         display: none !important;
     }
 

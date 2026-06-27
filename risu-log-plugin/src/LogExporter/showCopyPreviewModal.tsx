@@ -6,7 +6,7 @@ import { THEMES, COLORS } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
 import type { ThemeKey, ColorKey } from '../types';
 import { ConfigProvider, theme, Spin, Button, Tabs } from 'antd';
-import { SettingOutlined, ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, CloseOutlined } from '@ant-design/icons';
+import { SettingOutlined, ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 
 import PluginSettingsModal from './components/PluginSettingsModal';
 import ExportTab from './components/ExportTab';
@@ -587,6 +587,15 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                             <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 플러그인</span>
                             <Button 
                                 type="text"
+                                icon={<EditOutlined />}
+                                onClick={() => handleSettingChange('isEditable', !savedSettings.isEditable)}
+                                style={{ color: savedSettings.isEditable ? 'var(--accent-primary)' : 'var(--text-white)' }}
+                                title="로그 편집 활성화 토글"
+                            >
+                                {(isMobile || isTablet) ? null : '로그 편집'}
+                            </Button>
+                            <Button 
+                                type="text"
                                 icon={<SettingOutlined />}
                                 onClick={() => setIsSettingsOpen(true)}
                                 style={{ color: 'var(--text-white)' }}
@@ -664,12 +673,15 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                         onLoadLogData={handleLoadLogData}
                                         onDeleteSelected={handleDeleteSelected}
                                         hasSelection={selectedIndices.size > 0}
+                                        onSelectAll={handleSelectAll}
+                                        onDeselectAll={handleDeselectAll}
+                                        onInvertSelection={handleInvertSelection}
                                     />
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 130px)', overflow: 'hidden' }}>
+                                <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 71px)', overflow: 'hidden' }}>
                                     <div className="desktop-settings-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
                                         <Tabs
                                             activeKey={activeTab}
@@ -747,42 +759,45 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                             ]}
                                         />
                                     </div>
-                                    <div className="desktop-preview-panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
-                                        <PreviewPanel
-                                            logContainerProps={logContainerProps}
-                                            settings={savedSettings}
-                                            otherFormatContent={otherFormatContent}
-                                            selectedIndices={selectedIndices}
-                                            onSelectionChange={handleSelectionChange}
-                                            lastSelectedIndex={lastSelectedIndex}
-                                            onLastSelectedIndexChange={handleLastSelectedIndexChange}
-                                            onSelectAll={handleSelectAll}
-                                            onDeselectAll={handleDeselectAll}
-                                            onInvertSelection={handleInvertSelection}
-                                            onDimensionsChange={handleDimensionsChange}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="desktop-action-bar">
-                                    <Actionbar
-                                        charName={charName}
-                                        chatName={chatName}
-                                        getPreviewContent={getPreviewContentForExport}
-                                        messageNodes={nodesForExport}
-                                        settings={savedSettings}
-                                        backgroundColor={backgroundColor}
-                                        color={colorPalette}
-                                        charAvatarUrl={charAvatarUrl}
-                                        onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                                        onProgressStart={handleProgressStart}
-                                        onProgressUpdate={handleProgressUpdate}
-                                        onProgressEnd={handleProgressEnd}
-                                        onSaveLogData={handleSaveLogData}
-                                        onLoadLogData={handleLoadLogData}
-                                        onDeleteSelected={handleDeleteSelected}
-                                        hasSelection={selectedIndices.size > 0}
-                                    />
-                                </div>
+                                    <div className="desktop-preview-panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+                                         <PreviewPanel
+                                             logContainerProps={logContainerProps}
+                                             settings={savedSettings}
+                                             otherFormatContent={otherFormatContent}
+                                             selectedIndices={selectedIndices}
+                                             onSelectionChange={handleSelectionChange}
+                                             lastSelectedIndex={lastSelectedIndex}
+                                             onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                             onSelectAll={handleSelectAll}
+                                             onDeselectAll={handleDeselectAll}
+                                             onInvertSelection={handleInvertSelection}
+                                             onDimensionsChange={handleDimensionsChange}
+                                         />
+                                         <div className="desktop-floating-action-bar">
+                                             <Actionbar
+                                                 charName={charName}
+                                                 chatName={chatName}
+                                                 getPreviewContent={getPreviewContentForExport}
+                                                 messageNodes={nodesForExport}
+                                                 settings={savedSettings}
+                                                 backgroundColor={backgroundColor}
+                                                 color={colorPalette}
+                                                 charAvatarUrl={charAvatarUrl}
+                                                 onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                                                 onProgressStart={handleProgressStart}
+                                                 onProgressUpdate={handleProgressUpdate}
+                                                 onProgressEnd={handleProgressEnd}
+                                                 onSaveLogData={handleSaveLogData}
+                                                 onLoadLogData={handleLoadLogData}
+                                                 onDeleteSelected={handleDeleteSelected}
+                                                 hasSelection={selectedIndices.size > 0}
+                                                 onSelectAll={handleSelectAll}
+                                                 onDeselectAll={handleDeselectAll}
+                                                 onInvertSelection={handleInvertSelection}
+                                             />
+                                         </div>
+                                     </div>
+                                 </div>
                             </>
                         )}
 
