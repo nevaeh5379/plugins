@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { applyReplacements } from '../utils/domUtils';
 import { showWarning } from '../utils/notify';
-import type { ColorPalette, ReplacementRule } from '../../types';
+import type { ColorPalette, ReplacementRule, ImageStyle } from '../../types';
 
 export const useMessageProcessor = (
   originalMessageEl: Element | null,
@@ -11,7 +11,9 @@ export const useMessageProcessor = (
   color: ColorPalette,
   imageScale?: number,
   onComplete?: () => void,
-  replacementRules?: ReplacementRule[]
+  replacementRules?: ReplacementRule[],
+  imageAlign?: 'left' | 'center' | 'right',
+  imageStyle?: ImageStyle
 ) => {
   const [processedContent, setProcessedContent] = useState('');
 
@@ -22,7 +24,7 @@ export const useMessageProcessor = (
       if (allowHtmlRendering) {
         setProcessedContent(await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules));
       } else {
-        setProcessedContent(await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules));
+        setProcessedContent(await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle));
       }
       if (onComplete) {
         onComplete();
@@ -30,7 +32,7 @@ export const useMessageProcessor = (
     };
 
     process();
-  }, [originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, onComplete, replacementRules]);
+  }, [originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, onComplete, replacementRules, imageAlign, imageStyle]);
 
   return processedContent;
 };
@@ -73,7 +75,7 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
     return clonedContentEl.outerHTML.trim();
 };
 
-const processMessageContent = async (originalMessageEl: Element, embedImages: boolean, color: ColorPalette, imageScale?: number, replacementRules?: ReplacementRule[]): Promise<string> => {
+const processMessageContent = async (originalMessageEl: Element, embedImages: boolean, color: ColorPalette, imageScale?: number, replacementRules?: ReplacementRule[], imageAlign?: 'left' | 'center' | 'right', imageStyle?: ImageStyle): Promise<string> => {
     const contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
 
@@ -101,9 +103,132 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
     });
     await Promise.all(mediaPromises);
 
+    // 이미지 스케일, 정렬 및 스타일 적용
+    // none:      스타일 없음
+    // gallery:   클래식 액자 — 금색 프레임 + 매트 + 하단 캡션바
+    // modern:    현대 액자 — 얇은 프레임 + 넓은 여백 + 부드러운 그림자
+    // tape:      포스트잇 메모 — 크림 배경 + 와시 테이프 + 미세 회전
+    const alignValue = imageAlign || 'left';
+    const styleMode = imageStyle || 'none';
+    contentSourceEl.querySelectorAll('img').forEach(el => {
+        const img = el as HTMLImageElement;
+        const scale = imageScale && imageScale !== 100 ? imageScale : 100;
+        const parent = img.parentNode;
+        if (!parent) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'log-exporter-image-wrapper';
+        Object.assign(wrapper.style, {
+            textAlign: alignValue,
+            margin: '0.5em 0',
+        });
+
+        img.style.maxWidth = `${scale}%`;
+        img.style.width = `${scale}%`;
+        img.style.height = 'auto';
+        img.style.display = 'inline-block';
+        img.style.verticalAlign = 'middle';
+
+        switch (styleMode) {
+            case 'gallery': {
+                // 클래식 액자: 이중 프레임(외곽 갈색 금색 + 내곽 매트) + 하단 캡션바
+                const frame = document.createElement('div');
+                Object.assign(frame.style, {
+                    display: 'inline-block',
+                    backgroundColor: '#8b6914',
+                    padding: '4px',
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,215,0,0.3)',
+                    background: 'linear-gradient(135deg, #a67c1e 0%, #8b6914 50%, #6b4f0f 100%)',
+                });
+                const mat = document.createElement('div');
+                Object.assign(mat.style, {
+                    backgroundColor: '#f5f0e6',
+                    padding: '14px 18px 0',
+                });
+                img.style.borderRadius = '0';
+                img.style.display = 'block';
+                // 캡션바
+                const caption = document.createElement('div');
+                Object.assign(caption.style, {
+                    padding: '10px 18px 12px',
+                    fontSize: '0.75em',
+                    color: '#5c4a1e',
+                    fontStyle: 'italic',
+                    textAlign: 'center',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                });
+                caption.textContent = img.alt || '';
+                parent.insertBefore(wrapper, img);
+                wrapper.appendChild(frame);
+                frame.appendChild(mat);
+                mat.appendChild(img);
+                mat.appendChild(caption);
+                return;
+            }
+            case 'modern': {
+                // 현대 액자: 얇은 프레임 + 넓은 여백 + 부드러운 그림자
+                const frame = document.createElement('div');
+                Object.assign(frame.style, {
+                    display: 'inline-block',
+                    backgroundColor: '#fff',
+                    padding: '20px 24px 16px',
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.06)',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                });
+                img.style.borderRadius = '0';
+                img.style.display = 'block';
+                parent.insertBefore(wrapper, img);
+                wrapper.appendChild(frame);
+                frame.appendChild(img);
+                return;
+            }
+            case 'tape': {
+                // 포스트잇 메모: 크림 배경 + 와시 테이프 + 미세 회전
+                const inner = document.createElement('div');
+                const rotate = (Math.random() * 6 - 3).toFixed(1);
+                Object.assign(inner.style, {
+                    display: 'inline-block',
+                    position: 'relative',
+                    backgroundColor: '#fffef0',
+                    padding: '14px 14px 10px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                    transform: `rotate(${rotate}deg)`,
+                });
+                // 와시 테이프 (상단)
+                const tape = document.createElement('div');
+                Object.assign(tape.style, {
+                    position: 'absolute',
+                    top: '-10px',
+                    left: '50%',
+                    transform: 'translateX(-50%) rotate(-2deg)',
+                    width: '72px',
+                    height: '24px',
+                    backgroundColor: 'rgba(180, 130, 200, 0.45)',
+                    borderLeft: '1px dashed rgba(255,255,255,0.4)',
+                    borderRight: '1px dashed rgba(255,255,255,0.4)',
+                });
+                inner.appendChild(tape);
+                img.style.borderRadius = '1px';
+                parent.insertBefore(wrapper, img);
+                wrapper.appendChild(inner);
+                inner.appendChild(img);
+                return;
+            }
+            case 'none':
+            default:
+                break;
+        }
+
+        parent.insertBefore(wrapper, img);
+        wrapper.appendChild(img);
+    });
+
+    // 비디오도 스케일 적용
     if (imageScale && imageScale !== 100) {
-        contentSourceEl.querySelectorAll('img, video').forEach(el => {
-            const media = el as HTMLImageElement | HTMLVideoElement;
+        contentSourceEl.querySelectorAll('video').forEach(el => {
+            const media = el as HTMLVideoElement;
             media.style.maxWidth = `${imageScale}%`;
             media.style.width = `${imageScale}%`;
             media.style.height = 'auto';

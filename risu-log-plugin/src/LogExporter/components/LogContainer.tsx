@@ -37,6 +37,8 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
     fontSize,
     containerWidth,
     imageScale,
+    imageAlign,
+    imageStyle,
     selectedIndices,
     onMessageSelect,
     isForImageExport,
@@ -165,6 +167,8 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
             allowHtmlRendering={allowHtmlRendering}
             globalSettings={globalSettings}
             imageScale={imageScale}
+            imageAlign={imageAlign}
+            imageStyle={imageStyle}
             isEditable={props.isEditable}
             onMessageUpdate={props.onMessageUpdate}
             isSelected={selectedIndices?.has(index)}

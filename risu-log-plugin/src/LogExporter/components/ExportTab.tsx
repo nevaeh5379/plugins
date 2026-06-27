@@ -205,23 +205,53 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
 
           <Divider />
           <div className="tab-section">
-            <Title level={5} className="tab-section-title">이미지 크기</Title>
-            <div className="setting-slider-row">
-              <Slider
-                min={1}
-                max={100}
-                value={settings.imageScale || 100}
-                onChange={(val) => onSettingChange('imageScale', val)}
-                style={{ flex: 1 }}
+            <Title level={5} className="tab-section-title">이미지</Title>
+            <div className="setting-field">
+              <Text className="setting-field-label">이미지 크기</Text>
+              <div className="setting-slider-row">
+                <Slider
+                  min={1}
+                  max={100}
+                  value={settings.imageScale || 100}
+                  onChange={(val) => onSettingChange('imageScale', val)}
+                  style={{ flex: 1 }}
+                />
+                <InputNumber
+                  min={1}
+                  max={100}
+                  value={settings.imageScale || 100}
+                  onChange={(val) => onSettingChange('imageScale', val || 100)}
+                  style={{ width: '70px' }}
+                  formatter={(value) => `${value}%`}
+                  parser={(value) => parseFloat(value?.replace('%', '') || '100')}
+                />
+              </div>
+            </div>
+            <div className="setting-field">
+              <Text className="setting-field-label">이미지 정렬</Text>
+              <Segmented
+                value={settings.imageAlign || 'left'}
+                onChange={(val) => onSettingChange('imageAlign', val)}
+                options={[
+                  { label: '왼쪽', value: 'left' },
+                  { label: '중앙', value: 'center' },
+                  { label: '오른쪽', value: 'right' },
+                ]}
+                block
               />
-              <InputNumber
-                min={1}
-                max={100}
-                value={settings.imageScale || 100}
-                onChange={(val) => onSettingChange('imageScale', val || 100)}
-                style={{ width: '70px' }}
-                formatter={(value) => `${value}%`}
-                parser={(value) => parseFloat(value?.replace('%', '') || '100')}
+            </div>
+            <div className="setting-field">
+              <Text className="setting-field-label">이미지 스타일</Text>
+              <Select
+                value={settings.imageStyle || 'none'}
+                onChange={(val) => onSettingChange('imageStyle', val)}
+                style={{ width: '100%' }}
+                options={[
+                  { value: 'none', label: '없음' },
+                  { value: 'gallery', label: '갤러리 (클래식 액자)' },
+                  { value: 'modern', label: '모던 (현대 액자)' },
+                  { value: 'tape', label: '테이프 (메모)' },
+                ]}
               />
             </div>
           </div>

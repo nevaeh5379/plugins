@@ -4,10 +4,10 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const SimpleMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, replacementRules, fontSize } = props;
+  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, replacementRules, fontSize } = props;
   const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
-  const messageHtml = useMessageProcessor(originalMessageEl, props.embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules);
+  const messageHtml = useMessageProcessor(originalMessageEl, props.embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

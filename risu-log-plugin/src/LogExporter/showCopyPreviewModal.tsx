@@ -42,6 +42,8 @@ interface Settings {
   footerCenter?: string;
   footerRight?: string;
   imageScale?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageStyle?: 'none' | 'gallery' | 'modern' | 'tape';
   embedImages?: boolean;
   expandHover?: boolean;
   imageResolution?: number | 'auto';
@@ -142,6 +144,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         footerCenter: 'Created by Log Plugin',
         footerRight: '',
         imageScale: 100,
+        imageAlign: 'left',
+        imageStyle: 'none',
         embedImages: true,
         expandHover: false,
         imageResolution: 1,
@@ -407,6 +411,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         fontSize: savedSettings.htmlScaleFactor !== undefined ? 16 * savedSettings.htmlScaleFactor : savedSettings.previewFontSize,
         containerWidth: savedSettings.previewWidth,
         imageScale: savedSettings.imageScale,
+        imageAlign: savedSettings.imageAlign,
+        imageStyle: savedSettings.imageStyle,
         isEditable: savedSettings.isEditable,
         onMessageUpdate: handleMessageUpdate,
         replacementRules: savedSettings.replacementRules,

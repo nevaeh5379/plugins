@@ -1,3 +1,5 @@
+export type ImageStyle = 'none' | 'gallery' | 'modern' | 'tape';
+
 export interface CharInfo {
   name: string;
   chatName: string;
@@ -76,6 +78,8 @@ export interface LogContainerProps {
   fontSize?: number;
   containerWidth?: number;
   imageScale?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageStyle?: ImageStyle;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   selectedIndices?: Set<number>;
@@ -101,6 +105,8 @@ export interface MessageProps {
   allowHtmlRendering: boolean;
   globalSettings: GlobalSettings;
   imageScale?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageStyle?: ImageStyle;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   isSelected?: boolean;
@@ -172,6 +178,8 @@ export interface LogExportSettings {
   previewWidth?: number;
   // Image export
   imageScale?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageStyle?: ImageStyle;
   imageResolution?: number | 'auto';
   imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
   imageFormat?: 'png' | 'jpeg' | 'webp';
