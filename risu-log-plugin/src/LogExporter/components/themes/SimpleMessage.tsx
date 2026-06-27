@@ -1,58 +1,46 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import type { MessageProps } from '../../../types';
-import { useMessageProcessor } from '../../hooks/useMessageProcessor';
-import { getNameFromNode } from '../../utils/domUtils';
+import { useMessageCard } from './useMessageCard';
 
 const SimpleMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, replacementRules, fontSize, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight } = props;
-  const baseSize = fontSize ? `${fontSize}px` : '16px';
-  const originalMessageEl = node.querySelector('.prose, .chattext');
-  const messageHtml = useMessageProcessor(originalMessageEl, props.embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (contentRef.current && messageHtml !== contentRef.current.innerHTML) {
-      contentRef.current.innerHTML = messageHtml;
-    }
-  }, [messageHtml]);
+  const mc = useMessageCard(props);
+  const { messageHtml, isUser } = mc;
 
   if (!messageHtml || messageHtml.trim().length === 0) return null;
-
-  const isUser = node.classList.contains('justify-end');
-  const name = getNameFromNode(node as HTMLElement, globalSettings, charInfoName);
-
-  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    if (onMessageUpdate && e.currentTarget.innerHTML !== messageHtml) {
-      onMessageUpdate(index, e.currentTarget.innerHTML);
-    }
-  };
-
-  const handleContentClick = (e: React.MouseEvent) => {
-    if (isEditable) e.stopPropagation();
-  };
 
   return (
     <div className="chat-message-container" style={{
       marginBottom: '1.4em',
       paddingLeft: isUser ? '1.5em' : '0',
       paddingRight: isUser ? '0' : '1.5em',
-      borderLeft: isUser ? `2px solid ${color.border}` : 'none',
+      borderLeft: isUser ? `2px solid ${props.color.border}` : 'none',
     }}>
       <div style={{
-        color: color.nameColor,
+        color: props.color.nameColor,
         fontWeight: 600,
-        fontSize: `calc(${baseSize} * 0.88)`,
+        fontSize: `calc(${mc.baseSize} * 0.88)`,
         marginBottom: '0.2em',
         opacity: 0.7,
       }}>
-        {name}
+        {mc.name}
       </div>
-      <div ref={contentRef} style={{
-        color: color.text,
+      <div ref={mc.contentRef} style={{
+        color: props.color.text,
         lineHeight: 1.7,
-        fontSize: baseSize,
-      }} contentEditable={isEditable} onBlur={handleBlur} onClick={handleContentClick} suppressContentEditableWarning={true} />
-      {isEditable && <button className="log-exporter-delete-msg-btn" data-message-index={index} style={{ float: isUser ? 'left' : 'right', opacity: 0.3 }}>&times;</button>}
+        fontSize: mc.baseSize,
+      }}
+        contentEditable={props.isEditable}
+        onBlur={mc.handleBlur}
+        onClick={mc.handleContentClick}
+        suppressContentEditableWarning={true}
+      />
+      {props.isEditable && (
+        <button
+          className="log-exporter-delete-msg-btn"
+          data-message-index={props.index}
+          style={{ float: isUser ? 'left' : 'right', opacity: 0.3 }}
+        >&times;</button>
+      )}
     </div>
   );
 };
