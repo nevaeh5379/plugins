@@ -254,6 +254,108 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
                 ]}
               />
             </div>
+            <div className="setting-field" style={{ marginTop: '16px' }}>
+              <SettingToggle
+                label="이미지 크롭 활성화"
+                description="이미지를 특정 비율로 자르고 원하는 초점을 맞춥니다"
+                checked={settings.imageCropActive || false}
+                onChange={(v) => onSettingChange('imageCropActive', v)}
+              />
+            </div>
+
+            {settings.imageCropActive && (
+              <div style={{ paddingLeft: '12px', borderLeft: '2px solid #eaeaea', marginTop: '12px' }}>
+                <div className="setting-field">
+                  <Text className="setting-field-label">크롭 비율</Text>
+                  <Select
+                    value={settings.imageCropAspectRatio || 'original'}
+                    onChange={(val) => onSettingChange('imageCropAspectRatio', val)}
+                    style={{ width: '100%' }}
+                    options={[
+                      { value: 'original', label: '원본 비율 (높이 제한 없음)' },
+                      { value: '1:1', label: '1:1 (정사각형)' },
+                      { value: '3:4', label: '3:4 (세로형 인물/피규어)' },
+                      { value: '4:3', label: '4:3 (가로형 표준)' },
+                      { value: '9:16', label: '9:16 (스마트폰 세로)' },
+                      { value: '16:9', label: '16:9 (시네마틱 가로)' },
+                      { value: 'custom', label: '사용자 지정 비율' },
+                    ]}
+                  />
+                </div>
+
+                {settings.imageCropAspectRatio === 'custom' && (
+                  <div className="setting-field">
+                    <Text className="setting-field-label">사용자 지정 세로 비율 (가로 대비 세로 높이)</Text>
+                    <div className="setting-slider-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Slider
+                        min={0.1}
+                        max={3.0}
+                        step={0.01}
+                        value={settings.imageCropHeight || 1.0}
+                        onChange={(val) => onSettingChange('imageCropHeight', val)}
+                        style={{ flex: 1 }}
+                      />
+                      <InputNumber
+                        min={0.1}
+                        max={3.0}
+                        step={0.01}
+                        value={settings.imageCropHeight || 1.0}
+                        onChange={(val) => onSettingChange('imageCropHeight', val || 1.0)}
+                        style={{ width: '70px' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {settings.imageCropAspectRatio !== 'original' && (
+                  <>
+                    <div className="setting-field">
+                      <Text className="setting-field-label">세로 초점 위치 (0%: 상단/얼굴 ~ 100%: 하단/다리)</Text>
+                      <div className="setting-slider-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Slider
+                          min={0}
+                          max={100}
+                          value={settings.imageCropVAlign !== undefined ? settings.imageCropVAlign : 50}
+                          onChange={(val) => onSettingChange('imageCropVAlign', val)}
+                          style={{ flex: 1 }}
+                        />
+                        <InputNumber
+                          min={0}
+                          max={100}
+                          value={settings.imageCropVAlign !== undefined ? settings.imageCropVAlign : 50}
+                          onChange={(val) => onSettingChange('imageCropVAlign', val ?? 50)}
+                          style={{ width: '70px' }}
+                          formatter={(v) => `${v}%`}
+                          parser={(v) => parseInt(v?.replace('%', '') || '50')}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="setting-field">
+                      <Text className="setting-field-label">가로 초점 위치 (0%: 좌측 ~ 100%: 우측)</Text>
+                      <div className="setting-slider-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Slider
+                          min={0}
+                          max={100}
+                          value={settings.imageCropHAlign !== undefined ? settings.imageCropHAlign : 50}
+                          onChange={(val) => onSettingChange('imageCropHAlign', val)}
+                          style={{ flex: 1 }}
+                        />
+                        <InputNumber
+                          min={0}
+                          max={100}
+                          value={settings.imageCropHAlign !== undefined ? settings.imageCropHAlign : 50}
+                          onChange={(val) => onSettingChange('imageCropHAlign', val ?? 50)}
+                          style={{ width: '70px' }}
+                          formatter={(v) => `${v}%`}
+                          parser={(v) => parseInt(v?.replace('%', '') || '50')}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

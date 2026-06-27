@@ -80,6 +80,11 @@ export interface LogContainerProps {
   imageScale?: number;
   imageAlign?: 'left' | 'center' | 'right';
   imageStyle?: ImageStyle;
+  imageCropActive?: boolean;
+  imageCropAspectRatio?: string;
+  imageCropVAlign?: number;
+  imageCropHAlign?: number;
+  imageCropHeight?: number;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   selectedIndices?: Set<number>;
@@ -107,6 +112,11 @@ export interface MessageProps {
   imageScale?: number;
   imageAlign?: 'left' | 'center' | 'right';
   imageStyle?: ImageStyle;
+  imageCropActive?: boolean;
+  imageCropAspectRatio?: string;
+  imageCropVAlign?: number;
+  imageCropHAlign?: number;
+  imageCropHeight?: number;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   isSelected?: boolean;
@@ -180,6 +190,11 @@ export interface LogExportSettings {
   imageScale?: number;
   imageAlign?: 'left' | 'center' | 'right';
   imageStyle?: ImageStyle;
+  imageCropActive?: boolean;
+  imageCropAspectRatio?: string;
+  imageCropVAlign?: number;
+  imageCropHAlign?: number;
+  imageCropHeight?: number;
   imageResolution?: number | 'auto';
   imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
   imageFormat?: 'png' | 'jpeg' | 'webp';

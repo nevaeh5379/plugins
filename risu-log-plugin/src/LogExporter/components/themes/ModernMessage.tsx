@@ -5,10 +5,10 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const ModernMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, isForExport, replacementRules, fontSize } = props;
+  const { node, index, charInfoName, color, showAvatar, isForArca, embedImagesAsBlob, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, isForExport, replacementRules, fontSize, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight } = props;
   const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
-  const messageHtml = useMessageProcessor(originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle);
+  const messageHtml = useMessageProcessor(originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -5,10 +5,10 @@ import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
 const LogMessage: React.FC<MessageProps> = (props) => {
-  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, replacementRules, fontSize } = props;
+  const { node, index, charInfoName, color, allowHtmlRendering, globalSettings, isEditable, onMessageUpdate, imageScale, imageAlign, imageStyle, replacementRules, fontSize, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight } = props;
   const baseSize = fontSize ? `${fontSize}px` : '16px';
   const originalMessageEl = node.querySelector('.prose, .chattext');
-  const messageHtml = useMessageProcessor(originalMessageEl, false, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle);
+  const messageHtml = useMessageProcessor(originalMessageEl, false, allowHtmlRendering, color, imageScale, props.onRendered, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
 
   const name = getNameFromNode(node as HTMLElement, globalSettings, charInfoName);
   const isUser = node.classList.contains('justify-end');

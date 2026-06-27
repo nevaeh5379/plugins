@@ -5,7 +5,7 @@ import './showCopyPreviewModal.css';
 import { processChatLog, serializeNodes } from '../services/chatData';
 import { THEMES, COLORS } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
-import type { ThemeKey, ColorKey } from '../types';
+import type { ThemeKey, ColorKey, ImageStyle } from '../types';
 import { ConfigProvider, theme, Spin, Button, Drawer, message } from 'antd';
 import { SettingOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 
@@ -43,7 +43,12 @@ interface Settings {
   footerRight?: string;
   imageScale?: number;
   imageAlign?: 'left' | 'center' | 'right';
-  imageStyle?: 'none' | 'gallery' | 'modern' | 'tape';
+  imageStyle?: ImageStyle;
+  imageCropActive?: boolean;
+  imageCropAspectRatio?: string;
+  imageCropVAlign?: number;
+  imageCropHAlign?: number;
+  imageCropHeight?: number;
   embedImages?: boolean;
   expandHover?: boolean;
   imageResolution?: number | 'auto';
@@ -146,6 +151,11 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         imageScale: 100,
         imageAlign: 'left',
         imageStyle: 'none',
+        imageCropActive: false,
+        imageCropAspectRatio: 'original',
+        imageCropVAlign: 50,
+        imageCropHAlign: 50,
+        imageCropHeight: 1.0,
         embedImages: true,
         expandHover: false,
         imageResolution: 1,
@@ -413,6 +423,11 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         imageScale: savedSettings.imageScale,
         imageAlign: savedSettings.imageAlign,
         imageStyle: savedSettings.imageStyle,
+        imageCropActive: savedSettings.imageCropActive,
+        imageCropAspectRatio: savedSettings.imageCropAspectRatio,
+        imageCropVAlign: savedSettings.imageCropVAlign,
+        imageCropHAlign: savedSettings.imageCropHAlign,
+        imageCropHeight: savedSettings.imageCropHeight,
         isEditable: savedSettings.isEditable,
         onMessageUpdate: handleMessageUpdate,
         replacementRules: savedSettings.replacementRules,

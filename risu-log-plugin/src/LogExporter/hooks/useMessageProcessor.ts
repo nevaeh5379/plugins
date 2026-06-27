@@ -13,7 +13,12 @@ export const useMessageProcessor = (
   onComplete?: () => void,
   replacementRules?: ReplacementRule[],
   imageAlign?: 'left' | 'center' | 'right',
-  imageStyle?: ImageStyle
+  imageStyle?: ImageStyle,
+  imageCropActive?: boolean,
+  imageCropAspectRatio?: string,
+  imageCropVAlign?: number,
+  imageCropHAlign?: number,
+  imageCropHeight?: number
 ) => {
   const [processedContent, setProcessedContent] = useState('');
 
@@ -21,10 +26,17 @@ export const useMessageProcessor = (
     if (!originalMessageEl) return;
 
     const process = async () => {
+      console.log('[log plugin] useMessageProcessor hook process():', {
+        imageCropActive,
+        imageCropAspectRatio,
+        imageCropVAlign,
+        imageCropHAlign,
+        imageCropHeight
+      });
       if (allowHtmlRendering) {
         setProcessedContent(await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules));
       } else {
-        setProcessedContent(await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle));
+        setProcessedContent(await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight));
       }
       if (onComplete) {
         onComplete();
@@ -32,7 +44,7 @@ export const useMessageProcessor = (
     };
 
     process();
-  }, [originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, onComplete, replacementRules, imageAlign, imageStyle]);
+  }, [originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, onComplete, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight]);
 
   return processedContent;
 };
@@ -107,7 +119,20 @@ const isCustomCaption = (alt: string | null | undefined): boolean => {
     return true;
 };
 
-const processMessageContent = async (originalMessageEl: Element, embedImages: boolean, color: ColorPalette, imageScale?: number, replacementRules?: ReplacementRule[], imageAlign?: 'left' | 'center' | 'right', imageStyle?: ImageStyle): Promise<string> => {
+const processMessageContent = async (
+    originalMessageEl: Element,
+    embedImages: boolean,
+    color: ColorPalette,
+    imageScale?: number,
+    replacementRules?: ReplacementRule[],
+    imageAlign?: 'left' | 'center' | 'right',
+    imageStyle?: ImageStyle,
+    imageCropActive?: boolean,
+    imageCropAspectRatio?: string,
+    imageCropVAlign?: number,
+    imageCropHAlign?: number,
+    imageCropHeight?: number
+): Promise<string> => {
     const contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
 
@@ -136,10 +161,6 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
     await Promise.all(mediaPromises);
 
     // 이미지 스케일, 정렬 및 스타일 적용
-    // none:      스타일 없음
-    // gallery:   클래식 액자 — 은색 프레임 + 매트 + 하단 캡션바
-    // modern:    현대 액자 — 얇은 프레임 + 넓은 여백 + 부드러운 그림자
-    // tape:      포스트잇 메모 — 크림 배경 + 와시 테이프 + 미세 회전
     const alignValue = imageAlign || 'left';
     const styleMode = imageStyle || 'none';
     contentSourceEl.querySelectorAll('img').forEach(el => {
@@ -155,12 +176,55 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
             margin: '0.5em 0',
         });
 
-        img.style.maxWidth = `${scale}%`;
-        img.style.width = `${scale}%`;
-        img.style.height = 'auto';
-        img.style.display = 'inline-block';
-        img.style.verticalAlign = 'middle';
+        // wrapper를 원래 img가 있던 자리에 먼저 삽입해 둡니다. (img가 자식에서 분리되기 전)
+        parent.insertBefore(wrapper, img);
 
+        // 1. 크롭 레이어(wrapper) 구성 및 원본 이미지 크롭 스타일 지정
+        let imageToAppend: HTMLElement = img;
+        if (imageCropActive) {
+            const cropWrapper = document.createElement('div');
+            let aspect = '';
+            switch (imageCropAspectRatio) {
+                case '1:1': aspect = '1 / 1'; break;
+                case '3:4': aspect = '3 / 4'; break;
+                case '4:3': aspect = '4 / 3'; break;
+                case '9:16': aspect = '9 / 16'; break;
+                case '16:9': aspect = '16 / 9'; break;
+                case 'custom': aspect = `1 / ${imageCropHeight || 1.0}`; break;
+                default: break;
+            }
+
+            Object.assign(cropWrapper.style, {
+                display: 'block',
+                width: '100%',
+                overflow: 'hidden',
+                position: 'relative',
+                boxSizing: 'border-box',
+            });
+            if (aspect) {
+                cropWrapper.style.aspectRatio = aspect;
+            }
+
+            console.log('[log plugin] Setting img objectPosition to:', `${imageCropHAlign !== undefined ? imageCropHAlign : 50}% ${imageCropVAlign !== undefined ? imageCropVAlign : 50}%`);
+            img.style.setProperty('width', '100%', 'important');
+            img.style.setProperty('height', '100%', 'important');
+            img.style.setProperty('object-fit', 'cover', 'important');
+            img.style.setProperty('object-position', `${imageCropHAlign !== undefined ? imageCropHAlign : 50}% ${imageCropVAlign !== undefined ? imageCropVAlign : 50}%`, 'important');
+            img.style.setProperty('display', 'block', 'important');
+            img.style.setProperty('max-width', '100%', 'important');
+
+            cropWrapper.appendChild(img);
+            imageToAppend = cropWrapper;
+        } else {
+            // 크롭 미적용 시의 표준 스타일
+            img.style.maxWidth = `${scale}%`;
+            img.style.width = `${scale}%`;
+            img.style.height = 'auto';
+            img.style.display = 'inline-block';
+            img.style.verticalAlign = 'middle';
+        }
+
+        // 2. 테마별 프레임 씌우기
         switch (styleMode) {
             case 'gallery': {
                 // 클래식 액자: 3D 입체 에보니 원목 2단 프레임 + 이중 크림 매트보드 + 베벨 컷 이미지 윈도우
@@ -221,21 +285,23 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                     boxSizing: 'border-box',
                 });
 
-                img.style.borderRadius = '0';
-                img.style.display = 'block';
-                img.style.width = '100%';
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.border = '1px solid #a8a499'; // 이미지와 안쪽 매트 경계선
-                img.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                img.style.boxSizing = 'border-box';
+                // 최종 렌더링될 요소에 스타일(보더 및 섀도우) 부여
+                imageToAppend.style.borderRadius = '0';
+                imageToAppend.style.display = 'block';
+                imageToAppend.style.width = '100%';
+                imageToAppend.style.maxWidth = '100%';
+                if (!imageCropActive) {
+                    imageToAppend.style.height = 'auto';
+                }
+                imageToAppend.style.border = '1px solid #a8a499'; // 이미지와 안쪽 매트 경계선
+                imageToAppend.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+                imageToAppend.style.boxSizing = 'border-box';
 
-                parent.insertBefore(wrapper, img);
                 wrapper.appendChild(frame);
                 frame.appendChild(innerFrame);
                 innerFrame.appendChild(mat);
                 mat.appendChild(matWindow);
-                matWindow.appendChild(img);
+                matWindow.appendChild(imageToAppend);
 
                 if (hasCaption) {
                     // 미술관 종이 라벨 스타일의 정갈한 자막 영역 (사용자가 명시적으로 커스텀 자막을 정의한 경우에만 렌더링)
@@ -300,18 +366,19 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                     boxShadow: '0 12px 32px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.05), inset 0 0 0 1px #fcfcfc',
                 });
 
-                img.style.borderRadius = '1px';
-                img.style.display = 'block';
-                img.style.width = '100%';
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)';
-                img.style.border = '1px solid rgba(0,0,0,0.04)';
-                img.style.boxSizing = 'border-box';
+                imageToAppend.style.borderRadius = '1px';
+                imageToAppend.style.display = 'block';
+                imageToAppend.style.width = '100%';
+                imageToAppend.style.maxWidth = '100%';
+                if (!imageCropActive) {
+                    imageToAppend.style.height = 'auto';
+                }
+                imageToAppend.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)';
+                imageToAppend.style.border = '1px solid rgba(0,0,0,0.04)';
+                imageToAppend.style.boxSizing = 'border-box';
 
-                parent.insertBefore(wrapper, img);
                 wrapper.appendChild(frame);
-                frame.appendChild(img);
+                frame.appendChild(imageToAppend);
 
                 if (hasCaption) {
                     const labelBlock = document.createElement('div');
@@ -396,16 +463,17 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                 });
                 inner.appendChild(tape);
 
-                img.style.borderRadius = '1px';
-                img.style.width = '100%';
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.display = 'block';
-                img.style.boxSizing = 'border-box';
+                imageToAppend.style.borderRadius = '1px';
+                imageToAppend.style.width = '100%';
+                imageToAppend.style.maxWidth = '100%';
+                if (!imageCropActive) {
+                    imageToAppend.style.height = 'auto';
+                }
+                imageToAppend.style.display = 'block';
+                imageToAppend.style.boxSizing = 'border-box';
 
-                parent.insertBefore(wrapper, img);
                 wrapper.appendChild(inner);
-                inner.appendChild(img);
+                inner.appendChild(imageToAppend);
                 return;
             }
             case 'none':
@@ -413,8 +481,15 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                 break;
         }
 
-        parent.insertBefore(wrapper, img);
-        wrapper.appendChild(img);
+        // 스타일 적용 'none'일 때 크롭 및 스케일 속성을 최종 적용
+        if (imageCropActive) {
+            imageToAppend.style.maxWidth = `${scale}%`;
+            imageToAppend.style.width = `${scale}%`;
+            imageToAppend.style.display = 'inline-block';
+            imageToAppend.style.verticalAlign = 'middle';
+        }
+
+        wrapper.appendChild(imageToAppend);
     });
 
     // 비디오도 스케일 적용

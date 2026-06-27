@@ -39,6 +39,11 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
     imageScale,
     imageAlign,
     imageStyle,
+    imageCropActive,
+    imageCropAspectRatio,
+    imageCropVAlign,
+    imageCropHAlign,
+    imageCropHeight,
     selectedIndices,
     onMessageSelect,
     isForImageExport,
@@ -169,6 +174,11 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
             imageScale={imageScale}
             imageAlign={imageAlign}
             imageStyle={imageStyle}
+            imageCropActive={imageCropActive}
+            imageCropAspectRatio={imageCropAspectRatio}
+            imageCropVAlign={imageCropVAlign}
+            imageCropHAlign={imageCropHAlign}
+            imageCropHeight={imageCropHeight}
             isEditable={props.isEditable}
             onMessageUpdate={props.onMessageUpdate}
             isSelected={selectedIndices?.has(index)}
