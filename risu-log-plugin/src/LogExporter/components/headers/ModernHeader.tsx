@@ -1,5 +1,7 @@
 import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
+import { useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -8,7 +10,7 @@ interface LogHeaderProps {
 }
 
 const ModernHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags }) => {
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const tags = useParsedTags(headerTags);
 
   return (
     <header style={{
@@ -44,18 +46,7 @@ const ModernHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags })
             color: color.nameColor, fontWeight: 700,
             letterSpacing: '-0.02em',
           }}>{charInfo.name}</h1>
-          {tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '5px' }}>
-              {tags.map((tag, i) => (
-                <span key={i} style={{
-                  fontSize: '0.72em', color: color.textSecondary,
-                  backgroundColor: 'rgba(0,0,0,0.2)',
-                  padding: '2px 8px', borderRadius: '4px',
-                  border: `1px solid ${color.border}`,
-                }}>{tag}</span>
-              ))}
-            </div>
-          )}
+          <HeaderTags tags={tags} color={color} variant="modern" />
         </div>
         <p style={{
           margin: 0, color: color.text, opacity: 0.75,

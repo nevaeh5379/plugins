@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
-import { imageUrlToBlob } from '../../utils/imageUtils';
+import { useAvatarBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -11,21 +12,8 @@ interface LogHeaderProps {
 }
 
 const SmartHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesAsBlob, showHeaderIcon, headerTags }) => {
-  const [avatarSrc, setAvatarSrc] = useState(charInfo.avatarUrl);
-
-  useEffect(() => {
-    const convertAvatar = async () => {
-      if (embedImagesAsBlob && charInfo.avatarUrl) {
-        try {
-          const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-          setAvatarSrc(blobUrl);
-        } catch { /* ignore */ }
-      }
-    };
-    convertAvatar();
-  }, [charInfo.avatarUrl, embedImagesAsBlob]);
-
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const avatarSrc = useAvatarBlob(charInfo.avatarUrl, embedImagesAsBlob);
+  const tags = useParsedTags(headerTags);
 
   return (
     <header style={{
@@ -78,18 +66,7 @@ const SmartHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesAsB
             margin: 0, color: color.textSecondary,
             fontSize: '0.9em', fontWeight: 500,
           }}>{charInfo.chatName}</p>
-          {tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
-              {tags.map((tag, i) => (
-                <span key={i} style={{
-                  fontSize: '0.72em', color: color.nameColor,
-                  background: color.quoteBg,
-                  padding: '3px 9px', borderRadius: '6px',
-                  fontWeight: 600,
-                }}>{tag}</span>
-              ))}
-            </div>
-          )}
+          <HeaderTags tags={tags} color={color} variant="smart" />
         </div>
       </div>
     </header>

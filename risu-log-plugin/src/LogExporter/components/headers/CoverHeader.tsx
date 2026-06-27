@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
-import { imageUrlToBlob } from '../../utils/imageUtils';
-import { showWarning } from '../../utils/notify';
+import { useMultiImageBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -17,36 +17,11 @@ const CoverHeader: React.FC<LogHeaderProps> = ({
   charInfo, color, embedImagesAsBlob, showHeaderIcon, headerTags,
   headerBannerUrl, headerBannerBlur,
 }) => {
-  const [avatarSrc, setAvatarSrc] = useState(charInfo.avatarUrl);
-  const [bannerSrc, setBannerSrc] = useState<string | null>(headerBannerUrl || null);
-
-  useEffect(() => {
-    const convertImages = async () => {
-      if (embedImagesAsBlob) {
-        if (charInfo.avatarUrl) {
-          try {
-            const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-            setAvatarSrc(blobUrl);
-          } catch (e) {
-            console.error('[log plugin] Failed to convert avatar to blob:', charInfo.avatarUrl, e);
-            showWarning(`아바타 변환 실패: ${charInfo.avatarUrl.substring(0, 80)}${charInfo.avatarUrl.length > 80 ? '...' : ''}`);
-          }
-        }
-        if (headerBannerUrl) {
-          try {
-            const blobUrl = await imageUrlToBlob(headerBannerUrl);
-            setBannerSrc(blobUrl);
-          } catch (e) {
-            console.error('[log plugin] Failed to convert banner to blob:', headerBannerUrl, e);
-            showWarning(`배너 변환 실패: ${headerBannerUrl.substring(0, 80)}${headerBannerUrl.length > 80 ? '...' : ''}`);
-          }
-        }
-      }
-    };
-    convertImages();
-  }, [charInfo.avatarUrl, headerBannerUrl, embedImagesAsBlob]);
-
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const [avatarSrc, bannerSrc] = useMultiImageBlob(
+    [charInfo.avatarUrl, headerBannerUrl || ''],
+    embedImagesAsBlob
+  );
+  const tags = useParsedTags(headerTags);
 
   const backgroundStyle: React.CSSProperties = {
     backgroundImage: `url(${bannerSrc || avatarSrc})`,
@@ -126,20 +101,7 @@ const CoverHeader: React.FC<LogHeaderProps> = ({
               padding: '3px 10px', borderRadius: '100px',
               border: `1px solid ${color.border}`,
             }}>{charInfo.chatName}</p>
-            {tags.length > 0 && (
-              <div style={{
-                display: 'flex', gap: '5px',
-                flexWrap: 'wrap', justifyContent: 'flex-end',
-              }}>
-                {tags.map((tag, i) => (
-                  <span key={i} style={{
-                    fontSize: '0.72em', padding: '2px 7px',
-                    borderRadius: '4px', border: `1px solid ${color.border}`,
-                    color: color.textSecondary, opacity: 0.8,
-                  }}>{tag}</span>
-                ))}
-              </div>
-            )}
+            <HeaderTags tags={tags} color={color} variant="cover" />
           </div>
         </div>
       </div>

@@ -65,6 +65,64 @@ interface BaseMessageProps extends MessageProps {
   themeConfig: ThemeConfig;
 }
 
+/**
+ * 메시지 삭제 버튼 컴포넌트.
+ * placement에 따라 스타일이 달라집니다.
+ */
+interface DeleteButtonProps {
+  index: number;
+  isUser: boolean;
+  placement: 'beforeAvatar' | 'inAvatar' | 'afterContent';
+  customStyle?: React.CSSProperties;
+  opposite?: boolean;
+}
+
+const DeleteButton: React.FC<DeleteButtonProps> = ({ index, isUser, placement, customStyle, opposite }) => {
+  const baseStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '-2px',
+    right: '-2px',
+    width: '16px',
+    height: '16px',
+    fontSize: '12px',
+    lineHeight: '14px',
+    padding: 0,
+    border: 'none',
+    borderRadius: '50%',
+    backgroundColor: 'rgba(200,50,50,0.7)',
+    color: '#fff',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  };
+
+  const inAvatarStyle: React.CSSProperties = opposite
+    ? { ...baseStyle, right: isUser ? 'auto' : '-5px', left: isUser ? '-5px' : 'auto' }
+    : baseStyle;
+
+  const afterContentStyle: React.CSSProperties = {
+    float: isUser ? 'left' : 'right',
+    opacity: 0.3,
+  };
+
+  const style = placement === 'inAvatar'
+    ? { ...inAvatarStyle, ...customStyle }
+    : placement === 'afterContent'
+      ? { ...afterContentStyle, ...customStyle }
+      : customStyle;
+
+  return (
+    <button
+      className="log-exporter-delete-msg-btn"
+      data-message-index={index}
+      title="메시지 삭제"
+      style={style}
+    >&times;</button>
+  );
+};
+
 const BaseMessage: React.FC<BaseMessageProps> = (props) => {
   const {
     themeConfig, charInfoName,
@@ -107,27 +165,6 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
     margin: isUser
       ? `0 0 0 ${themeConfig.avatarMargin}px`
       : `0 ${themeConfig.avatarMargin}px 0 0`,
-  };
-
-  // Shared delete button style (for 'inAvatar' placement)
-  const defaultDeleteStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '-2px',
-    right: '-2px',
-    width: '16px',
-    height: '16px',
-    fontSize: '12px',
-    lineHeight: '14px',
-    padding: 0,
-    border: 'none',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(200,50,50,0.7)',
-    color: '#fff',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
   };
 
   // --- Card render mode (ModernMessage, SmartMessage) ---
@@ -188,11 +225,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
       <div style={containerStyle}>
         {/* Delete button before Avatar */}
         {isEditable && themeConfig.deleteButtonPlacement === 'beforeAvatar' && (
-          <button
-            className="log-exporter-delete-msg-btn"
-            data-message-index={index}
-            title="메시지 삭제"
-          >&times;</button>
+          <DeleteButton index={index} isUser={isUser} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
         )}
 
         {/* Avatar section */}
@@ -208,18 +241,13 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
             isForExport={isForExport}
           />
           {isEditable && themeConfig.deleteButtonPlacement === 'inAvatar' && (
-            <button
-              className="log-exporter-delete-msg-btn"
-              data-message-index={index}
-              title="메시지 삭제"
-              style={{
-                ...defaultDeleteStyle,
-                ...(themeConfig.deleteButtonOpposite
-                  ? { right: isUser ? 'auto' : '-5px', left: isUser ? '-5px' : 'auto' }
-                  : {}),
-                ...themeConfig.deleteButtonStyle,
-              }}
-            >&times;</button>
+            <DeleteButton
+              index={index}
+              isUser={isUser}
+              placement="inAvatar"
+              customStyle={themeConfig.deleteButtonStyle}
+              opposite={themeConfig.deleteButtonOpposite}
+            />
           )}
         </div>
 
@@ -242,7 +270,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            alignItems: isUser ? 'flex-end' : 'flex-start',
+            alignItems: isUser ? 'flex-end' : 'flex.start',
             maxWidth: '85%',
             minWidth: 0,
           }}>
@@ -268,11 +296,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
     <div style={containerStyle}>
       {/* Delete button before Avatar (BasicMessage, CustomMessage) */}
       {isEditable && themeConfig.deleteButtonPlacement === 'beforeAvatar' && (
-        <button
-          className="log-exporter-delete-msg-btn"
-          data-message-index={index}
-          title="메시지 삭제"
-        >&times;</button>
+        <DeleteButton index={index} isUser={isUser} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
       )}
 
       {/* Avatar section */}
@@ -289,18 +313,13 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
         />
         {/* Delete button inside avatar wrapper (SmartMessage) */}
         {isEditable && themeConfig.deleteButtonPlacement === 'inAvatar' && (
-          <button
-            className="log-exporter-delete-msg-btn"
-            data-message-index={index}
-            title="메시지 삭제"
-            style={{
-              ...defaultDeleteStyle,
-              ...(themeConfig.deleteButtonOpposite
-                ? { right: isUser ? 'auto' : '-5px', left: isUser ? '-5px' : 'auto' }
-                : {}),
-              ...themeConfig.deleteButtonStyle,
-            }}
-          >&times;</button>
+          <DeleteButton
+            index={index}
+            isUser={isUser}
+            placement="inAvatar"
+            customStyle={themeConfig.deleteButtonStyle}
+            opposite={themeConfig.deleteButtonOpposite}
+          />
         )}
       </div>
 
@@ -321,16 +340,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
 
       {/* Delete button after content, floated (SimpleMessage) */}
       {isEditable && themeConfig.deleteButtonPlacement === 'afterContent' && (
-        <button
-          className="log-exporter-delete-msg-btn"
-          data-message-index={index}
-          title="메시지 삭제"
-          style={{
-            float: isUser ? 'left' : 'right',
-            opacity: 0.3,
-            ...themeConfig.deleteButtonStyle,
-          }}
-        >&times;</button>
+        <DeleteButton index={index} isUser={isUser} placement="afterContent" customStyle={themeConfig.deleteButtonStyle} />
       )}
     </div>
   );

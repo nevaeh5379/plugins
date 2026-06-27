@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { toBlob } from 'html-to-image';
-import domtoimage from 'dom-to-image-more';
 import type { ColorPalette } from '../../types';
 import type { LogExportSettings } from '../../types';
 import JSZip from 'jszip';
@@ -10,18 +7,25 @@ import { convertWebMToAnimatedWebP } from '../../services/webmConverter';
 import { getLogHtml } from './htmlGenerator';
 import { collectCharacterAvatars } from './avatarService';
 import type { CharInfo } from '../../types';
-import { snapdom } from '@zumer/snapdom';
 import { loadGlobalSettings } from './settingsService';
 import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
 import { imageUrlToBlob, fetchToBlobNative } from '../utils/imageUtils';
 import { message } from 'antd';
+import {
+    captureElementToBlob,
+    createSectionWrapper,
+    withTempWrapper,
+    downloadBlob,
+    type ImageLibrary,
+    type ImageFormat,
+} from '../utils/captureUtils';
 
 const waitForMedia = async (element: HTMLElement) => {
     const images = Array.from(element.querySelectorAll('img'));
     const videos = Array.from(element.querySelectorAll('video'));
-    
+
     const promises = [
         ...images.map(img => {
             if (img.complete) return Promise.resolve();
@@ -38,164 +42,52 @@ const waitForMedia = async (element: HTMLElement) => {
             });
         })
     ];
-    
+
     if (promises.length === 0) return;
-    
+
     await Promise.race([
         Promise.all(promises),
         new Promise(resolve => setTimeout(resolve, 5000)) // 5s timeout
     ]);
 };
 
-const convertBlobToWebP = async (pngBlob: Blob): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                reject(new Error('Failed to get 2D context'));
-                return;
-            }
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((webpBlob) => {
-                if (webpBlob) {
-                    resolve(webpBlob);
-                } else {
-                    reject(new Error('Failed to convert canvas to WebP'));
-                }
-            }, 'image/webp');
-            URL.revokeObjectURL(img.src);
-        };
-        img.onerror = (err) => {
-            reject(err);
-        };
-        img.src = URL.createObjectURL(pngBlob);
-    });
-};
-
-// 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합하는 함수
+/**
+ * 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합합니다.
+ */
 const splitAndMergeAsOneFile = async (
     element: HTMLElement,
     maxHeight: number,
     resolution: number,
-    format: 'png' | 'jpeg' | 'webp',
-    imageLibrary: string,
+    format: ImageFormat,
+    imageLibrary: ImageLibrary,
     bgColor: string,
     onProgressUpdate: (update: { message?: string }) => void
 ): Promise<Blob> => {
     const totalHeight = element.offsetHeight;
     const totalWidth = element.offsetWidth;
     const numSections = Math.ceil(totalHeight / maxHeight);
-    
+
     onProgressUpdate({ message: `큰 이미지 분할 캡처 중 (${numSections}개 섹션)...` });
-    
-    // 각 섹션을 캡처
+
     const blobs: Blob[] = [];
     for (let i = 0; i < numSections; i++) {
         const startY = i * maxHeight;
         const sectionHeight = Math.min(maxHeight, totalHeight - startY);
-        
-        // 임시 래퍼 생성
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'relative';
-        wrapper.style.width = `${totalWidth}px`;
-        wrapper.style.height = `${sectionHeight}px`;
-        wrapper.style.overflow = 'hidden';
-        wrapper.style.backgroundColor = bgColor;
-        
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.position = 'absolute';
-        clone.style.top = `${-startY}px`;
-        clone.style.left = '0';
-        wrapper.appendChild(clone);
-        
-        document.body.appendChild(wrapper);
-        
-        try {
-            let blob: Blob | null = null;
-            const commonOptions = {
-                pixelRatio: resolution,
-                width: wrapper.offsetWidth,
-                height: wrapper.offsetHeight,
-            };
-            
+
+        const wrapper = createSectionWrapper(element, startY, sectionHeight, totalWidth, bgColor);
+
+        await withTempWrapper(wrapper, async () => {
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
-            
-            // WebP의 경우 PNG로 캡처 후 나중에 변환 (이미지 에셋 보존)
-            const captureFormat = format === 'webp' ? 'png' : format;
-            
-            if (imageLibrary === 'snapdom') {
-                blob = await snapdom.toBlob(wrapper, {
-                    scale: resolution,
-                    width: commonOptions.width,
-                    height: commonOptions.height,
-                    type: captureFormat === 'jpeg' ? 'jpeg' : captureFormat,
-                    backgroundColor: bgColor
-                } as any);
-            } else if (imageLibrary === 'dom-to-image') {
-                const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
-                if (captureFormat === 'png') {
-                    blob = await domtoimage.toBlob(wrapper, libOptions);
-                } else { // jpeg
-                    blob = await domtoimage.toBlob(wrapper, { ...libOptions, quality: 1.0 });
-                }
-            } else { // html-to-image
-                const libOptions = { ...commonOptions, backgroundColor: bgColor };
-                if (captureFormat === 'png') {
-                    blob = await toBlob(wrapper, libOptions);
-                } else { // jpeg
-                    blob = await toBlob(wrapper, { ...libOptions, quality: 1.0 });
-                }
-            }
-            
-            if (!blob) throw new Error('Failed to capture section');
-            
-            // 실제 Blob 타입 확인 및 로깅
+
+            const blob = await captureElementToBlob(
+                wrapper, format, imageLibrary, bgColor, resolution, true
+            );
+
             console.log(`[Log Exporter] Section ${i + 1} captured: ${blob.type} (requested: image/${format})`);
-            
-            // dom-to-image와 html-to-image는 항상 PNG를 생성하므로
-            // JPEG 요청 시에만 포맷 변환 (WebP는 병합 후 변환)
-            if (blob.type === 'image/png' && format === 'jpeg') {
-                console.log(`[Log Exporter] Converting PNG to JPEG...`);
-                const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                    const image = new Image();
-                    image.crossOrigin = 'anonymous'; // CORS 설정
-                    image.onload = () => resolve(image);
-                    image.onerror = reject;
-                    image.src = URL.createObjectURL(blob!);
-                });
-                
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d', { 
-                    alpha: false,
-                    willReadFrequently: false
-                });
-                if (!ctx) throw new Error('Canvas context not available');
-                
-                // 이미지 스무딩 비활성화 (픽셀 완벽 재현)
-                ctx.imageSmoothingEnabled = false;
-                
-                // 이미지 그리기
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(img.src);
-                
-                blob = await new Promise<Blob>((resolve) => {
-                    canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95);
-                });
-            }
-            
             blobs.push(blob);
-            
-        } finally {
-            document.body.removeChild(wrapper);
-        }
+        });
     }
-    
+
     // 포맷에 따라 바이너리 레벨 병합 사용
     onProgressUpdate({ message: `이미지 병합 중...` });
     if (format === 'png') {
@@ -204,19 +96,21 @@ const splitAndMergeAsOneFile = async (
     } else if (format === 'jpeg') {
         console.log('[Log Exporter] Using JPEG binary merge (no Canvas!)');
         return await mergeJPEGsBinary(blobs);
-    } else { // webp
+    } else {
         console.log('[Log Exporter] Using WebP merge (PNG binary merge + WebP conversion)');
         return await mergeWebPsBinary(blobs);
     }
 };
 
-// 큰 메시지를 분할하여 여러 개의 개별 파일로 저장하는 함수
+/**
+ * 큰 메시지를 분할하여 여러 개의 개별 파일로 저장합니다.
+ */
 const splitAndSaveAsSeparateFiles = async (
     element: HTMLElement,
     maxHeight: number,
     resolution: number,
-    format: 'png' | 'jpeg' | 'webp',
-    imageLibrary: string,
+    format: ImageFormat,
+    imageLibrary: ImageLibrary,
     bgColor: string,
     onProgressUpdate: (update: { message?: string }) => void,
     safeCharName: string,
@@ -227,109 +121,66 @@ const splitAndSaveAsSeparateFiles = async (
     const totalHeight = element.offsetHeight;
     const totalWidth = element.offsetWidth;
     const numSections = Math.ceil(totalHeight / maxHeight);
-    
+
     onProgressUpdate({ message: `큰 이미지 분할 저장 중 (${numSections}개 섹션)...` });
-    
-    // 각 섹션을 개별 파일로 저장
+
     for (let i = 0; i < numSections; i++) {
         const startY = i * maxHeight;
         const sectionHeight = Math.min(maxHeight, totalHeight - startY);
-        
-        // 임시 래퍼 생성
-        const wrapper = document.createElement('div');
-        wrapper.style.position = 'relative';
-        wrapper.style.width = `${totalWidth}px`;
-        wrapper.style.height = `${sectionHeight}px`;
-        wrapper.style.overflow = 'hidden';
-        
-        const clone = element.cloneNode(true) as HTMLElement;
-        clone.style.position = 'absolute';
-        clone.style.top = `${-startY}px`;
-        clone.style.left = '0';
-        wrapper.appendChild(clone);
-        
-        document.body.appendChild(wrapper);
-        
-        try {
-            let blob: Blob | null = null;
-            const commonOptions = {
-                pixelRatio: resolution,
-                width: wrapper.offsetWidth,
-                height: wrapper.offsetHeight,
-            };
-            
+
+        const wrapper = createSectionWrapper(element, startY, sectionHeight, totalWidth, bgColor);
+
+        await withTempWrapper(wrapper, async () => {
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
-            
-            if (imageLibrary === 'snapdom') {
-                blob = await snapdom.toBlob(wrapper, {
-                    scale: resolution,
-                    width: commonOptions.width,
-                    height: commonOptions.height,
-                    type: format === 'jpeg' ? 'jpeg' : format,
-                    backgroundColor: bgColor
-                } as any);
-            } else if (imageLibrary === 'dom-to-image') {
-                const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
-                if (format === 'png') {
-                    blob = await domtoimage.toBlob(wrapper, libOptions);
-                } else if (format === 'jpeg') {
-                    blob = await domtoimage.toBlob(wrapper, { ...libOptions, quality: 1.0 });
-                } else {
-                    const pngBlob = await domtoimage.toBlob(wrapper, libOptions);
-                    if (!pngBlob) throw new Error('Failed to capture PNG');
-                    blob = await convertBlobToWebP(pngBlob);
-                }
-            } else { // html-to-image
-                const libOptions = { ...commonOptions, backgroundColor: bgColor };
-                if (format === 'png') {
-                    blob = await toBlob(wrapper, libOptions);
-                } else if (format === 'jpeg') {
-                    blob = await toBlob(wrapper, { ...libOptions, quality: 1.0 });
-                } else {
-                    const pngBlob = await toBlob(wrapper, libOptions);
-                    if (!pngBlob) throw new Error('Failed to capture PNG');
-                    blob = await convertBlobToWebP(pngBlob);
-                }
-            }
-            
+
+            const blob = await captureElementToBlob(
+                wrapper, format, imageLibrary, bgColor, resolution, false
+            );
+
             if (!blob) throw new Error('Failed to capture section');
-            
-            // 파일 저장
+
             const sectionNumber = totalBaseParts > 1 ? `${basePart + 1}_${i + 1}` : `${i + 1}`;
             const filename = `Risu_Log_${safeCharName}_${safeChatName}_part${sectionNumber}.${format}`;
-            
+
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 파일 저장 중...` });
-            
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-        } finally {
-            document.body.removeChild(wrapper);
-        }
+            await downloadBlob(blob, filename);
+        });
     }
 };
 
-export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'png' | 'jpeg' | 'webp', charName: string, chatName: string, options: LogExportSettings, backgroundColor?: string) => {
+/**
+ * 요소 전체를 이미지로 캡처하여 Blob을 반환합니다.
+ */
+const captureElement = async (
+    element: HTMLElement,
+    format: ImageFormat,
+    imageLibrary: ImageLibrary,
+    bgColor: string,
+    resolution: number
+): Promise<Blob> => {
+    return captureElementToBlob(element, format, imageLibrary, bgColor, resolution, false);
+};
+
+export const saveAsImage = async (
+    nodes: HTMLElement[] | HTMLElement,
+    format: ImageFormat,
+    charName: string,
+    chatName: string,
+    options: LogExportSettings,
+    backgroundColor?: string
+) => {
     try {
-        const { 
-            imageResolution: initialImageResolution = 1, 
-            imageLibrary = 'html-to-image', 
-            splitImage = 'none', 
+        const {
+            imageResolution: initialImageResolution = 1,
+            imageLibrary = 'html-to-image',
+            splitImage = 'none',
             maxImageHeight: userMaxImageHeight = 10000,
-            onProgressStart = (_message: string, _total?: number) => {},
-            onProgressUpdate = (_update: { current?: number; message?: string }) => {},
+            onProgressStart = () => {},
+            onProgressUpdate = () => {},
             onProgressEnd = () => {},
             ...htmlOptions
         } = options;
 
-        // Pre-convert remote avatar and banner URLs to base64 data URLs to prevent async rendering delays and CSP blocks
         const resolvedAvatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
         const resolvedBannerUrl = htmlOptions.headerBannerUrl ? await imageUrlToBlob(htmlOptions.headerBannerUrl) : '';
 
@@ -338,9 +189,9 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
         const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
             onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
             await new Promise(resolve => setTimeout(resolve, 50));
-            const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
-            const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
-            const filename = totalParts > 1 
+            const safeCharName = charName.replace(/[/?%*:|"<>]/g, '-');
+            const safeChatName = chatName.replace(/[/?%*:|"<>]/g, '-');
+            const filename = totalParts > 1
                 ? `Risu_Log_${safeCharName}_${safeChatName}_part${part + 1}.${format}`
                 : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
 
@@ -348,10 +199,10 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
 
             try {
                 let blob: Blob | null = null;
-                
+
                 const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
                 const isTooTall = element.offsetHeight > finalMaxHeight;
-                
+
                 if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
                     if (splitImage === 'chunk') {
                         blob = await splitAndMergeAsOneFile(
@@ -359,17 +210,17 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                             finalMaxHeight,
                             resolution,
                             format,
-                            imageLibrary,
+                            imageLibrary as ImageLibrary,
                             bgColor,
                             onProgressUpdate
                         );
-                    } else { // splitImage === 'message'
+                    } else {
                         await splitAndSaveAsSeparateFiles(
                             element,
                             finalMaxHeight,
                             resolution,
                             format,
-                            imageLibrary,
+                            imageLibrary as ImageLibrary,
                             bgColor,
                             onProgressUpdate,
                             safeCharName,
@@ -377,65 +228,26 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                             part,
                             totalParts
                         );
-                        return; 
+                        return;
                     }
                 } else {
-                    const commonOptions = {
-                        pixelRatio: resolution,
-                        width: element.offsetWidth,
-                        height: element.offsetHeight,
-                    };
-
-                    if (imageLibrary === 'snapdom') {
-                        blob = await snapdom.toBlob(element, {
-                            scale: resolution,
-                            width: commonOptions.width,
-                            height: commonOptions.height,
-                            type: format === 'jpeg' ? 'jpeg' : format,
-                            backgroundColor: bgColor
-                        } as any);
-                    } else if (imageLibrary === 'dom-to-image') {
-                        const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
-                        if (format === 'png') {
-                            blob = await domtoimage.toBlob(element, libOptions);
-                        } else if (format === 'jpeg') {
-                            blob = await domtoimage.toBlob(element, { ...libOptions, quality: 1.0 });
-                        } else {
-                            const pngBlob = await domtoimage.toBlob(element, libOptions);
-                            if (!pngBlob) throw new Error('Failed to capture PNG');
-                            blob = await convertBlobToWebP(pngBlob);
-                        }
-                    } else { // html-to-image
-                        const libOptions = { ...commonOptions, backgroundColor: bgColor };
-                        if (format === 'png') {
-                            blob = await toBlob(element, libOptions);
-                        } else if (format === 'jpeg') {
-                            blob = await toBlob(element, { ...libOptions, quality: 1.0 });
-                        } else {
-                            const pngBlob = await toBlob(element, libOptions);
-                            if (!pngBlob) throw new Error('Failed to capture PNG');
-                            blob = await convertBlobToWebP(pngBlob);
-                        }
-                    }
+                    blob = await captureElement(
+                        element,
+                        format,
+                        imageLibrary as ImageLibrary,
+                        bgColor,
+                        resolution
+                    );
                 }
 
                 if (!blob) {
                     throw new Error('Failed to generate image blob.');
                 }
-                
+
                 onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
                 await new Promise(resolve => setTimeout(resolve, 50));
-                
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                await new Promise(resolve => setTimeout(resolve, 100));
 
+                await downloadBlob(blob, filename);
             } catch (error) {
                 console.error('Error saving image part:', error);
                 message.error(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
@@ -480,7 +292,22 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                 chunks.push({ nodes: nodesToChunk });
             }
             return chunks;
-        }
+        };
+
+        const computeAutoResolution = (height: number): number => {
+            if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) return 4;
+            if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) return 3;
+            if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) return 2;
+            return 1;
+        };
+
+        const clampResolution = (resolution: number, elementHeight: number): number => {
+            if (elementHeight * resolution > BROWSER_MAX_HEIGHT) {
+                const clamped = Math.floor(BROWSER_MAX_HEIGHT / elementHeight);
+                return Math.max(1, clamped);
+            }
+            return resolution;
+        };
 
         onProgressStart('분할 이미지 계산 중...', 1);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -501,33 +328,20 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                 for (let i = 0; i < chunks.length; i++) {
                     const chunk = chunks[i];
                     const elementToRender = chunk.nodes[0];
-                    
+
                     container.innerHTML = '';
                     container.appendChild(elementToRender);
 
-                    let finalResolution: number;
-                    if (initialImageResolution === 'auto') {
-                        const height = elementToRender.offsetHeight;
-                        if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) {
-                            finalResolution = 4;
-                        } else if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) {
-                            finalResolution = 3;
-                        } else if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) {
-                            finalResolution = 2;
-                        } else {
-                            finalResolution = 1;
-                        }
-                    } else {
-                        finalResolution = initialImageResolution as number;
-                    }
+                    let finalResolution = initialImageResolution === 'auto'
+                        ? computeAutoResolution(elementToRender.offsetHeight)
+                        : (initialImageResolution as number);
 
-                    if (elementToRender.offsetHeight * finalResolution > BROWSER_MAX_HEIGHT) {
-                        const oldRes = finalResolution;
-                        finalResolution = Math.floor(BROWSER_MAX_HEIGHT / elementToRender.offsetHeight);
-                        if (finalResolution < 1) finalResolution = 1;
+                    const oldRes = finalResolution;
+                    finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
+                    if (finalResolution !== oldRes) {
                         onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
                     }
-                    
+
                     await waitForMedia(elementToRender);
                     await renderImage(elementToRender, finalResolution, i, chunks.length);
                 }
@@ -594,27 +408,18 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
                 const elementToRender = container.firstChild as HTMLElement;
                 if (!elementToRender) continue;
 
-                let finalResolution: number;
+                let finalResolution = initialImageResolution === 'auto'
+                    ? computeAutoResolution(elementToRender.offsetHeight)
+                    : (initialImageResolution as number);
+
                 if (initialImageResolution === 'auto') {
                     const height = elementToRender.offsetHeight;
-                    if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) {
-                        finalResolution = 4;
-                    } else if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) {
-                        finalResolution = 3;
-                    } else if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) {
-                        finalResolution = 2;
-                    } else {
-                        finalResolution = 1;
-                    }
                     onProgressUpdate({ message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x` });
-                } else {
-                    finalResolution = initialImageResolution as number;
                 }
 
-                if (elementToRender.offsetHeight * finalResolution > BROWSER_MAX_HEIGHT) {
-                    const oldRes = finalResolution;
-                    finalResolution = Math.floor(BROWSER_MAX_HEIGHT / elementToRender.offsetHeight);
-                    if (finalResolution < 1) finalResolution = 1;
+                const oldRes = finalResolution;
+                finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
+                if (finalResolution !== oldRes) {
                     onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
                 }
 
@@ -739,8 +544,8 @@ export const downloadImagesAsZip = async (
             tempDiv.innerHTML = baseHtml;
             tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
         } else {
-             const globalSettings = await loadGlobalSettings();
-             const tempDiv = document.createElement('div');
+            const globalSettings = await loadGlobalSettings();
+            const tempDiv = document.createElement('div');
             const html = await getLogHtml({
                 nodes: nodes,
                 charInfo: charInfo,
@@ -764,7 +569,6 @@ export const downloadImagesAsZip = async (
             tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
         }
 
-
         if (mediaPromises.length === 0) {
             message.warning('다운로드할 이미지나 비디오가 로그에 없습니다.');
             return;
@@ -772,18 +576,11 @@ export const downloadImagesAsZip = async (
 
         await Promise.all(mediaPromises);
         const content = await zip.generateAsync({ type: "blob" });
-        const safeCharName = charInfo.name.replace(/[\/\?%\*:|"<>]/g, '-');
-        const safeChatName = charInfo.chatName.replace(/[\/\?%\*:|"<>]/g, '-');
+        const safeCharName = charInfo.name.replace(/[/?%*:|"<>]/g, '-');
+        const safeChatName = charInfo.chatName.replace(/[/?%*:|"<>]/g, '-');
         const zipFilename = `Risu_Log_Media_${safeCharName}_${safeChatName}${sequentialNaming ? '_Arca' : ''}.zip`;
 
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = zipFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-
+        await downloadBlob(content, zipFilename);
     } catch (error) {
         console.error('[Log Exporter] Error creating ZIP file:', error);
         message.error('미디어 ZIP 파일 생성 중 오류가 발생했습니다.');

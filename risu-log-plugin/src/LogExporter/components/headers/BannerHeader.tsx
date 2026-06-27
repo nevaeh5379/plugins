@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
-import { imageUrlToBlob } from '../../utils/imageUtils';
-import { showWarning } from '../../utils/notify';
+import { useMultiImageBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -21,42 +21,35 @@ const BannerHeader: React.FC<LogHeaderProps> = ({
   headerBannerUrl, headerBannerBlur = true, headerBannerAlign = 50,
   isForExport, isForArca,
 }) => {
-  const [avatarSrc, setAvatarSrc] = useState(charInfo.avatarUrl);
-  const [bannerSrc, setBannerSrc] = useState(headerBannerUrl || charInfo.avatarUrl);
+  const bannerSourceUrl = headerBannerUrl || charInfo.avatarUrl;
+  const [avatarSrc, bannerSrc] = useMultiImageBlob(
+    [charInfo.avatarUrl, bannerSourceUrl],
+    embedImagesAsBlob
+  );
+  const tags = useParsedTags(headerTags);
 
-  useEffect(() => {
-    const convertImages = async () => {
-      if (embedImagesAsBlob) {
-        if (charInfo.avatarUrl) {
-          try {
-            const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-            setAvatarSrc(blobUrl);
-          } catch (e) {
-            console.error('[log plugin] Failed to convert avatar to blob:', charInfo.avatarUrl, e);
-            showWarning(`아바타 변환 실패: ${charInfo.avatarUrl.substring(0, 80)}${charInfo.avatarUrl.length > 80 ? '...' : ''}`);
-          }
-        }
-        const sourceUrl = headerBannerUrl || charInfo.avatarUrl;
-        if (sourceUrl) {
-          try {
-            const blobUrl = await imageUrlToBlob(sourceUrl);
-            setBannerSrc(blobUrl);
-          } catch (e) {
-            console.error('[log plugin] Failed to convert banner to blob:', sourceUrl, e);
-            showWarning(`배너 변환 실패: ${sourceUrl.substring(0, 80)}${sourceUrl.length > 80 ? '...' : ''}`);
-          }
-        }
-      }
-    };
-    convertImages();
-  }, [charInfo.avatarUrl, headerBannerUrl, embedImagesAsBlob]);
+  const finalBannerSrc = embedImagesAsBlob ? bannerSrc : bannerSourceUrl;
 
-  useEffect(() => {
-    setBannerSrc(headerBannerUrl || charInfo.avatarUrl);
-  }, [headerBannerUrl, charInfo.avatarUrl]);
-
-  const finalBannerSrc = embedImagesAsBlob ? bannerSrc : (headerBannerUrl || charInfo.avatarUrl);
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  // Shared content for avatar + name section
+  const renderContentSection = () => (
+    <>
+      {showHeaderIcon !== false && (
+        <img src={avatarSrc} data-log-exporter-avatar="true" style={{
+          width: '82px', height: '82px', borderRadius: '50%',
+          objectFit: 'cover', border: `3px solid ${color.avatarBorder}`,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.4)', flexShrink: 0,
+        }} alt="Avatar" />
+      )}
+      <div style={{ textAlign: 'left' }}>
+        <h1 style={{
+          color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+          margin: '0 0 0.2em 0', fontSize: '1.8em', fontWeight: 700,
+        }}>{charInfo.name}</h1>
+        <p style={{ opacity: 0.85, margin: '0 0 0.8em 0', fontSize: '0.95em' }}>{charInfo.chatName}</p>
+        <HeaderTags tags={tags} color={color} variant="banner" />
+      </div>
+    </>
+  );
 
   if (isForArca) {
     const divStyles: React.CSSProperties = {
@@ -75,31 +68,7 @@ const BannerHeader: React.FC<LogHeaderProps> = ({
     }
     return (
       <div style={divStyles} data-is-banner-header="true">
-        {showHeaderIcon !== false && (
-          <img src={avatarSrc} data-log-exporter-avatar="true" style={{
-            width: '82px', height: '82px', borderRadius: '50%',
-            objectFit: 'cover', border: `3px solid ${color.avatarBorder}`,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.4)', flexShrink: 0,
-          }} alt="Avatar" />
-        )}
-        <div style={{ textAlign: 'left' }}>
-          <h1 style={{
-            color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-            margin: '0 0 0.2em 0', fontSize: '1.8em', fontWeight: 700,
-          }}>{charInfo.name}</h1>
-          <p style={{ opacity: 0.85, margin: '0 0 0.8em 0', fontSize: '0.95em' }}>{charInfo.chatName}</p>
-          {tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {tags.map((tag, i) => (
-                <span key={i} style={{
-                  background: 'rgba(0,0,0,0.4)', color: '#fff',
-                  padding: '4px 10px', borderRadius: '100px',
-                  fontSize: '0.78em', border: '1px solid rgba(255,255,255,0.2)',
-                }}>{tag}</span>
-              ))}
-            </div>
-          )}
-        </div>
+        {renderContentSection()}
       </div>
     );
   }
@@ -135,31 +104,7 @@ const BannerHeader: React.FC<LogHeaderProps> = ({
         position: 'relative', zIndex: 2,
         display: 'flex', alignItems: 'center', gap: '18px', width: '100%',
       }}>
-        {showHeaderIcon !== false && (
-          <img src={avatarSrc} data-log-exporter-avatar="true" style={{
-            width: '82px', height: '82px', borderRadius: '50%',
-            objectFit: 'cover', border: `3px solid ${color.avatarBorder}`,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.4)', flexShrink: 0,
-          }} alt="Avatar" />
-        )}
-        <div style={{ textAlign: 'left' }}>
-          <h1 style={{
-            color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-            margin: '0 0 0.2em 0', fontSize: '1.8em', fontWeight: 700,
-          }}>{charInfo.name}</h1>
-          <p style={{ opacity: 0.85, margin: '0 0 0.8em 0', fontSize: '0.95em' }}>{charInfo.chatName}</p>
-          {tags.length > 0 && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {tags.map((tag, i) => (
-                <span key={i} style={{
-                  background: 'rgba(0,0,0,0.4)', color: '#fff',
-                  padding: '4px 10px', borderRadius: '100px',
-                  fontSize: '0.78em', border: '1px solid rgba(255,255,255,0.2)',
-                }}>{tag}</span>
-              ))}
-            </div>
-          )}
-        </div>
+        {renderContentSection()}
       </div>
     </header>
   );

@@ -4,15 +4,56 @@ import { loadGlobalSettings } from './settingsService';
 import { showWarning } from '../utils/notify';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 
+/**
+ * 메시지 노드에서 텍스트를 추출합니다.
+ * replacementRules가 있으면 적용합니다.
+ */
+function extractMessageText(
+    messageEl: Element | null,
+    settings?: LogExportSettings
+): string {
+    if (!messageEl) return '';
 
-// This is a simplified version of the original generateBasicFormatLog function.
-// It will be expanded later.
-export const generateBasicLog = async (nodes: HTMLElement[], charName: string, chatName: string, charAvatarUrl: string, settings: LogExportSettings, themes: Record<string, ThemeInfo>, colors: Record<string, ColorPalette>) => {
+    if (settings?.replacementRules && settings.replacementRules.length > 0) {
+        const clonedEl = messageEl.cloneNode(true) as HTMLElement;
+        applyReplacements(clonedEl, settings.replacementRules);
+        return clonedEl.innerText;
+    }
+
+    return (messageEl as HTMLElement).innerText;
+}
+
+/**
+ * 메시지 노드에서 이름과 메시지 텍스트를 추출합니다.
+ */
+function extractMessageData(
+    node: HTMLElement,
+    globalSettings: import('../../types').GlobalSettings,
+    charName: string,
+    settings?: LogExportSettings
+): { name: string; messageText: string } {
+    const name = getNameFromNode(node, globalSettings, charName);
+    const messageEl = node.querySelector('.prose, .chattext');
+    const messageText = extractMessageText(messageEl, settings);
+    return { name, messageText };
+}
+
+export const generateBasicLog = async (
+    nodes: HTMLElement[],
+    charName: string,
+    chatName: string,
+    charAvatarUrl: string,
+    settings: LogExportSettings,
+    themes: Record<string, ThemeInfo>,
+    colors: Record<string, ColorPalette>
+) => {
     let contentHtml = '';
     const globalSettings = await loadGlobalSettings();
 
     const themeInfo = themes[settings.theme || 'basic'] || themes.basic;
-    const colorPalette = settings.theme === 'basic' ? ((typeof settings.color === 'string' ? colors[settings.color || 'dark'] : colors.dark) || colors.dark) : (themeInfo.color || colors.dark);
+    const colorPalette = settings.theme === 'basic'
+        ? ((typeof settings.color === 'string' ? colors[settings.color || 'dark'] : colors.dark) || colors.dark)
+        : (themeInfo.color || colors.dark);
 
     if (settings.showHeader !== false) {
         contentHtml += `
@@ -26,9 +67,7 @@ export const generateBasicLog = async (nodes: HTMLElement[], charName: string, c
 
     for (const node of nodes) {
         const isUser = node.classList.contains('justify-end');
-        const name = getNameFromNode(node, globalSettings, charName);
-        const messageEl = node.querySelector('.prose, .chattext');
-        const messageHtml = messageEl ? messageEl.innerHTML : '';
+        const { name, messageText: messageHtml } = extractMessageData(node, globalSettings, charName);
 
         contentHtml += `
             <div class="chat-message-container" style="display: flex; align-items: flex-start; margin-bottom: 20px; flex-direction: ${isUser ? 'row-reverse' : 'row'};">
@@ -45,47 +84,31 @@ export const generateBasicLog = async (nodes: HTMLElement[], charName: string, c
     return `<div style="padding: 20px; background-color: ${colorPalette.background};">${contentHtml}</div>`;
 };
 
-export const generateMarkdownLog = async (nodes: HTMLElement[], charName: string, settings?: LogExportSettings) => {
+export const generateMarkdownLog = async (
+    nodes: HTMLElement[],
+    charName: string,
+    settings?: LogExportSettings
+) => {
     let markdown = '';
     const globalSettings = await loadGlobalSettings();
+
     for (const node of nodes) {
-        const name = getNameFromNode(node, globalSettings, charName);
-        const messageEl = node.querySelector('.prose, .chattext');
-        
-        let messageText = '';
-        if (messageEl) {
-             if (settings?.replacementRules && settings.replacementRules.length > 0) {
-                 const clonedEl = messageEl.cloneNode(true) as HTMLElement;
-                 applyReplacements(clonedEl, settings.replacementRules);
-                 messageText = clonedEl.innerText;
-             } else {
-                 messageText = (messageEl as HTMLElement).innerText;
-             }
-        }
-        
+        const { name, messageText } = extractMessageData(node, globalSettings, charName, settings);
         markdown += `**${name}**\n\n${messageText}\n\n---\n\n`;
     }
     return markdown;
 };
 
-export const generateTextLog = async (nodes: HTMLElement[], charName: string, settings?: LogExportSettings) => {
+export const generateTextLog = async (
+    nodes: HTMLElement[],
+    charName: string,
+    settings?: LogExportSettings
+) => {
     let text = '';
     const globalSettings = await loadGlobalSettings();
-    for (const node of nodes) {
-        const name = getNameFromNode(node, globalSettings, charName);
-        const messageEl = node.querySelector('.prose, .chattext');
-        
-        let messageText = '';
-        if (messageEl) {
-             if (settings?.replacementRules && settings.replacementRules.length > 0) {
-                 const clonedEl = messageEl.cloneNode(true) as HTMLElement;
-                 applyReplacements(clonedEl, settings.replacementRules);
-                 messageText = clonedEl.innerText;
-             } else {
-                 messageText = (messageEl as HTMLElement).innerText;
-             }
-        }
 
+    for (const node of nodes) {
+        const { name, messageText } = extractMessageData(node, globalSettings, charName, settings);
         text += `${name}: ${messageText}\n\n`;
     }
     return text;
@@ -187,7 +210,7 @@ async function generateForceHoverCss(): Promise<string> {
                     if (importantRule) newRules.add(importantRule);
                 }
             }
-        } catch (e) {
+        } catch {
             // ignore CORS errors
         }
     }
@@ -197,7 +220,7 @@ async function generateForceHoverCss(): Promise<string> {
 export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
     // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
     const parentStyles = await getParentPageStyles();
-    
+
     const getThemeCssVariables = async () => {
         let colors: Record<string, string> = {};
         try {
@@ -209,7 +232,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
             console.warn('[log plugin] Failed to getColorScheme:', e);
         }
 
-        let textColors: Record<string, string> = {};
+        const textColors: Record<string, string> = {};
         try {
             const rootDoc = await Risuai.getRootDocument();
             if (rootDoc) {
@@ -311,7 +334,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
                 for (const rule of Array.from(rules)) {
                     cssTexts.add(rule.cssText);
                 }
-            } catch (e) {
+            } catch {
                 // ignore CORS
             }
         }
@@ -358,7 +381,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         const tempStyle = document.createElement('style');
         tempStyle.textContent = cssText;
         document.head.appendChild(tempStyle);
-        
+
         const sheet = tempStyle.sheet;
         if (!sheet) {
             document.head.removeChild(tempStyle);
@@ -418,7 +441,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
 
     const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
         const clonedNode = node.cloneNode(true) as HTMLElement;
-        
+
         // Remove RisuAI's utility buttons, model badges, and custom injected buttons
         clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
 
@@ -492,7 +515,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
                 }
             }
         }
-        
+
         if (settings.replacementRules && settings.replacementRules.length > 0) {
             // Apply replacements to the message content within the cloned node
             const messageEl = clonedNode.querySelector('.prose, .chattext');
@@ -505,12 +528,12 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         if (scaleMode === 'full' && scaleFactor !== 1.0) {
             scaleInlineStyles(clonedNode);
         }
-    
+
         return clonedNode.outerHTML;
     }));
 
     let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
-    
+
     let extraCss = '';
     if (settings.expandHover) {
         extraCss += await generateForceHoverCss();
@@ -552,4 +575,3 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         </div>
     `;
 };
-

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
-import { imageUrlToBlob } from '../../utils/imageUtils';
+import { useAvatarBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -11,21 +12,8 @@ interface LogHeaderProps {
 }
 
 const CompactHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesAsBlob, showHeaderIcon, headerTags }) => {
-  const [avatarSrc, setAvatarSrc] = useState(charInfo.avatarUrl);
-
-  useEffect(() => {
-    const convertAvatar = async () => {
-      if (embedImagesAsBlob && charInfo.avatarUrl) {
-        try {
-          const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
-          setAvatarSrc(blobUrl);
-        } catch { /* ignore */ }
-      }
-    };
-    convertAvatar();
-  }, [charInfo.avatarUrl, embedImagesAsBlob]);
-
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const avatarSrc = useAvatarBlob(charInfo.avatarUrl, embedImagesAsBlob);
+  const tags = useParsedTags(headerTags);
 
   return (
     <header style={{
@@ -55,20 +43,7 @@ const CompactHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesA
           }}>{charInfo.chatName}</p>
         </div>
       </div>
-      {tags.length > 0 && (
-        <div style={{
-          marginTop: '0.6em', display: 'flex',
-          justifyContent: 'center', gap: '5px', flexWrap: 'wrap',
-        }}>
-          {tags.map((tag, i) => (
-            <span key={i} style={{
-              background: color.cardBg, color: color.textSecondary || color.text,
-              padding: '2px 8px', borderRadius: '100px',
-              fontSize: '0.72em', border: `1px solid ${color.border}`,
-            }}>{tag}</span>
-          ))}
-        </div>
-      )}
+      <HeaderTags tags={tags} color={color} variant="compact" />
     </header>
   );
 };

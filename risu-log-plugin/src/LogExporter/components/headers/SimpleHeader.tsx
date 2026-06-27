@@ -1,5 +1,7 @@
 import React from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
+import { useParsedTags } from '../../hooks/useHeaderHelpers';
+import HeaderTags from './HeaderTags';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -8,7 +10,7 @@ interface LogHeaderProps {
 }
 
 const SimpleHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags }) => {
-  const tags = headerTags ? headerTags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  const tags = useParsedTags(headerTags);
 
   return (
     <header style={{
@@ -29,13 +31,7 @@ const SimpleHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags })
           fontSize: '0.88em',
         }}>{charInfo.chatName}</span>
       </div>
-      {tags.length > 0 && (
-        <div style={{
-          fontSize: '0.82em', color: color.textSecondary || color.text,
-        }}>
-          {tags.join(' · ')}
-        </div>
-      )}
+      <HeaderTags tags={tags} color={color} variant="simple" />
     </header>
   );
 };

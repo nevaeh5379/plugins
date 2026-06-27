@@ -6,6 +6,7 @@
 import type { RisuCharacter, RisuChat } from '../types/risuai'
 import type { Persona } from '../types'
 import { getAllMessageNodes } from './messageScanner'
+import { extractSwImageLocation, extractTauriAssetLocation } from '../LogExporter/utils/imageUtils'
 
 
 
@@ -226,35 +227,29 @@ async function collectAvatarsMain(
       
       if (avatarUrl) {
         let finalDataUrl = ''
-        
+
         // 서비스 워커 주소인 경우
-        const swImgMatch = avatarUrl.match(/\/sw\/img\/([0-9a-fA-F]+)/)
-        if (swImgMatch && swImgMatch[1]) {
+        const swLoc = extractSwImageLocation(avatarUrl)
+        if (swLoc) {
           try {
-            const hex = swImgMatch[1]
-            let loc = ''
-            for (let i = 0; i < hex.length; i += 2) {
-              loc += String.fromCharCode(parseInt(hex.substr(i, 2), 16))
-            }
-            finalDataUrl = await extractAvatarDataUrl(loc)
-          } catch {}
+            finalDataUrl = await extractAvatarDataUrl(swLoc)
+          } catch {
+            // ignore - 이미 수집된 아바타일 수 있음
+          }
         }
-        
+
         // Tauri 로컬 프로토콜 주소인 경우
         if (!finalDataUrl && (avatarUrl.startsWith('asset://') || avatarUrl.includes('asset.localhost'))) {
           try {
-            const decoded = decodeURIComponent(avatarUrl)
-            let loc = ''
-            const assetsIdx = decoded.indexOf('assets/')
-            if (assetsIdx !== -1) {
-              loc = decoded.substring(assetsIdx)
-            } else {
-              loc = decoded.replace(/^(asset:\/\/localhost\/|https:\/\/asset\.localhost\/|http:\/\/asset\.localhost\/|asset:\/\/)/, '')
+            const loc = extractTauriAssetLocation(avatarUrl)
+            if (loc) {
+              finalDataUrl = await extractAvatarDataUrl(loc)
             }
-            finalDataUrl = await extractAvatarDataUrl(loc)
-          } catch {}
+          } catch {
+            // ignore - Tauri asset 로드 실패
+          }
         }
-        
+
         // 일반 URL인 경우 fetch 시도
         if (!finalDataUrl && !avatarUrl.startsWith('data:') && !avatarUrl.startsWith('blob:')) {
           try {
@@ -266,9 +261,11 @@ async function collectAvatarsMain(
               reader.onerror = () => rejVal(new Error('FileReader failed'))
               reader.readAsDataURL(blob)
             })
-          } catch {}
+          } catch {
+            // ignore - 외부 URL fetch 실패
+          }
         }
-        
+
         if (finalDataUrl) {
           avatarMap[name] = finalDataUrl
         }
