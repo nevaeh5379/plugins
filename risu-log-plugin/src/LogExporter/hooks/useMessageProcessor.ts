@@ -75,6 +75,38 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
     return clonedContentEl.outerHTML.trim();
 };
 
+const isCustomCaption = (alt: string | null | undefined): boolean => {
+    if (!alt) return false;
+    const trimmed = alt.trim();
+    if (!trimmed) return false;
+    const lower = trimmed.toLowerCase();
+    
+    const placeholders = [
+        'character portrait',
+        'character-portrait',
+        'image',
+        'avatar',
+        'user portrait',
+        'user-portrait',
+        'attachment',
+        'file',
+        'portrait'
+    ];
+    
+    if (placeholders.includes(lower)) return false;
+    
+    // 경로 형태(슬래시 포함) 및 RisuAI 가상 경로명 필터링
+    if (lower.startsWith('/sw/') || lower.includes('/') || lower.includes('\\')) return false;
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return false;
+    if (lower.startsWith('data:') || lower.startsWith('blob:')) return false;
+    
+    // 파일 확장자 및 난수 해시 파일명 필터링
+    if (/\.(png|jpe?g|webp|gif|bmp)$/i.test(lower)) return false;
+    if (/^[a-f0-9\-_]+$/i.test(lower) && lower.length > 8) return false;
+    
+    return true;
+};
+
 const processMessageContent = async (originalMessageEl: Element, embedImages: boolean, color: ColorPalette, imageScale?: number, replacementRules?: ReplacementRule[], imageAlign?: 'left' | 'center' | 'right', imageStyle?: ImageStyle): Promise<string> => {
     const contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
@@ -105,7 +137,7 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
 
     // 이미지 스케일, 정렬 및 스타일 적용
     // none:      스타일 없음
-    // gallery:   클래식 액자 — 금색 프레임 + 매트 + 하단 캡션바
+    // gallery:   클래식 액자 — 은색 프레임 + 매트 + 하단 캡션바
     // modern:    현대 액자 — 얇은 프레임 + 넓은 여백 + 부드러운 그림자
     // tape:      포스트잇 메모 — 크림 배경 + 와시 테이프 + 미세 회전
     const alignValue = imageAlign || 'left';
@@ -131,57 +163,208 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
 
         switch (styleMode) {
             case 'gallery': {
-                // 클래식 액자: 이중 프레임(외곽 갈색 금색 + 내곽 매트) + 하단 캡션바
+                // 클래식 액자: 3D 입체 에보니 원목 2단 프레임 + 이중 크림 매트보드 + 베벨 컷 이미지 윈도우
                 const frame = document.createElement('div');
                 Object.assign(frame.style, {
-                    display: 'inline-block',
-                    backgroundColor: '#8b6914',
-                    padding: '4px',
-                    boxShadow: '0 6px 20px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,215,0,0.3)',
-                    background: 'linear-gradient(135deg, #a67c1e 0%, #8b6914 50%, #6b4f0f 100%)',
+                    display: 'inline-flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: '#181818',
+                    border: '12px solid #111111', // 1단 외곽 원목 몰딩
+                    borderRadius: '2px',
+                    maxWidth: `${scale}%`,
+                    boxSizing: 'border-box',
+                    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.65)',
                 });
+
+                const innerFrame = document.createElement('div');
+                Object.assign(innerFrame.style, {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: '#1f1f1f',
+                    // 광원에 따른 3D 음영을 구현한 2단 베벨 몰딩 테두리
+                    borderStyle: 'solid',
+                    borderWidth: '5px',
+                    borderTopColor: '#2b2b2b',
+                    borderLeftColor: '#252525',
+                    borderRightColor: '#0a0a0a',
+                    borderBottomColor: '#080808',
+                    padding: '4px',
+                    boxSizing: 'border-box',
+                    width: '100%',
+                });
+                
+                const hasCaption = isCustomCaption(img.alt);
                 const mat = document.createElement('div');
                 Object.assign(mat.style, {
-                    backgroundColor: '#f5f0e6',
-                    padding: '14px 18px 0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: '#f5f3eb', // 정통 파인아트용 웜 크림 매트보드
+                    padding: hasCaption ? '24px 24px 0' : '24px',
+                    border: '1px solid #d8d4c7', // 매트 외곽선
+                    boxShadow: 'inset 0 3px 8px rgba(0,0,0,0.06)',
+                    width: '100%',
+                    boxSizing: 'border-box',
                 });
+
+                // 이중 매트(Double Matting) 및 사선 베벨 컷 효과를 내는 윈도우 프레임
+                const matWindow = document.createElement('div');
+                Object.assign(matWindow.style, {
+                    display: 'block',
+                    backgroundColor: '#e6e3d8', // 이중 매트의 안쪽 어두운 레이어
+                    padding: '3px',
+                    border: '1px solid #c2bdb0',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                });
+
                 img.style.borderRadius = '0';
                 img.style.display = 'block';
-                // 캡션바
-                const caption = document.createElement('div');
-                Object.assign(caption.style, {
-                    padding: '10px 18px 12px',
-                    fontSize: '0.75em',
-                    color: '#5c4a1e',
-                    fontStyle: 'italic',
-                    textAlign: 'center',
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                });
-                caption.textContent = img.alt || '';
+                img.style.width = '100%';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.border = '1px solid #a8a499'; // 이미지와 안쪽 매트 경계선
+                img.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+                img.style.boxSizing = 'border-box';
+
                 parent.insertBefore(wrapper, img);
                 wrapper.appendChild(frame);
-                frame.appendChild(mat);
-                mat.appendChild(img);
-                mat.appendChild(caption);
+                frame.appendChild(innerFrame);
+                innerFrame.appendChild(mat);
+                mat.appendChild(matWindow);
+                matWindow.appendChild(img);
+
+                if (hasCaption) {
+                    // 미술관 종이 라벨 스타일의 정갈한 자막 영역 (사용자가 명시적으로 커스텀 자막을 정의한 경우에만 렌더링)
+                    const labelContainer = document.createElement('div');
+                    Object.assign(labelContainer.style, {
+                        display: 'flex',
+                        justifyContent: 'center',
+                        padding: '16px 0',
+                        width: '0',
+                        minWidth: '100%',
+                        boxSizing: 'border-box',
+                    });
+
+                    const label = document.createElement('div');
+                    Object.assign(label.style, {
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '2px',
+                        padding: '5px 12px',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                        maxWidth: '90%',
+                        boxSizing: 'border-box',
+                    });
+
+                    const caption = document.createElement('span');
+                    Object.assign(caption.style, {
+                        fontSize: '11px',
+                        color: '#333333',
+                        fontFamily: '"Times New Roman", Times, "Georgia", serif',
+                        fontStyle: 'italic',
+                        letterSpacing: '0.04em',
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        flex: '1',
+                    });
+                    caption.textContent = img.alt;
+
+                    label.appendChild(caption);
+                    labelContainer.appendChild(label);
+                    mat.appendChild(labelContainer);
+                }
                 return;
             }
             case 'modern': {
-                // 현대 액자: 얇은 프레임 + 넓은 여백 + 부드러운 그림자
+                // 현대 액자: 넓은 화이트 패스파르투 + 플로팅 이미지 효과
+                const hasCaption = isCustomCaption(img.alt);
                 const frame = document.createElement('div');
                 Object.assign(frame.style, {
-                    display: 'inline-block',
-                    backgroundColor: '#fff',
-                    padding: '20px 24px 16px',
-                    boxShadow: '0 12px 40px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.06)',
-                    border: '1px solid rgba(0,0,0,0.08)',
+                    display: 'inline-flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: '#ffffff',
+                    padding: hasCaption ? '24px 24px 16px' : '24px',
+                    border: '1px solid #e2e2e2',
+                    maxWidth: `${scale}%`,
+                    boxSizing: 'border-box',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.05), inset 0 0 0 1px #fcfcfc',
                 });
-                img.style.borderRadius = '0';
+
+                img.style.borderRadius = '1px';
                 img.style.display = 'block';
+                img.style.width = '100%';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.boxShadow = '0 6px 18px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08)';
+                img.style.border = '1px solid rgba(0,0,0,0.04)';
+                img.style.boxSizing = 'border-box';
+
                 parent.insertBefore(wrapper, img);
                 wrapper.appendChild(frame);
                 frame.appendChild(img);
+
+                if (hasCaption) {
+                    const labelBlock = document.createElement('div');
+                    Object.assign(labelBlock.style, {
+                        marginTop: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px',
+                        width: '0',
+                        minWidth: '100%',
+                        boxSizing: 'border-box',
+                    });
+
+                    const divider = document.createElement('div');
+                    Object.assign(divider.style, {
+                        width: '24px',
+                        height: '1px',
+                        backgroundColor: '#e6e6e6',
+                        marginBottom: '6px',
+                    });
+
+                    const title = document.createElement('span');
+                    Object.assign(title.style, {
+                        fontSize: '10px',
+                        color: '#222222',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        fontWeight: '600',
+                        letterSpacing: '0.12em',
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        width: '90%',
+                        boxSizing: 'border-box',
+                    });
+                    title.textContent = img.alt.toUpperCase();
+
+                    const subtitle = document.createElement('span');
+                    Object.assign(subtitle.style, {
+                        fontSize: '7.5px',
+                        color: '#999999',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        letterSpacing: '0.08em',
+                        fontWeight: '500',
+                    });
+                    subtitle.textContent = 'EXHIBIT COLLECTION';
+
+                    labelBlock.appendChild(divider);
+                    labelBlock.appendChild(title);
+                    labelBlock.appendChild(subtitle);
+                    frame.appendChild(labelBlock);
+                }
                 return;
             }
             case 'tape': {
@@ -193,8 +376,10 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                     position: 'relative',
                     backgroundColor: '#fffef0',
                     padding: '14px 14px 10px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)',
                     transform: `rotate(${rotate}deg)`,
+                    maxWidth: `${scale}%`,
+                    boxSizing: 'border-box',
                 });
                 // 와시 테이프 (상단)
                 const tape = document.createElement('div');
@@ -210,7 +395,14 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
                     borderRight: '1px dashed rgba(255,255,255,0.4)',
                 });
                 inner.appendChild(tape);
+
                 img.style.borderRadius = '1px';
+                img.style.width = '100%';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.display = 'block';
+                img.style.boxSizing = 'border-box';
+
                 parent.insertBefore(wrapper, img);
                 wrapper.appendChild(inner);
                 inner.appendChild(img);
