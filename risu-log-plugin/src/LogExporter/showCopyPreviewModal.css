@@ -3132,28 +3132,55 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.75);
-    z-index: 10002; /* Higher than the modal backdrop */
+    background-color: rgba(0, 0, 0, 0.45);
+    z-index: 10002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px 32px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: white;
     gap: 16px;
-    backdrop-filter: blur(4px);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    min-width: 280px;
+    text-align: center;
+    animation: zoomIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.progress-overlay p {
-    font-size: 1.1em;
+.progress-card .progress-message {
+    font-size: 1.05em;
     font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
 }
 
-.progress-overlay span {
-    font-size: 1.2em;
+.progress-card .progress-count {
+    font-size: 1.1em;
     font-weight: bold;
-    background: rgba(0,0,0,0.3);
+    color: var(--accent-primary);
+    background: rgba(255, 255, 255, 0.05);
     padding: 4px 12px;
-    border-radius: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@keyframes zoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* ========================================
@@ -3583,6 +3610,16 @@
 [data-theme="classic"] .ant-dropdown-menu-item .anticon {
     color: var(--accent-primary) !important;
     margin-right: 8px !important;
+}
+
+/* GPU 하드웨어 가속을 이용해 메인 스레드가 블락(이미지 내보내기 연산 중)되어도 스피너가 회전하도록 보정 */
+.progress-overlay .anticon-spin,
+.progress-overlay .anticon-loading,
+.progress-overlay .ant-spin,
+.progress-overlay .ant-spin-dot {
+    will-change: transform !important;
+    transform: translate3d(0, 0, 0) !important;
+    backface-visibility: hidden !important;
 }
 
 

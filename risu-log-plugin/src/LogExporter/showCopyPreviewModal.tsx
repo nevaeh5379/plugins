@@ -771,12 +771,13 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                     </div>
                 )}
                 {progress.active && (
-                    <div className="desktop-modal-loading progress-overlay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                        <Spin size="large" />
-                        <p>{progress.message}</p>
-                        {progress.total > 0 && (
-                            <span>{progress.current} / {progress.total}</span>
-                        )}
+                    <div className="progress-overlay">
+                        <div className="progress-card">
+                            <p className="progress-message">{progress.message}</p>
+                            {progress.total > 0 && (
+                                <span className="progress-count">{progress.current} / {progress.total}</span>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
