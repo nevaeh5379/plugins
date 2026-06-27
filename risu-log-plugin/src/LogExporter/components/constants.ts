@@ -1,5 +1,8 @@
 import type { ThemeInfo, ColorPalette, ThemeKey, ColorKey } from '../../types/index';
 
+// Selector string used to find the main text content container inside chat bubble DOM nodes.
+export const CHAT_CONTENT_SELECTOR = '.prose, .chattext';
+
 // (기존 코드의 THEMES, COLORS 객체를 여기에 붙여넣고 타입을 지정합니다)
 export const THEMES: Record<ThemeKey, ThemeInfo> = {
     basic: {

@@ -3,10 +3,12 @@
 // 모든 메서드는 async이며, 반환된 SafeElement는 이후 outerHTML 문자열로 변환하여
 // iframe 내부에서 표준 HTMLElement로 재구성합니다.
 
+import { CHAT_CONTENT_SELECTOR } from '../LogExporter/components/constants';
+
 // 메시지 노드가 채팅 메시지 본문을 포함하는지 판별
 async function hasMessageContent(node: SafeElement): Promise<boolean> {
   try {
-    const prose = await node.querySelector('.prose, .chattext')
+    const prose = await node.querySelector(CHAT_CONTENT_SELECTOR)
     return !!prose
   } catch {
     return false

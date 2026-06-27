@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import './showCopyPreviewModal.css';
 import { processChatLog, serializeNodes } from '../services/chatData';
-import { THEMES, COLORS } from './components/constants';
+import { THEMES, COLORS, CHAT_CONTENT_SELECTOR } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
 import type { ThemeKey, ColorKey, ImageStyle } from '../types';
 import { ConfigProvider, theme, Spin, Button, Drawer, message } from 'antd';
@@ -257,7 +257,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         setMessageNodes(currentNodes => {
             const newNodes = [...currentNodes];
             const nodeToUpdate = newNodes[index].cloneNode(true) as HTMLElement;
-            const messageEl = nodeToUpdate.querySelector('.prose, .chattext');
+            const messageEl = nodeToUpdate.querySelector(CHAT_CONTENT_SELECTOR);
             if (messageEl) {
                 messageEl.innerHTML = newHtml;
                 newNodes[index] = nodeToUpdate;
@@ -386,7 +386,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                 return node;
             })
             .filter(node => {
-                const isMessageNode = node.querySelector('.prose, .chattext');
+                const isMessageNode = node.querySelector(CHAT_CONTENT_SELECTOR);
                 if (isMessageNode) {
                     const name = getNameFromNode(node as HTMLElement, globalSettings, charName);
                     if (globalSettings?.filteredParticipants?.includes(name)) {

@@ -3,6 +3,8 @@ import type { MessageProps } from '../../../types';
 import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
 
+import { CHAT_CONTENT_SELECTOR } from '../constants';
+
 export interface UseMessageCardResult {
   baseSize: string;
   messageHtml: string;
@@ -26,7 +28,7 @@ export function useMessageCard(
   } = props;
 
   const baseSize = fontSize ? `${fontSize}px` : '16px';
-  const originalMessageEl = node.querySelector('.prose, .chattext');
+  const originalMessageEl = node.querySelector(CHAT_CONTENT_SELECTOR);
 
   const messageHtml = useMessageProcessor(
     originalMessageEl,
