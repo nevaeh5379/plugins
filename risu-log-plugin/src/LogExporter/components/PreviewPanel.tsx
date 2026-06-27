@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState } from 'react';
-import { Button, Space } from 'antd';
+import { Button, Space, Spin } from 'antd';
 import LogContainer from './LogContainer';
 import type { LogContainerProps } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
@@ -17,6 +17,7 @@ interface PreviewPanelProps {
   onDeselectAll?: () => void;
   onInvertSelection?: () => void;
   onDimensionsChange: (dims: { width: number, height: number, maxMessageHeight: number }) => void;
+  isConverting: boolean;
 }
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ 
@@ -31,6 +32,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   onDeselectAll,
   onInvertSelection,
   onDimensionsChange,
+  isConverting,
 }) => {
   const shadowHostRef = useRef<HTMLDivElement>(null);
   const previewContentRef = useRef<HTMLDivElement>(null);
@@ -119,6 +121,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
     return <div ref={shadowHostRef}></div>;
   };
 
+  const showSpinner = !isBasicFormat && isConverting;
+
   return (
     <>
         {settings.isEditable && (
@@ -130,7 +134,25 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                 </Space>
             </div>
         )}
-        <div className="desktop-preview-content" ref={previewContentRef}>
+        <div className="desktop-preview-content" ref={previewContentRef} style={{ position: 'relative' }}>
+            {showSpinner && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(26, 27, 38, 0.7)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10,
+                    backdropFilter: 'blur(3px)',
+                    gap: '12px',
+                    borderRadius: '8px'
+                }}>
+                    <Spin size="large" />
+                    <span style={{ color: '#c0caf5', fontSize: '14px', fontWeight: 500 }}>로딩 및 변환 중...</span>
+                </div>
+            )}
             <div className="log-exporter-modal-preview">
                 {renderContent()}
             </div>

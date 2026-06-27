@@ -54,12 +54,33 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
   const [avatarMap, setAvatarMap] = useState<Map<string, string>>(preCollectedAvatarMap || new Map());
   const [isAvatarReady, setIsAvatarReady] = useState(false);
 
+  // Incremental rendering for long logs in preview mode.
+  // When exporting images or files, render everything immediately.
+  const [visibleCount, setVisibleCount] = useState(isForImageExport || isForExport ? nodes.length : 50);
+
+  useEffect(() => {
+    if (isForImageExport || isForExport) {
+      setVisibleCount(nodes.length);
+    } else {
+      setVisibleCount(Math.min(50, nodes.length));
+    }
+  }, [nodes, isForImageExport, isForExport]);
+
+  useEffect(() => {
+    if (isForImageExport || isForExport) return;
+    if (visibleCount >= nodes.length) return;
+
+    const timer = setTimeout(() => {
+      setVisibleCount(prev => Math.min(prev + 50, nodes.length));
+    }, 80); // Load chunks of 50 messages every 80ms
+    return () => clearTimeout(timer);
+  }, [visibleCount, nodes.length, isForImageExport, isForExport]);
+
   const renderedIndicesRef = useRef<Set<number>>(new Set());
   const [allMessagesReady, setAllMessagesReady] = useState(false);
 
   const handleMessageRendered = useCallback((index: number) => {
     renderedIndicesRef.current.add(index);
-    // nodes.length check ensures we wait for all messages
     if (renderedIndicesRef.current.size >= nodes.length) {
         setAllMessagesReady(true);
     }
@@ -86,20 +107,13 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
   }, [nodes, charInfo.name, isForArca, preCollectedAvatarMap, globalSettings]);
 
   useEffect(() => {
+    renderedIndicesRef.current.clear();
     if (nodes.length === 0) {
         setAllMessagesReady(true);
     } else {
-       // Reset ready state if nodes change (though typically they don't in export)
-       // Actually, if nodes change, we should reset renderedIndicesRef too?
-       // For the export use case, nodes are static. For preview, it updates.
-       // In preview, onReady isn't usually used.
-       if (renderedIndicesRef.current.size >= nodes.length) {
-           setAllMessagesReady(true);
-       } else {
-           setAllMessagesReady(false);
-       }
+        setAllMessagesReady(false);
     }
-  }, [nodes.length]);
+  }, [nodes]);
 
 
   useEffect(() => {
@@ -156,7 +170,7 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
         isForArca={isForArca}
       />}
       <main>
-        {nodes.map((node, index) => (
+        {nodes.slice(0, visibleCount).map((node, index) => (
           <MessageRenderer
             key={index} // It's better to have a unique key from the message data
             node={node}

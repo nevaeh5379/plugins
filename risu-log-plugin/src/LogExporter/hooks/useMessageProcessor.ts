@@ -1,8 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { applyReplacements } from '../utils/domUtils';
 import { showWarning } from '../utils/notify';
 import type { ColorPalette, ReplacementRule, ImageStyle } from '../../types';
+
+// Helper to determine if a message node can be processed synchronously without spawning async promises.
+const canProcessSynchronously = (
+  originalMessageEl: Element | null,
+  replacementRules?: ReplacementRule[]
+): boolean => {
+  if (!originalMessageEl) return true;
+
+  // Active replacement rules require DOM traversal and string replacements.
+  if (replacementRules && replacementRules.length > 0) return false;
+
+  // Images, video, background styles, regex formats, and buttons require processing.
+  const hasSpecialElements = originalMessageEl.querySelector(
+    'img, video, [style*="background-image"], button, .log-exporter-msg-btn-group, .x-risu-regex-quote-block, .x-risu-regex-thought-block, mark[risu-mark^="quote"]'
+  );
+
+  if (hasSpecialElements) return false;
+
+  return true;
+};
 
 export const useMessageProcessor = (
   originalMessageEl: Element | null,
@@ -20,10 +40,52 @@ export const useMessageProcessor = (
   imageCropHAlign?: number,
   imageCropHeight?: number
 ) => {
-  const [processedContent, setProcessedContent] = useState('');
+  // Determine if we can shortcut. If yes, we set initial state immediately to avoid layout shifts.
+  const isSync = canProcessSynchronously(originalMessageEl, replacementRules);
+  const getInitialContent = () => {
+    if (!originalMessageEl) return '';
+    if (isSync) {
+      return originalMessageEl.innerHTML.trim();
+    }
+    return '';
+  };
+
+  const [processedContent, setProcessedContent] = useState(getInitialContent);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Serialize props to avoid redundant effect triggers when object/array references change but contents are identical.
+  const depsKey = JSON.stringify({
+    embedImagesAsBlob,
+    allowHtmlRendering,
+    color,
+    imageScale,
+    replacementRules,
+    imageAlign,
+    imageStyle,
+    imageCropActive,
+    imageCropAspectRatio,
+    imageCropVAlign,
+    imageCropHAlign,
+    imageCropHeight
+  });
 
   useEffect(() => {
     if (!originalMessageEl) return;
+
+    if (isSync) {
+      const syncContent = originalMessageEl.innerHTML.trim();
+      if (processedContent !== syncContent) {
+        setProcessedContent(syncContent);
+      }
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
+      }
+      return;
+    }
 
     const process = async () => {
       console.log('[log plugin] useMessageProcessor hook process():', {
@@ -33,18 +95,20 @@ export const useMessageProcessor = (
         imageCropHAlign,
         imageCropHeight
       });
+      let result = '';
       if (allowHtmlRendering) {
-        setProcessedContent(await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules));
+        result = await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules);
       } else {
-        setProcessedContent(await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight));
+        result = await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
       }
-      if (onComplete) {
-        onComplete();
+      setProcessedContent(result);
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
       }
     };
 
     process();
-  }, [originalMessageEl, embedImagesAsBlob, allowHtmlRendering, color, imageScale, onComplete, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight]);
+  }, [originalMessageEl, depsKey, isSync]);
 
   return processedContent;
 };

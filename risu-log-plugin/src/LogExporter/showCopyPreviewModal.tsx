@@ -177,6 +177,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     const [savedSettings, setSavedSettings] = useState<Settings>(defaultSettings);
     const [globalSettings, setGlobalSettings] = useState<any>({});
     const [otherFormatContent, setOtherFormatContent] = useState('');
+    const [isConverting, setIsConverting] = useState(false);
     const [activeTab, setActiveTab] = useState('export');
     const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
     const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
@@ -372,29 +373,35 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         fetchData();
     }, [options]);
 
-    const activeFilters = savedSettings.customFilters ? Object.entries(savedSettings.customFilters).filter(([, checked]) => checked).map(([key]) => key) : [];
+    const activeFilters = useMemo(() => {
+        return savedSettings.customFilters ? Object.entries(savedSettings.customFilters).filter(([, checked]) => checked).map(([key]) => key) : [];
+    }, [savedSettings.customFilters]);
 
-    const finalNodes = messageNodes
-        .map(node => {
-            if (activeFilters.length > 0) {
-                return filterWithCustomClasses(node, activeFilters, globalSettings);
-            }
-            return node;
-        })
-        .filter(node => {
-            const isMessageNode = node.querySelector('.prose, .chattext');
-            if (isMessageNode) {
-                const name = getNameFromNode(node as HTMLElement, globalSettings, charName);
-                if (globalSettings?.filteredParticipants?.includes(name)) {
-                    return false;
+    const finalNodes = useMemo(() => {
+        return messageNodes
+            .map(node => {
+                if (activeFilters.length > 0) {
+                    return filterWithCustomClasses(node, activeFilters, globalSettings);
                 }
-            }
-            return true;
-        });
+                return node;
+            })
+            .filter(node => {
+                const isMessageNode = node.querySelector('.prose, .chattext');
+                if (isMessageNode) {
+                    const name = getNameFromNode(node as HTMLElement, globalSettings, charName);
+                    if (globalSettings?.filteredParticipants?.includes(name)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+    }, [messageNodes, activeFilters, globalSettings, charName]);
 
-    const nodesForExport = selectedIndices.size > 0
-        ? finalNodes.filter((_, i) => selectedIndices.has(i))
-        : finalNodes;
+    const nodesForExport = useMemo(() => {
+        return selectedIndices.size > 0
+            ? finalNodes.filter((_, i) => selectedIndices.has(i))
+            : finalNodes;
+    }, [finalNodes, selectedIndices]);
 
     const logContainerProps = useMemo(() => ({
         nodes: finalNodes,
@@ -509,21 +516,34 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
     };
 
     useEffect(() => {
-        const generateOtherFormatPreview = async () => {
-            if (savedSettings.format === 'basic' || !savedSettings.format) {
-                setOtherFormatContent('');
-                return;
-            }
-            const content = await getPreviewContentForExport();
-            if (savedSettings.format === 'markdown' || savedSettings.format === 'text') {
-                const style = `font-size: ${savedSettings.previewFontSize || 16}px; max-width: ${savedSettings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: #1a1b26; color: #c0caf5; border-radius: 8px;`;
-                setOtherFormatContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`);
-            } else {
-                setOtherFormatContent(content);
-            }
-        };
+        if (savedSettings.format === 'basic' || !savedSettings.format) {
+            setOtherFormatContent('');
+            setIsConverting(false);
+            return;
+        }
 
-        generateOtherFormatPreview();
+        setIsConverting(true);
+        // Apply a 300ms debounce to prevent heavy conversion workloads from locking the main thread 
+        // when users are dragging setting sliders (e.g., font size, layout configurations).
+        const handler = setTimeout(async () => {
+            try {
+                const content = await getPreviewContentForExport();
+                if (savedSettings.format === 'markdown' || savedSettings.format === 'text') {
+                    const style = `font-size: ${savedSettings.previewFontSize || 16}px; max-width: ${savedSettings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: #1a1b26; color: #c0caf5; border-radius: 8px;`;
+                    setOtherFormatContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`);
+                } else {
+                    setOtherFormatContent(content);
+                }
+            } catch (err) {
+                console.error('[Log Exporter] Format conversion error:', err);
+            } finally {
+                setIsConverting(false);
+            }
+        }, 300);
+
+        return () => {
+            clearTimeout(handler);
+        };
     }, [finalNodes, selectedIndices, savedSettings, globalSettings, charName]);
 
     const handleClose = async () => {
@@ -640,6 +660,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                     onDeselectAll={handleDeselectAll}
                                     onInvertSelection={handleInvertSelection}
                                     onDimensionsChange={handleDimensionsChange}
+                                    isConverting={isConverting}
                                 />
                                 <div className="mobile-action-bar">
                                     <Actionbar
@@ -697,6 +718,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                              onDeselectAll={handleDeselectAll}
                                              onInvertSelection={handleInvertSelection}
                                              onDimensionsChange={handleDimensionsChange}
+                                             isConverting={isConverting}
                                          />
                                          <div className="desktop-floating-action-bar">
                                              <Actionbar
