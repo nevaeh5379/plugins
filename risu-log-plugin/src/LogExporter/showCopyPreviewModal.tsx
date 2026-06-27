@@ -13,8 +13,6 @@ import ExportTab from './components/ExportTab';
 import FilterTab from './components/FilterTab';
 import AdvancedTab from './components/AdvancedTab';
 import ReplacementTab from './components/ReplacementTab';
-import MobileSettingsPanel from './components/MobileSettingsPanel';
-import MobileToolsPanel from './components/MobileToolsPanel';
 
 import PreviewPanel from './components/PreviewPanel';
 import ArcaHelperModal from './components/ArcaHelperModal';
@@ -609,52 +607,20 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                 <p>로그 데이터를 불러오는 중...</p>
                             </div>
                         ) : (isMobile || isTablet) ? (
-                            <div className="log-exporter-modal-content">
-                                <div className="mobile-tab-navigation">
-                                    <button className={`mobile-tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-                                        설정
-                                    </button>
-                                    <button className={`mobile-tab-btn ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>
-                                        미리보기
-                                    </button>
-                                    <button className={`mobile-tab-btn ${activeTab === 'tools' ? 'active' : ''}`} onClick={() => setActiveTab('tools')}>
-                                        도구
-                                    </button>
-                                </div>
-                                <div className={`mobile-tab-content mobile-settings-tab ${activeTab === 'settings' ? 'active' : ''}`}>
-                                    <MobileSettingsPanel
-                                        settings={savedSettings}
-                                        onSettingChange={handleSettingChange}
-                                        themes={THEMES}
-                                        colors={COLORS}
-                                        participants={participants}
-                                        globalSettings={globalSettings}
-                                        onGlobalSettingChange={handleGlobalSettingChange}
-                                        uiClasses={uiClasses}
-                                    />
-                                </div>
-                                <div className={`mobile-tab-content mobile-preview-tab ${activeTab === 'preview' ? 'active' : ''}`}>
-                                    <PreviewPanel
-                                        logContainerProps={logContainerProps}
-                                        settings={savedSettings}
-                                        otherFormatContent={otherFormatContent}
-                                        selectedIndices={selectedIndices}
-                                        onSelectionChange={handleSelectionChange}
-                                        lastSelectedIndex={lastSelectedIndex}
-                                        onLastSelectedIndexChange={handleLastSelectedIndexChange}
-                                        onSelectAll={handleSelectAll}
-                                        onDeselectAll={handleDeselectAll}
-                                        onInvertSelection={handleInvertSelection}
-                                        onDimensionsChange={handleDimensionsChange}
-                                    />
-                                </div>
-                                <div className={`mobile-tab-content mobile-tools-tab ${activeTab === 'tools' ? 'active' : ''}`}>
-                                    <MobileToolsPanel
-                                        settings={savedSettings}
-                                        onSettingChange={handleSettingChange}
-                                        imageSizeWarning={imageSizeWarning}
-                                    />
-                                </div>
+                            <div className="log-exporter-modal-content mobile-preview-tab" style={{ height: 'calc(100% - 71px)', position: 'relative', overflow: 'hidden' }}>
+                                <PreviewPanel
+                                    logContainerProps={logContainerProps}
+                                    settings={savedSettings}
+                                    otherFormatContent={otherFormatContent}
+                                    selectedIndices={selectedIndices}
+                                    onSelectionChange={handleSelectionChange}
+                                    lastSelectedIndex={lastSelectedIndex}
+                                    onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                    onSelectAll={handleSelectAll}
+                                    onDeselectAll={handleDeselectAll}
+                                    onInvertSelection={handleInvertSelection}
+                                    onDimensionsChange={handleDimensionsChange}
+                                />
                                 <div className="mobile-action-bar">
                                     <Actionbar
                                         charName={charName}
@@ -679,6 +645,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                     />
                                 </div>
                             </div>
+                        
                         ) : (
                             <>
                                 <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 71px)', overflow: 'hidden' }}>
@@ -834,6 +801,14 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                     onClose={() => setIsSettingsOpen(false)}
                     globalSettings={globalSettings}
                     onGlobalSettingChange={handleGlobalSettingChange}
+                    isMobile={isMobile}
+                    settings={savedSettings}
+                    onSettingChange={handleSettingChange}
+                    themes={THEMES}
+                    colors={COLORS}
+                    participants={participants}
+                    uiClasses={uiClasses}
+                    imageSizeWarning={imageSizeWarning}
                 />
             )}
         </ConfigProvider>
