@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { applyReplacements } from '../utils/domUtils';
+import { showWarning } from '../utils/notify';
 import type { ColorPalette, ReplacementRule } from '../../types';
 
 export const useMessageProcessor = (
@@ -45,7 +46,10 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
             if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
                 try {
                     img.src = await imageUrlToBlob(img.src);
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to embed image as blob:', img.src, e);
+                    showWarning(`이미지 임베딩 실패: ${img.src.substring(0, 80)}${img.src.length > 80 ? '...' : ''}`);
+                }
             }
         } else {
             const style = element.getAttribute('style');
@@ -54,7 +58,10 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
                 try {
                     const convertedUrl = await imageUrlToBlob(urlMatch[1]);
                     element.style.backgroundImage = `url("${convertedUrl}")`;
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to embed background image as blob:', urlMatch[1], e);
+                    showWarning(`배경 이미지 임베딩 실패: ${urlMatch[1].substring(0, 80)}${urlMatch[1].length > 80 ? '...' : ''}`);
+                }
             }
         }
     });
@@ -67,7 +74,7 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
 };
 
 const processMessageContent = async (originalMessageEl: Element, embedImages: boolean, color: ColorPalette, imageScale?: number, replacementRules?: ReplacementRule[]): Promise<string> => {
-    let contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
+    const contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
 
     const mediaPromises = Array.from(contentSourceEl.querySelectorAll('img, [style*="background-image"]')).map(async (el) => {
@@ -76,7 +83,10 @@ const processMessageContent = async (originalMessageEl: Element, embedImages: bo
             if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
                 try {
                     img.src = await imageUrlToBlob(img.src);
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to embed image as blob:', img.src, e);
+                    showWarning(`이미지 임베딩 실패: ${img.src.substring(0, 80)}${img.src.length > 80 ? '...' : ''}`);
+                }
             }
         } else {
             const style = el.getAttribute('style');

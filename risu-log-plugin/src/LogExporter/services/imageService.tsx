@@ -16,6 +16,7 @@ import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
 import { imageUrlToBlob, fetchToBlobNative } from '../utils/imageUtils';
+import { message } from 'antd';
 
 const waitForMedia = async (element: HTMLElement) => {
     const images = Array.from(element.querySelectorAll('img'));
@@ -437,7 +438,7 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
 
             } catch (error) {
                 console.error('Error saving image part:', error);
-                alert(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
+                message.error(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
             }
         };
 
@@ -623,7 +624,7 @@ export const saveAsImage = async (nodes: HTMLElement[] | HTMLElement, format: 'p
             }
         } catch (error) {
             console.error('Error preparing images:', error);
-            alert('이미지 준비 중 오류가 발생했습니다.');
+            message.error('이미지 준비 중 오류가 발생했습니다.');
         } finally {
             onProgressEnd();
             document.body.removeChild(container);
@@ -765,7 +766,7 @@ export const downloadImagesAsZip = async (
 
 
         if (mediaPromises.length === 0) {
-            alert("No images or videos to download in the log.");
+            message.warning('다운로드할 이미지나 비디오가 로그에 없습니다.');
             return;
         }
 
@@ -785,6 +786,6 @@ export const downloadImagesAsZip = async (
 
     } catch (error) {
         console.error('[Log Exporter] Error creating ZIP file:', error);
-        alert('An error occurred while creating the media ZIP file.');
+        message.error('미디어 ZIP 파일 생성 중 오류가 발생했습니다.');
     }
 };

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { CharInfo, ColorPalette } from '../../../types';
 import { imageUrlToBlob } from '../../utils/imageUtils';
+import { showWarning } from '../../utils/notify';
 
 interface LogHeaderProps {
   charInfo: CharInfo;
@@ -33,14 +34,20 @@ const CoverHeader: React.FC<LogHeaderProps> = ({
                 try {
                     const blobUrl = await imageUrlToBlob(charInfo.avatarUrl);
                     setAvatarSrc(blobUrl);
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to convert avatar to blob:', charInfo.avatarUrl, e);
+                    showWarning(`아바타 변환 실패: ${charInfo.avatarUrl.substring(0, 80)}${charInfo.avatarUrl.length > 80 ? '...' : ''}`);
+                }
             }
             // 배너 변환
             if (headerBannerUrl) {
                 try {
                     const blobUrl = await imageUrlToBlob(headerBannerUrl);
                     setBannerSrc(blobUrl);
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to convert banner to blob:', headerBannerUrl, e);
+                    showWarning(`배너 변환 실패: ${headerBannerUrl.substring(0, 80)}${headerBannerUrl.length > 80 ? '...' : ''}`);
+                }
             }
         }
     };

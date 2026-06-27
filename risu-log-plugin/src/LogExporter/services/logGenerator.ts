@@ -1,6 +1,7 @@
 import { getNameFromNode, applyReplacements } from '../utils/domUtils';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { loadGlobalSettings } from './settingsService';
+import { showWarning } from '../utils/notify';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 
 
@@ -104,7 +105,10 @@ async function getParentPageStyles(): Promise<string[]> {
                     if (html && html.trim()) {
                         cssTexts.push(html);
                     }
-                } catch (e) { /* ignore */ }
+                } catch (e) {
+                    console.error('[log plugin] Failed to get style innerHTML:', e);
+                    showWarning('스타일 시트 읽기 중 오류가 발생했습니다.');
+                }
             }
 
             // Collect parent <link rel="stylesheet"> blocks

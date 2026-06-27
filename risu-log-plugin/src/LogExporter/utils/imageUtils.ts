@@ -84,7 +84,7 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
       parentHost = new URL(document.referrer).host;
     }
   } catch (e) {
-    /* ignore */
+    console.warn('[log plugin] Failed to parse referrer URL for same-origin check:', e);
   }
 
   const isRelative = url.startsWith('/') || (!url.startsWith('http://') && !url.startsWith('https://'));

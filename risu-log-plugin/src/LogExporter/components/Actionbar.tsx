@@ -3,7 +3,7 @@ import React from 'react';
 import { copyToClipboard, saveAsFile } from '../services/fileService';
 import { saveAsImage } from '../services/imageService';
 import { THEMES, COLORS } from './constants';
-import { Button, Dropdown } from 'antd';
+import { Button, Dropdown, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   CopyOutlined,
@@ -76,7 +76,7 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
             const elementToCapture = tempDiv.querySelector('div');
             
             if (!elementToCapture) {
-                alert('이미지를 생성할 콘텐츠가 없습니다.');
+                message.warning('이미지를 생성할 콘텐츠가 없습니다.');
                 return;
             }
 

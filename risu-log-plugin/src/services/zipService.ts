@@ -7,6 +7,7 @@ import { collectCharacterAvatars } from '../LogExporter/services/avatarService';
 import { convertWebMToAnimatedWebP } from './webmConverter';
 import { loadGlobalSettings } from '../LogExporter/services/settingsService';
 import type { ArcaImage } from '../types';
+import { message } from 'antd';
 
 const getBlobFromUrl = (url: string): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -76,8 +77,7 @@ export async function createZipFromMediaList(
 }
 
 
-// 전역 alert 함수가 있다면, 타입을 선언해줍니다.
-declare function alert(message: string, type: 'info' | 'error' | 'success'): void;
+
 
 // addMediaToZip 함수에 전달될 수 있는 요소의 타입을 정의합니다.
 type MediaElement = HTMLImageElement | HTMLVideoElement | { tagName: 'IMG', src: string };
@@ -234,7 +234,7 @@ export async function downloadImagesAsZip(
     }
 
     if (mediaPromises.length === 0) {
-      alert("다운로드할 이미지나 비디오가 로그에 없습니다.", "info");
+      message.warning('다운로드할 이미지나 비디오가 로그에 없습니다.');
       return;
     }
 
@@ -254,6 +254,6 @@ export async function downloadImagesAsZip(
 
   } catch (error) {
     console.error('[Log Exporter] Error creating ZIP file:', error);
-    alert('미디어 ZIP 파일 생성 중 오류가 발생했습니다.', 'error');
+    message.error('미디어 ZIP 파일 생성 중 오류가 발생했습니다.');
   }
 }

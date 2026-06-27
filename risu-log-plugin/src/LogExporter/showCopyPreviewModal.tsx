@@ -6,7 +6,7 @@ import { processChatLog, serializeNodes } from '../services/chatData';
 import { THEMES, COLORS } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
 import type { ThemeKey, ColorKey } from '../types';
-import { ConfigProvider, theme, Spin, Button, Tabs } from 'antd';
+import { ConfigProvider, theme, Spin, Button, Tabs, message } from 'antd';
 import { SettingOutlined, ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 
 import PluginSettingsModal from './components/PluginSettingsModal';
@@ -293,12 +293,12 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                         return tempDiv.firstChild as HTMLElement;
                     });
                     setMessageNodes(newNodes);
-                    alert('로그 데이터를 성공적으로 불러왔습니다.');
+                    message.success('로그 데이터를 성공적으로 불러왔습니다.');
                 } else {
-                    alert('잘못된 형식의 로그 데이터 파일입니다.');
+                    message.error('잘못된 형식의 로그 데이터 파일입니다.');
                 }
             } catch (err) {
-                alert('로그 데이터 파일을 읽는 데 실패했습니다.');
+                message.error('로그 데이터 파일을 읽는 데 실패했습니다.');
                 console.error(err);
             }
         };
