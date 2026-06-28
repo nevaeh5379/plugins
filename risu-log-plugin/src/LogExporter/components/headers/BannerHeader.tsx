@@ -1,20 +1,7 @@
 import React from 'react';
-import type { CharInfo, ColorPalette } from '../../../types';
+import type { LogHeaderProps } from '../../../types';
 import { useMultiImageBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
 import HeaderTags from './HeaderTags';
-
-interface LogHeaderProps {
-  charInfo: CharInfo;
-  color: ColorPalette;
-  embedImagesAsBlob: boolean;
-  showHeaderIcon?: boolean;
-  headerTags?: string;
-  headerBannerUrl?: string;
-  headerBannerBlur?: boolean;
-  headerBannerAlign?: number;
-  isForExport?: boolean;
-  isForArca?: boolean;
-}
 
 const BannerHeader: React.FC<LogHeaderProps> = ({
   charInfo, color, embedImagesAsBlob, showHeaderIcon, headerTags,

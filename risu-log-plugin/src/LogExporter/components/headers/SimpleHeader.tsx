@@ -1,13 +1,7 @@
 import React from 'react';
-import type { CharInfo, ColorPalette } from '../../../types';
+import type { LogHeaderProps } from '../../../types';
 import { useParsedTags } from '../../hooks/useHeaderHelpers';
 import HeaderTags from './HeaderTags';
-
-interface LogHeaderProps {
-  charInfo: CharInfo;
-  color: ColorPalette;
-  headerTags?: string;
-}
 
 const SimpleHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags }) => {
   const tags = useParsedTags(headerTags);

@@ -4,6 +4,35 @@ import { loadGlobalSettings } from './settingsService';
 import { showWarning } from '../utils/notify';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 
+// CSS 변수 목록 (중복 제거)
+const THEME_CSS_VARIABLES = [
+    '--risu-theme-textcolor',
+    '--risu-theme-textcolor2',
+    '--risu-theme-bgcolor',
+    '--risu-theme-darkbg',
+    '--risu-theme-borderc',
+    '--risu-theme-darkborderc',
+    '--risu-theme-selected',
+    '--risu-theme-darkbutton',
+    '--risu-theme-draculared',
+    '--color-textcolor',
+    '--color-textcolor2',
+    '--color-bgcolor',
+    '--color-darkbg',
+    '--color-borderc',
+    '--color-darkborderc',
+    '--color-selected',
+    '--color-draculared',
+    '--color-darkbutton',
+    '--FontColorStandard',
+    '--FontColorItalic',
+    '--FontColorBold',
+    '--FontColorItalicBold',
+    '--FontColorQuote1',
+    '--FontColorQuote2',
+    '--risu-font-family',
+] as const;
+
 /**
  * 메시지 노드에서 텍스트를 추출합니다.
  * replacementRules가 있으면 적용합니다.
@@ -288,33 +317,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
             const body = document.body;
             const computedRoot = window.getComputedStyle(root);
             const computedBody = window.getComputedStyle(body);
-            const variables = [
-                '--risu-theme-textcolor',
-                '--risu-theme-textcolor2',
-                '--risu-theme-bgcolor',
-                '--risu-theme-darkbg',
-                '--risu-theme-borderc',
-                '--risu-theme-darkborderc',
-                '--risu-theme-selected',
-                '--risu-theme-darkbutton',
-                '--risu-theme-draculared',
-                '--color-textcolor',
-                '--color-textcolor2',
-                '--color-bgcolor',
-                '--color-darkbg',
-                '--color-borderc',
-                '--color-darkborderc',
-                '--color-selected',
-                '--color-draculared',
-                '--color-darkbutton',
-                '--FontColorStandard',
-                '--FontColorItalic',
-                '--FontColorBold',
-                '--FontColorItalicBold',
-                '--FontColorQuote1',
-                '--FontColorQuote2',
-                '--risu-font-family'
-            ];
+            const variables = THEME_CSS_VARIABLES;
             for (const v of variables) {
                 const val = root.style.getPropertyValue(v) || body.style.getPropertyValue(v) || computedRoot.getPropertyValue(v) || computedBody.getPropertyValue(v);
                 if (val) {

@@ -1,12 +1,5 @@
 import React from 'react';
-import type { ColorPalette } from '../../../types';
-
-interface FooterProps {
-  color: ColorPalette;
-  footerLeft?: string;
-  footerCenter?: string;
-  footerRight?: string;
-}
+import type { FooterProps } from '../../../types';
 
 const SimpleFooter: React.FC<FooterProps> = ({ color, footerLeft, footerCenter, footerRight }) => {
   return (

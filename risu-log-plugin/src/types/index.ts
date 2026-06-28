@@ -226,6 +226,27 @@ export interface LogExportSettings {
 
 
 
+// Shared component prop types for headers and footers
+export interface FooterProps {
+  color: ColorPalette;
+  footerLeft?: string;
+  footerCenter?: string;
+  footerRight?: string;
+}
+
+export interface LogHeaderProps {
+  charInfo: CharInfo;
+  color: ColorPalette;
+  embedImagesAsBlob: boolean;
+  showHeaderIcon?: boolean;
+  headerTags?: string;
+  headerBannerUrl?: string;
+  headerBannerBlur?: boolean;
+  headerBannerAlign?: number;
+  isForExport?: boolean;
+  isForArca?: boolean;
+}
+
 export interface Persona {
   id: string;
   name: string;

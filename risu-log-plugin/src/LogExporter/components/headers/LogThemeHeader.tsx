@@ -1,12 +1,6 @@
 
 import React from 'react';
-import type { CharInfo, ColorPalette } from '../../../types';
-
-interface LogHeaderProps {
-  charInfo: CharInfo;
-  color: ColorPalette;
-  headerTags?: string;
-}
+import type { LogHeaderProps } from '../../../types';
 
 const LogThemeHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags }) => {
   const tags = headerTags ? headerTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];

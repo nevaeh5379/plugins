@@ -1,15 +1,7 @@
 import React from 'react';
-import type { CharInfo, ColorPalette } from '../../../types';
+import type { LogHeaderProps } from '../../../types';
 import { useAvatarBlob, useParsedTags } from '../../hooks/useHeaderHelpers';
 import HeaderTags from './HeaderTags';
-
-interface LogHeaderProps {
-  charInfo: CharInfo;
-  color: ColorPalette;
-  embedImagesAsBlob: boolean;
-  showHeaderIcon?: boolean;
-  headerTags?: string;
-}
 
 const CompactHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesAsBlob, showHeaderIcon, headerTags }) => {
   const avatarSrc = useAvatarBlob(charInfo.avatarUrl, embedImagesAsBlob);

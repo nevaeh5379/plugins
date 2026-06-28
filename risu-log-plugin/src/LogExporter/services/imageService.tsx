@@ -11,7 +11,7 @@ import { loadGlobalSettings } from './settingsService';
 import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
-import { imageUrlToBlob, fetchToBlobNative } from '../utils/imageUtils';
+import { imageUrlToBlob, fetchToBlobNative, hexToString } from '../utils/imageUtils';
 import { message } from 'antd';
 import {
     captureElementToBlob,
@@ -452,14 +452,6 @@ export const downloadImagesAsZip = async (
         const mediaPromises: Promise<void>[] = [];
         let mediaCounter = 0;
         const addedUrls = new Set<string>();
-
-        const hexToString = (hex: string) => {
-            let str = '';
-            for (let i = 0; i < hex.length; i += 2) {
-                str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-            }
-            return str;
-        };
 
         const addMediaToZip = (el: HTMLImageElement | HTMLVideoElement) => {
             const isVideo = el.tagName === 'VIDEO';
