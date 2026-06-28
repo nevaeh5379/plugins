@@ -1,4 +1,4 @@
-import type { ColorPalette } from '../../types';
+import type { ColorPalette, ColorKey, ThemeKey } from '../../types';
 import type { LogExportSettings } from '../../types';
 import JSZip from 'jszip';
 import { createRoot } from 'react-dom/client';
@@ -22,6 +22,8 @@ import {
     type ImageLibrary,
     type ImageFormat,
 } from '../utils/captureUtils';
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const waitForMedia = async (element: HTMLElement) => {
     const images = Array.from(element.querySelectorAll('img'));
@@ -80,6 +82,7 @@ const forEachSection = async (
 
         await withTempWrapper(wrapper, async () => {
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
+            await sleep(50);
 
             const blob = await captureElementToBlob(
                 wrapper, format, imageLibrary, bgColor, resolution, preserveWebpAsset
@@ -152,6 +155,7 @@ const splitAndSaveAsSeparateFiles = async (
             const filename = `Risu_Log_${safeCharName}_${safeChatName}_part${sectionNumber}.${format}`;
 
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 파일 저장 중...` });
+            await sleep(50);
             await downloadBlob(blob, filename);
         }
     );
@@ -170,6 +174,433 @@ const captureElement = async (
     return captureElementToBlob(element, format, imageLibrary, bgColor, resolution, false);
 };
 
+// --------------------------------------------------------------------
+// Utility helpers
+// --------------------------------------------------------------------
+
+const BROWSER_MAX_HEIGHT = 16384;
+
+const sanitizeFilename = (name: string): string => name.replace(/[/?%*:|"<>]/g, '-');
+
+/** Export 파일명 생성 */
+const buildExportFilename = (
+    charName: string,
+    chatName: string,
+    format: string,
+    part?: number,
+    totalParts?: number
+): string => {
+    const safeChar = sanitizeFilename(charName);
+    const safeChat = sanitizeFilename(chatName);
+    if (totalParts && totalParts > 1 && part !== undefined) {
+        return `Risu_Log_${safeChar}_${safeChat}_part${part + 1}.${format}`;
+    }
+    return `Risu_Log_${safeChar}_${safeChat}.${format}`;
+};
+
+/** avatar / banner URL 을 blob URL 로 변환 */
+const resolveAssetUrls = async (
+    options: LogExportSettings
+): Promise<{ avatarUrl: string; bannerUrl: string }> => {
+    const avatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
+    const bannerUrl = (options as Record<string, unknown>).headerBannerUrl
+        ? await imageUrlToBlob((options as Record<string, unknown>).headerBannerUrl as string)
+        : '';
+    return { avatarUrl, bannerUrl };
+};
+
+/** 요소 높이에 기반한 최대 해상도 자동 계산 */
+const computeAutoResolution = (height: number): number => {
+    if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) return 4;
+    if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) return 3;
+    if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) return 2;
+    return 1;
+};
+
+/** 브라우저 제한 내에서 해상도 clamp */
+const clampResolution = (resolution: number, elementHeight: number): number => {
+    if (elementHeight * resolution > BROWSER_MAX_HEIGHT) {
+        const clamped = Math.floor(BROWSER_MAX_HEIGHT / elementHeight);
+        return Math.max(1, clamped);
+    }
+    return resolution;
+};
+
+/** 최종 해상도 결정 (auto 계산 + clamp 적용 + 경고 메시지) */
+const computeFinalResolution = (
+    initialResolution: number | 'auto',
+    elementHeight: number,
+    onProgressUpdate: (update: { message?: string }) => void
+): number => {
+    let finalResolution = initialResolution === 'auto'
+        ? computeAutoResolution(elementHeight)
+        : (initialResolution as number);
+
+    const oldRes = finalResolution;
+    finalResolution = clampResolution(finalResolution, elementHeight);
+    if (finalResolution !== oldRes) {
+        onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
+    }
+    return finalResolution;
+};
+
+// --------------------------------------------------------------------
+// Chunking
+// --------------------------------------------------------------------
+
+/** 노드 배열을 높이 기준으로 chunk 로 분할 */
+const chunkNodesByHeight = (
+    nodes: HTMLElement[],
+    splitImage: string,
+    userMaxImageHeight: number,
+    initialImageResolution: number | 'auto',
+    previewWidth?: number
+): { nodes: HTMLElement[] }[] => {
+    if (splitImage !== 'message') {
+        return [{ nodes }];
+    }
+
+    const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
+    const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
+    const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
+
+    const chunks: { nodes: HTMLElement[] }[] = [];
+    let currentChunk: HTMLElement[] = [];
+    let currentHeight = 0;
+    const { container: tempRenderDiv, remove: removeRenderDiv } = createOffscreenContainer(previewWidth || 900);
+
+    try {
+        for (const node of nodes) {
+            const nodeClone = node.cloneNode(true) as HTMLElement;
+            tempRenderDiv.appendChild(nodeClone);
+            const nodeHeight = nodeClone.offsetHeight;
+            tempRenderDiv.removeChild(nodeClone);
+
+            if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
+                chunks.push({ nodes: currentChunk });
+                currentChunk = [node];
+                currentHeight = nodeHeight;
+            } else {
+                currentChunk.push(node);
+                currentHeight += nodeHeight;
+            }
+        }
+        if (currentChunk.length > 0) {
+            chunks.push({ nodes: currentChunk });
+        }
+    } finally {
+        removeRenderDiv();
+    }
+
+    return chunks;
+};
+
+// --------------------------------------------------------------------
+// React rendering
+// --------------------------------------------------------------------
+
+/** chunk 노드를 React LogContainer 로 렌더링하여 HTMLElement 반환 */
+const renderChunkAsReactComponent = async (
+    container: HTMLElement,
+    chunkNodes: HTMLElement[],
+    charName: string,
+    chatName: string,
+    resolvedAvatarUrl: string,
+    resolvedBannerUrl: string,
+    htmlOptions: Record<string, unknown>,
+    onProgressUpdate: (update: { message?: string }) => void,
+    chunkIndex: number,
+    totalChunks: number
+): Promise<HTMLElement | null> => {
+    const globalSettings = await loadGlobalSettings();
+
+    return await new Promise<HTMLElement | null>(resolve => {
+        const onReady = () => {
+            resolve(container.firstChild as HTMLElement | null);
+        };
+
+        const props = {
+            nodes: chunkNodes,
+            charInfo: { name: charName, chatName: chatName, avatarUrl: resolvedAvatarUrl },
+            selectedThemeKey: htmlOptions.theme as ThemeKey | undefined,
+            selectedColorKey: htmlOptions.color as ColorKey | undefined,
+            color: htmlOptions.color as ColorPalette | undefined,
+            showAvatar: htmlOptions.showAvatar as boolean | undefined,
+            showHeader: htmlOptions.showHeader as boolean | undefined,
+            showHeaderIcon: htmlOptions.showHeaderIcon as boolean | undefined,
+            headerTags: htmlOptions.headerTags as string | undefined,
+            headerLayout: htmlOptions.headerLayout as 'default' | 'compact' | 'banner' | 'smart' | 'cover' | undefined,
+            headerBannerUrl: resolvedBannerUrl,
+            headerBannerBlur: htmlOptions.headerBannerBlur as boolean | undefined,
+            headerBannerAlign: htmlOptions.headerBannerAlign as number | undefined,
+            showFooter: htmlOptions.showFooter as boolean | undefined,
+            footerLeft: htmlOptions.footerLeft as string | undefined,
+            footerCenter: htmlOptions.footerCenter as string | undefined,
+            footerRight: htmlOptions.footerRight as string | undefined,
+            showBubble: htmlOptions.showBubble as boolean | undefined,
+            embedImagesAsBlob: true,
+            globalSettings: globalSettings,
+            onReady: onReady,
+            fontSize: htmlOptions.htmlScaleFactor !== undefined
+                ? 16 * Number(htmlOptions.htmlScaleFactor)
+                : Number(htmlOptions.previewFontSize || 16),
+            containerWidth: htmlOptions.previewWidth as number | undefined,
+            imageScale: Number(htmlOptions.imageScale),
+            isForImageExport: true,
+            replacementRules: htmlOptions.replacementRules as import('../../types').ReplacementRule[] | undefined,
+        };
+
+        onProgressUpdate({
+            message: `[${chunkIndex + 1}/${totalChunks}] 컴포넌트 렌더링 중...`,
+        });
+
+        const root = createRoot(container);
+        root.render(<LogContainer {...props} />);
+    });
+};
+
+// --------------------------------------------------------------------
+// Capture & Save
+// --------------------------------------------------------------------
+
+/** 단일 요소 캡처 → (필요시 분할/병합) → 다운로드 */
+const captureAndSaveElement = async (
+    element: HTMLElement,
+    resolution: number,
+    part: number,
+    totalParts: number,
+    format: ImageFormat,
+    imageLibrary: string,
+    splitImage: string,
+    userMaxImageHeight: number,
+    charName: string,
+    chatName: string,
+    backgroundColor: string,
+    onProgressUpdate: (update: { message?: string }) => void
+): Promise<void> => {
+    onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
+    await sleep(50);
+
+    const filename = buildExportFilename(charName, chatName, format, part, totalParts);
+    const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
+    const isTooTall = element.offsetHeight > finalMaxHeight;
+
+    let blob: Blob | null = null;
+
+    if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
+        if (splitImage === 'chunk') {
+            blob = await splitAndMergeAsOneFile(
+                element,
+                finalMaxHeight,
+                resolution,
+                format,
+                imageLibrary as ImageLibrary,
+                backgroundColor,
+                onProgressUpdate
+            );
+        } else {
+            await splitAndSaveAsSeparateFiles(
+                element,
+                finalMaxHeight,
+                resolution,
+                format,
+                imageLibrary as ImageLibrary,
+                backgroundColor,
+                onProgressUpdate,
+                sanitizeFilename(charName),
+                sanitizeFilename(chatName),
+                part,
+                totalParts
+            );
+            return;
+        }
+    } else {
+        blob = await captureElement(
+            element,
+            format,
+            imageLibrary as ImageLibrary,
+            backgroundColor,
+            resolution
+        );
+    }
+
+    if (!blob) {
+        throw new Error('Failed to generate image blob.');
+    }
+
+    onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
+    await sleep(50);
+    await downloadBlob(blob, filename);
+};
+
+// --------------------------------------------------------------------
+// Pipeline: single node
+// --------------------------------------------------------------------
+
+/** 단일 HTMLElement export 파이프라인 */
+const processSingleNode = async (
+    node: HTMLElement,
+    format: ImageFormat,
+    charName: string,
+    chatName: string,
+    initialImageResolution: number | 'auto',
+    imageLibrary: string,
+    splitImage: string,
+    userMaxImageHeight: number,
+    backgroundColor: string,
+    onProgressStart: (message: string, total: number) => void,
+    onProgressUpdate: (update: { message?: string }) => void,
+    onProgressEnd: () => void,
+    previewWidth?: number
+): Promise<void> => {
+    const chunks = chunkNodesByHeight(
+        [node],
+        splitImage,
+        userMaxImageHeight,
+        initialImageResolution,
+        previewWidth
+    );
+
+    onProgressStart(`이미지 생성 중...`, chunks.length);
+    const { container, remove } = createOffscreenContainer();
+
+    try {
+        for (let i = 0; i < chunks.length; i++) {
+            const elementToRender = chunks[i].nodes[0];
+
+            container.innerHTML = '';
+            container.appendChild(elementToRender);
+
+            const finalResolution = computeFinalResolution(
+                initialImageResolution,
+                elementToRender.offsetHeight,
+                onProgressUpdate
+            );
+
+            await waitForMedia(elementToRender);
+            await captureAndSaveElement(
+                elementToRender,
+                finalResolution,
+                i,
+                chunks.length,
+                format,
+                imageLibrary,
+                splitImage,
+                userMaxImageHeight,
+                charName,
+                chatName,
+                backgroundColor,
+                onProgressUpdate
+            );
+        }
+    } finally {
+        onProgressEnd();
+        remove();
+    }
+};
+
+// --------------------------------------------------------------------
+// Pipeline: node array
+// --------------------------------------------------------------------
+
+/** HTMLElement[] export 파이프라인 (React 렌더링 포함) */
+const processNodeArray = async (
+    nodes: HTMLElement[],
+    format: ImageFormat,
+    charName: string,
+    chatName: string,
+    initialImageResolution: number | 'auto',
+    imageLibrary: string,
+    splitImage: string,
+    userMaxImageHeight: number,
+    backgroundColor: string,
+    resolvedAvatarUrl: string,
+    resolvedBannerUrl: string,
+    htmlOptions: Record<string, unknown>,
+    onProgressStart: (message: string, total: number) => void,
+    onProgressUpdate: (update: { message?: string; current?: number }) => void,
+    onProgressEnd: () => void
+): Promise<void> => {
+    const chunks = chunkNodesByHeight(
+        nodes,
+        splitImage,
+        userMaxImageHeight,
+        initialImageResolution
+    );
+
+    onProgressStart(`이미지 생성 중...`, chunks.length);
+    await sleep(50);
+
+    const { container, remove } = createOffscreenContainer();
+
+    try {
+        for (let i = 0; i < chunks.length; i++) {
+            const chunkNodes = chunks[i].nodes;
+            await sleep(50);
+
+            const elementToRender = await renderChunkAsReactComponent(
+                container,
+                chunkNodes,
+                charName,
+                chatName,
+                resolvedAvatarUrl,
+                resolvedBannerUrl,
+                htmlOptions,
+                onProgressUpdate,
+                i,
+                chunks.length
+            );
+            if (!elementToRender) continue;
+
+            const finalResolution = computeFinalResolution(
+                initialImageResolution,
+                elementToRender.offsetHeight,
+                onProgressUpdate
+            );
+
+            // auto 모드일 때 해상도 정보 출력
+            if (initialImageResolution === 'auto') {
+                const height = elementToRender.offsetHeight;
+                onProgressUpdate({
+                    message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x`,
+                });
+            }
+
+            await waitForMedia(elementToRender);
+            await captureAndSaveElement(
+                elementToRender,
+                finalResolution,
+                i,
+                chunks.length,
+                format,
+                imageLibrary,
+                splitImage,
+                userMaxImageHeight,
+                charName,
+                chatName,
+                backgroundColor,
+                onProgressUpdate
+            );
+            container.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error preparing images:', error);
+        message.error('이미지 준비 중 오류가 발생했습니다.');
+    } finally {
+        onProgressEnd();
+        remove();
+    }
+};
+
+// --------------------------------------------------------------------
+// Main entry
+// --------------------------------------------------------------------
+
+/**
+ * 로그 노드를 이미지로 내보냅니다.
+ * - 단일 요소: DOM 직접 조작
+ * - 노드 배열: React LogContainer 렌더링 후 캡처
+ */
 export const saveAsImage = async (
     nodes: HTMLElement[] | HTMLElement,
     format: ImageFormat,
@@ -177,7 +608,7 @@ export const saveAsImage = async (
     chatName: string,
     options: LogExportSettings,
     backgroundColor?: string
-) => {
+): Promise<void> => {
     try {
         const {
             imageResolution: initialImageResolution = 1,
@@ -190,246 +621,50 @@ export const saveAsImage = async (
             ...htmlOptions
         } = options;
 
-        const resolvedAvatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
-        const resolvedBannerUrl = htmlOptions.headerBannerUrl ? await imageUrlToBlob(htmlOptions.headerBannerUrl) : '';
+        const { avatarUrl: resolvedAvatarUrl, bannerUrl: resolvedBannerUrl } =
+            await resolveAssetUrls(options);
 
-        const BROWSER_MAX_HEIGHT = 16384;
-
-        const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
-            onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
-            await new Promise(resolve => setTimeout(resolve, 50));
-            const safeCharName = charName.replace(/[/?%*:|"<>]/g, '-');
-            const safeChatName = chatName.replace(/[/?%*:|"<>]/g, '-');
-            const filename = totalParts > 1
-                ? `Risu_Log_${safeCharName}_${safeChatName}_part${part + 1}.${format}`
-                : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
-
-            const bgColor = backgroundColor || '#1a1b26';
-
-            try {
-                let blob: Blob | null = null;
-
-                const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
-                const isTooTall = element.offsetHeight > finalMaxHeight;
-
-                if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
-                    if (splitImage === 'chunk') {
-                        blob = await splitAndMergeAsOneFile(
-                            element,
-                            finalMaxHeight,
-                            resolution,
-                            format,
-                            imageLibrary as ImageLibrary,
-                            bgColor,
-                            onProgressUpdate
-                        );
-                    } else {
-                        await splitAndSaveAsSeparateFiles(
-                            element,
-                            finalMaxHeight,
-                            resolution,
-                            format,
-                            imageLibrary as ImageLibrary,
-                            bgColor,
-                            onProgressUpdate,
-                            safeCharName,
-                            safeChatName,
-                            part,
-                            totalParts
-                        );
-                        return;
-                    }
-                } else {
-                    blob = await captureElement(
-                        element,
-                        format,
-                        imageLibrary as ImageLibrary,
-                        bgColor,
-                        resolution
-                    );
-                }
-
-                if (!blob) {
-                    throw new Error('Failed to generate image blob.');
-                }
-
-                onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                await downloadBlob(blob, filename);
-            } catch (error) {
-                console.error('Error saving image part:', error);
-                message.error(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
-            }
-        };
-
-        const getChunks = (nodesToChunk: HTMLElement[], resolutionForChunking: number) => {
-            const chunks: { nodes: HTMLElement[] }[] = [];
-            const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
-            const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
-
-            if (splitImage === 'message') {
-                let currentChunk: HTMLElement[] = [];
-                let currentHeight = 0;
-                const { container: tempRenderDiv, remove: removeRenderDiv } = createOffscreenContainer(htmlOptions.previewWidth || 900);
-
-                for (const node of nodesToChunk) {
-                    const nodeClone = node.cloneNode(true) as HTMLElement;
-                    tempRenderDiv.appendChild(nodeClone);
-                    const nodeHeight = nodeClone.offsetHeight;
-                    tempRenderDiv.removeChild(nodeClone);
-
-                    if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
-                        chunks.push({ nodes: currentChunk });
-                        currentChunk = [node];
-                        currentHeight = nodeHeight;
-                    } else {
-                        currentChunk.push(node);
-                        currentHeight += nodeHeight;
-                    }
-                }
-                if (currentChunk.length > 0) {
-                    chunks.push({ nodes: currentChunk });
-                }
-                removeRenderDiv();
-            } else {
-                chunks.push({ nodes: nodesToChunk });
-            }
-            return chunks;
-        };
-
-        const computeAutoResolution = (height: number): number => {
-            if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) return 4;
-            if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) return 3;
-            if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) return 2;
-            return 1;
-        };
-
-        const clampResolution = (resolution: number, elementHeight: number): number => {
-            if (elementHeight * resolution > BROWSER_MAX_HEIGHT) {
-                const clamped = Math.floor(BROWSER_MAX_HEIGHT / elementHeight);
-                return Math.max(1, clamped);
-            }
-            return resolution;
-        };
+        const bgColor = backgroundColor || '#1a1b26';
 
         onProgressStart('분할 이미지 계산 중...', 1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await sleep(50);
 
         if (!Array.isArray(nodes)) {
-            const singleElement = nodes;
-            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-            const chunks = getChunks([singleElement], resolutionForChunking);
-
-            onProgressStart(`이미지 생성 중...`, chunks.length);
-            const { container, remove } = createOffscreenContainer();
-
-            try {
-                for (let i = 0; i < chunks.length; i++) {
-                    const chunk = chunks[i];
-                    const elementToRender = chunk.nodes[0];
-
-                    container.innerHTML = '';
-                    container.appendChild(elementToRender);
-
-                    let finalResolution = initialImageResolution === 'auto'
-                        ? computeAutoResolution(elementToRender.offsetHeight)
-                        : (initialImageResolution as number);
-
-                    const oldRes = finalResolution;
-                    finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
-                    if (finalResolution !== oldRes) {
-                        onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
-                    }
-
-                    await waitForMedia(elementToRender);
-                    await renderImage(elementToRender, finalResolution, i, chunks.length);
-                }
-            } finally {
-                onProgressEnd();
-                remove();
-            }
+            await processSingleNode(
+                nodes,
+                format,
+                charName,
+                chatName,
+                initialImageResolution,
+                imageLibrary,
+                splitImage,
+                userMaxImageHeight,
+                bgColor,
+                onProgressStart,
+                onProgressUpdate,
+                onProgressEnd,
+                (htmlOptions as Record<string, unknown>).previewWidth as number | undefined
+            );
             return;
         }
 
-        const { container, remove } = createOffscreenContainer();
-
-        try {
-            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-            const chunks = getChunks(nodes, resolutionForChunking);
-            onProgressStart(`이미지 생성 중...`, chunks.length);
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
-                const chunkNodes = chunk.nodes;
-                onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                const globalSettings = await loadGlobalSettings();
-                await new Promise<void>(resolve => {
-                    const onReady = () => resolve();
-                    const props = {
-                        nodes: chunkNodes,
-                        charInfo: { name: charName, chatName: chatName, avatarUrl: resolvedAvatarUrl },
-                        selectedThemeKey: htmlOptions.theme as import("../../types").ThemeKey | undefined,
-                        selectedColorKey: htmlOptions.color as import("../../types").ColorKey | undefined,
-                        color: htmlOptions.color as ColorPalette | undefined,
-                        showAvatar: htmlOptions.showAvatar,
-                        showHeader: htmlOptions.showHeader,
-                        showHeaderIcon: htmlOptions.showHeaderIcon,
-                        headerTags: htmlOptions.headerTags,
-                        headerLayout: htmlOptions.headerLayout,
-                        headerBannerUrl: resolvedBannerUrl,
-                        headerBannerBlur: htmlOptions.headerBannerBlur,
-                        headerBannerAlign: htmlOptions.headerBannerAlign,
-                        showFooter: htmlOptions.showFooter,
-                        footerLeft: htmlOptions.footerLeft,
-                        footerCenter: htmlOptions.footerCenter,
-                        footerRight: htmlOptions.footerRight,
-                        showBubble: htmlOptions.showBubble,
-                        embedImagesAsBlob: true,
-                        globalSettings: globalSettings,
-                        onReady: onReady,
-                        fontSize: htmlOptions.htmlScaleFactor !== undefined ? 16 * Number(htmlOptions.htmlScaleFactor) : Number(htmlOptions.previewFontSize || 16),
-                        containerWidth: htmlOptions.previewWidth,
-                        imageScale: Number(htmlOptions.imageScale),
-                        isForImageExport: true,
-                        replacementRules: htmlOptions.replacementRules,
-                    };
-                    const root = createRoot(container);
-                    root.render(<LogContainer {...props} />);
-                });
-
-                const elementToRender = container.firstChild as HTMLElement;
-                if (!elementToRender) continue;
-
-                let finalResolution = initialImageResolution === 'auto'
-                    ? computeAutoResolution(elementToRender.offsetHeight)
-                    : (initialImageResolution as number);
-
-                if (initialImageResolution === 'auto') {
-                    const height = elementToRender.offsetHeight;
-                    onProgressUpdate({ message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x` });
-                }
-
-                const oldRes = finalResolution;
-                finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
-                if (finalResolution !== oldRes) {
-                    onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
-                }
-
-                await waitForMedia(elementToRender);
-                await renderImage(elementToRender, finalResolution, i, chunks.length);
-                container.innerHTML = '';
-            }
-        } catch (error) {
-            console.error('Error preparing images:', error);
-            message.error('이미지 준비 중 오류가 발생했습니다.');
-        } finally {
-            onProgressEnd();
-            remove();
-        }
+        await processNodeArray(
+            nodes,
+            format,
+            charName,
+            chatName,
+            initialImageResolution,
+            imageLibrary,
+            splitImage,
+            userMaxImageHeight,
+            bgColor,
+            resolvedAvatarUrl,
+            resolvedBannerUrl,
+            htmlOptions as Record<string, unknown>,
+            onProgressStart,
+            onProgressUpdate,
+            onProgressEnd
+        );
     } catch (e) {
         console.error('Error in saveAsImage:', e);
     }
@@ -529,32 +764,40 @@ export const downloadImagesAsZip = async (
                 globalSettings: globalSettings,
             });
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = baseHtml;
-            tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+            try {
+                tempDiv.innerHTML = baseHtml;
+                tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+            } finally {
+                tempDiv.innerHTML = '';
+            }
         } else {
             const globalSettings = await loadGlobalSettings();
             const tempDiv = document.createElement('div');
-            const html = await getLogHtml({
-                nodes: nodes,
-                charInfo: charInfo,
-                selectedThemeKey: 'basic',
-                selectedColorKey: 'dark',
-                showAvatar: showAvatar,
-                isForArca: false,
-                embedImagesAsBlob: false,
-                globalSettings: globalSettings,
-            });
-            tempDiv.innerHTML = html;
+            try {
+                const html = await getLogHtml({
+                    nodes: nodes,
+                    charInfo: charInfo,
+                    selectedThemeKey: 'basic',
+                    selectedColorKey: 'dark',
+                    showAvatar: showAvatar,
+                    isForArca: false,
+                    embedImagesAsBlob: false,
+                    globalSettings: globalSettings,
+                });
+                tempDiv.innerHTML = html;
 
-            if (showAvatar) {
-                const avatarMap = await collectCharacterAvatars(Array.from(tempDiv.children), charInfo.name, false, globalSettings);
-                for (const avatarUrl of avatarMap.values()) {
-                    const fakeImg = document.createElement('img');
-                    fakeImg.src = avatarUrl;
-                    addMediaToZip(fakeImg);
+                if (showAvatar) {
+                    const avatarMap = await collectCharacterAvatars(Array.from(tempDiv.children), charInfo.name, false, globalSettings);
+                    for (const avatarUrl of avatarMap.values()) {
+                        const fakeImg = document.createElement('img');
+                        fakeImg.src = avatarUrl;
+                        addMediaToZip(fakeImg);
+                    }
                 }
+                tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+            } finally {
+                tempDiv.innerHTML = '';
             }
-            tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
         }
 
         if (mediaPromises.length === 0) {
