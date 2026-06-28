@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { imageUrlToBlob } from '../utils/imageUtils';
+import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { applyReplacements } from '../utils/domUtils';
 import { showWarning } from '../utils/notify';
 import type { ColorPalette, ReplacementRule, ImageStyle } from '../../types';
@@ -131,14 +131,14 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
             }
         } else {
             const style = element.getAttribute('style');
-            const urlMatch = style?.match(/url\(["'"]?(.+?)["'"]?\)/);
-            if (urlMatch?.[1] && embedImages && !urlMatch[1].startsWith('data:') && !urlMatch[1].startsWith('blob:')) {
+            const bgUrl = style ? extractBackgroundImageUrl(style) : null;
+            if (bgUrl && embedImages && !bgUrl.startsWith('data:') && !bgUrl.startsWith('blob:')) {
                 try {
-                    const convertedUrl = await imageUrlToBlob(urlMatch[1]);
+                    const convertedUrl = await imageUrlToBlob(bgUrl);
                     element.style.backgroundImage = `url("${convertedUrl}")`;
                 } catch (e) {
-                    console.error('[log plugin] Failed to embed background image as blob:', urlMatch[1], e);
-                    showWarning(`배경 이미지 임베딩 실패: ${urlMatch[1].substring(0, 80)}${urlMatch[1].length > 80 ? '...' : ''}`);
+                    console.error('[log plugin] Failed to embed background image as blob:', bgUrl, e);
+                    showWarning(`배경 이미지 임베딩 실패: ${bgUrl.substring(0, 80)}${bgUrl.length > 80 ? '...' : ''}`);
                 }
             }
         }
@@ -213,10 +213,10 @@ const processMessageContent = async (
             }
         } else {
             const style = el.getAttribute('style');
-            const urlMatch = style?.match(/url\(["'"]?(.+?)["'"]?\)/);
-            if (urlMatch?.[1]) {
+            const bgUrl = style ? extractBackgroundImageUrl(style) : null;
+            if (bgUrl) {
                 const img = document.createElement('img');
-                img.src = embedImages ? await imageUrlToBlob(urlMatch[1]) : urlMatch[1];
+                img.src = embedImages ? await imageUrlToBlob(bgUrl) : bgUrl;
                 el.parentNode?.insertBefore(img, el);
                 el.remove();
             }

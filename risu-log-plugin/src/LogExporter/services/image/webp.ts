@@ -1,5 +1,6 @@
 import { mergePNGsBinary } from './png';
 import imageCompression from 'browser-image-compression';
+import { loadImageBlobToCanvas, canvasToBlob } from '../../utils/imageUtils';
 
 // WebP 파일을 바이너리 레벨에서 병합하는 함수
 // 전략: PNG 바이너리 병합 → browser-image-compression으로 WebP 변환
@@ -19,25 +20,8 @@ export const mergeWebPsBinary = async (
             pngBlobs.push(blob);
         } else {
             console.log(`[WebP Merge] Converting to PNG for image ${i + 1}...`);
-            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-                const image = new Image();
-                image.onload = () => resolve(image);
-                image.onerror = reject;
-                image.src = URL.createObjectURL(blob);
-            });
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('Canvas context not available');
-            
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(img.src);
-            
-            const pngBlob = await new Promise<Blob>((resolve) => {
-                canvas.toBlob((b) => resolve(b!), 'image/png');
-            });
+            const canvas = await loadImageBlobToCanvas(blob);
+            const pngBlob = await canvasToBlob(canvas, 'image/png');
             pngBlobs.push(pngBlob);
         }
     }

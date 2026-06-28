@@ -168,6 +168,52 @@ export const imageUrlToBlob = async (url: string): Promise<string> => {
   }
 }
 
+/**
+ * 이미지 Blob을 Canvas에 로드합니다.
+ */
+export async function loadImageBlobToCanvas(
+    blob: Blob,
+    contextOptions?: CanvasRenderingContext2DSettings
+): Promise<HTMLCanvasElement> {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = URL.createObjectURL(blob);
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d', contextOptions);
+    if (!ctx) throw new Error('Canvas context not available');
+
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(img.src);
+    return canvas;
+}
+
+/**
+ * Canvas를 지정된 포맷의 Blob으로 내보냅니다.
+ */
+export function canvasToBlob(canvas: HTMLCanvasElement, format: string, quality?: number): Promise<Blob> {
+    return new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+            if (b) resolve(b);
+            else reject(new Error(`Failed to convert canvas to ${format}`));
+        }, format, quality);
+    });
+}
+
+/**
+ * CSS background-image style 문자열에서 이미지 URL을 추출합니다.
+ * `url(...)`, `url("...")`, `url('...')`, `url(&quot;...&quot;)` 모든 형식을 지원합니다.
+ */
+export function extractBackgroundImageUrl(styleAttr: string): string | null {
+    const match = styleAttr.match(/url\(['"]?([^'"]+?)['"]?\)/) || styleAttr.match(/url\(&quot;(.+?)&quot;\)/);
+    return match?.[1] ?? null;
+}
+
 export const clearBlobUrlCache = () => {
   // data URL은 revoke 불필요. 캐시만 비움.
   dataUrlCache.clear()

@@ -1,5 +1,5 @@
 import { getNameFromNode, applyReplacements } from '../utils/domUtils';
-import { imageUrlToBlob } from '../utils/imageUtils';
+import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { loadGlobalSettings } from './settingsService';
 import { showWarning } from '../utils/notify';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
@@ -287,25 +287,21 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
 
         let cssText = ':root, :host {\n';
         if (colors) {
-            cssText += `  --risu-theme-textcolor: ${colors.textcolor};\n`;
-            cssText += `  --risu-theme-textcolor2: ${colors.textcolor2};\n`;
-            cssText += `  --risu-theme-bgcolor: ${colors.bgcolor};\n`;
-            cssText += `  --risu-theme-darkbg: ${colors.darkbg};\n`;
-            cssText += `  --risu-theme-borderc: ${colors.borderc};\n`;
-            cssText += `  --risu-theme-darkborderc: ${colors.darkBorderc || colors.darkborderc || '#4b5563'};\n`;
-            cssText += `  --risu-theme-selected: ${colors.selected};\n`;
-            cssText += `  --risu-theme-darkbutton: ${colors.darkbutton};\n`;
-            cssText += `  --risu-theme-draculared: ${colors.draculared};\n`;
-
-            cssText += `  --color-textcolor: ${colors.textcolor};\n`;
-            cssText += `  --color-textcolor2: ${colors.textcolor2};\n`;
-            cssText += `  --color-bgcolor: ${colors.bgcolor};\n`;
-            cssText += `  --color-darkbg: ${colors.darkbg};\n`;
-            cssText += `  --color-borderc: ${colors.borderc};\n`;
-            cssText += `  --color-darkborderc: ${colors.darkBorderc || colors.darkborderc || '#4b5563'};\n`;
-            cssText += `  --color-selected: ${colors.selected};\n`;
-            cssText += `  --color-draculared: ${colors.draculared};\n`;
-            cssText += `  --color-darkbutton: ${colors.darkbutton};\n`;
+            const cssVars: [string, string][] = [
+                ['textcolor', colors.textcolor],
+                ['textcolor2', colors.textcolor2],
+                ['bgcolor', colors.bgcolor],
+                ['darkbg', colors.darkbg],
+                ['borderc', colors.borderc],
+                ['darkborderc', colors.darkBorderc || colors.darkborderc || '#4b5563'],
+                ['selected', colors.selected],
+                ['darkbutton', colors.darkbutton],
+                ['draculared', colors.draculared],
+            ];
+            for (const [name, value] of cssVars) {
+                cssText += `  --risu-theme-${name}: ${value};\n`;
+                cssText += `  --color-${name}: ${value};\n`;
+            }
         }
 
         for (const [k, v] of Object.entries(textColors)) {
@@ -477,8 +473,8 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
                     if (!el.closest('.prose, .chattext')) {
                         const styleAttr = el.getAttribute('style');
                         if (styleAttr) {
-                            const newStyle = styleAttr.replace(/url\(['"]?.*?['"]?\)/g, `url('${avatarDataUrl}')`)
-                                                     .replace(/url\(&quot;.*?&quot;\)/g, `url('${avatarDataUrl}')`);
+                            const newStyle = styleAttr.replace(/url\(['"]?[^'"]+?['"]?\)/g, `url('${avatarDataUrl}')`)
+                                                     .replace(/url\(&quot;[^&]+?&quot;\)/g, `url('${avatarDataUrl}')`);
                             el.setAttribute('style', newStyle);
                         }
                     }
@@ -501,9 +497,8 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
             for (const el of Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'))) {
                 const styleAttr = el.getAttribute('style');
                 if (styleAttr) {
-                    const urlMatch = styleAttr.match(/url\(['"]?(.*?)['"]?\)/) || styleAttr.match(/url\(&quot;(.*?)&quot;\)/);
-                    if (urlMatch && urlMatch[1]) {
-                        const originalUrl = urlMatch[1];
+                    const originalUrl = extractBackgroundImageUrl(styleAttr);
+                    if (originalUrl) {
                         if (!originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
                             try {
                                 const dataUrl = await imageUrlToBlob(originalUrl);

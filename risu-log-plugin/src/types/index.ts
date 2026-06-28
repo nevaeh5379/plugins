@@ -49,7 +49,7 @@ export type ColorKey =
   | 'darkcontrast';
 
 // 메인 컴포넌트의 Props
-export interface LogContainerProps {
+export interface LogContainerProps extends ImageDisplayOptions {
   nodes: Element[];
   charInfo: CharInfo;
   selectedThemeKey?: ThemeKey;
@@ -77,14 +77,6 @@ export interface LogContainerProps {
   globalSettings: GlobalSettings;
   fontSize?: number;
   containerWidth?: number;
-  imageScale?: number;
-  imageAlign?: 'left' | 'center' | 'right';
-  imageStyle?: ImageStyle;
-  imageCropActive?: boolean;
-  imageCropAspectRatio?: string;
-  imageCropVAlign?: number;
-  imageCropHAlign?: number;
-  imageCropHeight?: number;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   selectedIndices?: Set<number>;
@@ -96,7 +88,7 @@ export interface LogContainerProps {
 }
 
 // 메시지 컴포넌트 Props
-export interface MessageProps {
+export interface MessageProps extends ImageDisplayOptions {
   node: Element;
   index: number;
   charInfoName: string;
@@ -109,14 +101,6 @@ export interface MessageProps {
   embedImagesAsBlob: boolean;
   allowHtmlRendering: boolean;
   globalSettings: GlobalSettings;
-  imageScale?: number;
-  imageAlign?: 'left' | 'center' | 'right';
-  imageStyle?: ImageStyle;
-  imageCropActive?: boolean;
-  imageCropAspectRatio?: string;
-  imageCropVAlign?: number;
-  imageCropHAlign?: number;
-  imageCropHeight?: number;
   isEditable?: boolean;
   onMessageUpdate?: (index: number, newHtml: string) => void;
   isSelected?: boolean;
@@ -143,6 +127,20 @@ export interface GlobalSettings {
   filteredParticipants?: string[];
 }
 
+export interface ImageCropOptions {
+    imageCropActive?: boolean;
+    imageCropAspectRatio?: string;
+    imageCropVAlign?: number;
+    imageCropHAlign?: number;
+    imageCropHeight?: number;
+}
+
+export interface ImageDisplayOptions extends ImageCropOptions {
+    imageScale?: number;
+    imageAlign?: 'left' | 'center' | 'right';
+    imageStyle?: ImageStyle;
+}
+
 export interface ReplacementRule {
   id: string;
   pattern: string;
@@ -152,7 +150,7 @@ export interface ReplacementRule {
   isEnabled?: boolean;
 }
 
-export interface LogExportSettings {
+export interface LogExportSettings extends ImageDisplayOptions {
   // Format
   format?: 'basic' | 'html' | 'markdown' | 'text';
   // Theme & Color
@@ -187,14 +185,6 @@ export interface LogExportSettings {
   previewFontSize?: number;
   previewWidth?: number;
   // Image export
-  imageScale?: number;
-  imageAlign?: 'left' | 'center' | 'right';
-  imageStyle?: ImageStyle;
-  imageCropActive?: boolean;
-  imageCropAspectRatio?: string;
-  imageCropVAlign?: number;
-  imageCropHAlign?: number;
-  imageCropHeight?: number;
   imageResolution?: number | 'auto';
   imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
   imageFormat?: 'png' | 'jpeg' | 'webp';
@@ -211,11 +201,6 @@ export interface LogExportSettings {
   // External data
   charAvatarUrl?: string;
 }
-
-
-
-
-
 
 
 

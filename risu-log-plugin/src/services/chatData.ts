@@ -6,7 +6,7 @@
 import type { RisuCharacter, RisuChat } from '../types/risuai'
 import type { Persona } from '../types'
 import { getAllMessageNodes } from './messageScanner'
-import { extractSwImageLocation, extractTauriAssetLocation } from '../LogExporter/utils/imageUtils'
+import { extractSwImageLocation, extractTauriAssetLocation, extractBackgroundImageUrl } from '../LogExporter/utils/imageUtils'
 
 
 
@@ -217,9 +217,9 @@ async function collectAvatarsMain(
       for (const div of arr) {
         const styleAttr = await div.getAttribute('style')
         if (styleAttr) {
-          const urlMatch = styleAttr.match(/url\(['"]?(.*?)['"]?\)/) || styleAttr.match(/url\(&quot;(.*?)&quot;\)/)
-          if (urlMatch && urlMatch[1]) {
-            avatarUrl = urlMatch[1]
+          const url = extractBackgroundImageUrl(styleAttr)
+          if (url) {
+            avatarUrl = url
             break
           }
         }

@@ -1,6 +1,7 @@
 import { toBlob as htmlToImageToBlob } from 'html-to-image';
 import domtoimage from 'dom-to-image-more';
 import { snapdom, type SnapdomOptions } from '@zumer/snapdom';
+import { loadImageBlobToCanvas, canvasToBlob } from './imageUtils';
 
 export type ImageLibrary = 'snapdom' | 'dom-to-image' | 'html-to-image';
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
@@ -15,65 +16,18 @@ export interface CaptureOptions {
  * Blob을 WebP로 변환합니다.
  */
 export const convertBlobToWebP = async (pngBlob: Blob): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                reject(new Error('Failed to get 2D context'));
-                return;
-            }
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((webpBlob) => {
-                if (webpBlob) {
-                    resolve(webpBlob);
-                } else {
-                    reject(new Error('Failed to convert canvas to WebP'));
-                }
-            }, 'image/webp');
-            URL.revokeObjectURL(img.src);
-        };
-        img.onerror = (err) => {
-            reject(err);
-        };
-        img.src = URL.createObjectURL(pngBlob);
-    });
+    const canvas = await loadImageBlobToCanvas(pngBlob);
+    return canvasToBlob(canvas, 'image/webp');
 };
 
 /**
  * PNG Blob을 JPEG로 변환합니다.
  */
 export const convertPngToJpeg = async (pngBlob: Blob): Promise<Blob> => {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
-        image.crossOrigin = 'anonymous';
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = URL.createObjectURL(pngBlob);
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d', {
-        alpha: false,
-        willReadFrequently: false
-    });
-    if (!ctx) throw new Error('Canvas context not available');
-
+    const canvas = await loadImageBlobToCanvas(pngBlob, { alpha: false, willReadFrequently: false });
+    const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, 0, 0);
-    URL.revokeObjectURL(img.src);
-
-    return new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-            if (b) resolve(b);
-            else reject(new Error('Failed to convert to JPEG'));
-        }, 'image/jpeg', 0.95);
-    });
+    return canvasToBlob(canvas, 'image/jpeg', 0.95);
 };
 
 /**

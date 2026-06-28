@@ -1,6 +1,6 @@
 
 import { getNameFromNode } from '../utils/domUtils';
-import { imageUrlToBlob} from '../utils/imageUtils';
+import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 
 // This function is based on the logic that would be needed to replicate the original functionality.
 // It assumes that avatar URLs are found in a specific way within the DOM nodes.
@@ -62,11 +62,7 @@ export const collectCharacterAvatars = async (
 
       // 3. Extract URL from the found element
       if (avatarElement) {
-        const style = avatarElement.style.backgroundImage;
-        const urlMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
-        if (urlMatch && urlMatch[1]) {
-          avatarUrl = urlMatch[1];
-        }
+        avatarUrl = extractBackgroundImageUrl(avatarElement.style.backgroundImage) || '';
       }
 
       if (avatarUrl) {

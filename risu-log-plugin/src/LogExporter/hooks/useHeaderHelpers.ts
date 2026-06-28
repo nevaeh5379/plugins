@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { imageUrlToBlob } from '../utils/imageUtils';
 import { showWarning } from '../utils/notify';
 
+async function convertSingleUrl(url: string): Promise<string> {
+    return imageUrlToBlob(url);
+}
+
 /**
- * 이미지 URL을 blob(data URL)로 변환합니다.
+ * 단일 이미지 URL을 blob(data URL)로 변환합니다.
  * 변환 실패 시 원본 URL을 유지합니다.
  */
 export function useConvertedImage(
@@ -22,7 +26,7 @@ export function useConvertedImage(
         let cancelled = false;
         const convert = async () => {
             try {
-                const blobUrl = await imageUrlToBlob(url);
+                const blobUrl = await convertSingleUrl(url);
                 if (!cancelled) setConvertedUrl(blobUrl);
             } catch (e) {
                 console.error('[log plugin] Failed to convert image to blob:', url, e);
@@ -67,7 +71,7 @@ export function useMultiImageBlob(
                 urls.map(async (url) => {
                     if (!url) return url;
                     try {
-                        return await imageUrlToBlob(url);
+                        return await convertSingleUrl(url);
                     } catch (e) {
                         console.error('[log plugin] Failed to convert image to blob:', url, e);
                         showWarning(`이미지 변환 실패: ${url.substring(0, 80)}${url.length > 80 ? '...' : ''}`);
