@@ -1,4 +1,5 @@
 import { message } from 'antd';
+import { downloadBlob } from '../utils/captureUtils';
 
 /**
  * HTML 형식으로 클립보드에 복사합니다.
@@ -69,12 +70,6 @@ const fallbackCopyToClipboard = (text: string) => {
 
 export const saveAsFile = (filename: string, content: string, type = 'text/plain;charset=utf-8') => {
     const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, filename);
 };
+
