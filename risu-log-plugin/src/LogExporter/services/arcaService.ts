@@ -14,6 +14,17 @@ export const generateArcaContent = async (nodes: LogNode[], settings: LogExportS
         showBubble: settings.showBubble,
         embedImagesAsBlob: false, // URL을 그대로 사용
         globalSettings,
+        isForArca: true,
+        allowHtmlRendering: settings.allowHtmlRendering ?? false,
+        disableAnimations: settings.disableAnimations ?? false,
+        imageCropActive: settings.imageCropActive ?? false,
+        imageCropAspectRatio: settings.imageCropAspectRatio ?? 'original',
+        imageCropVAlign: settings.imageCropVAlign ?? 50,
+        imageCropHAlign: settings.imageCropHAlign ?? 50,
+        imageCropHeight: settings.imageCropHeight ?? 1,
+        imageScale: settings.imageScale !== undefined ? Number(settings.imageScale) : 100,
+        imageAlign: settings.imageAlign ?? 'left',
+        imageStyle: settings.imageStyle ?? 'none',
     });
 
     const tempDiv = document.createElement('div');

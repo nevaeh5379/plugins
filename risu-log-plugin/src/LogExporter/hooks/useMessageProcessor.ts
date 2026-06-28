@@ -74,7 +74,12 @@ export const useMessageProcessor = (
   });
 
   useEffect(() => {
-    if (!originalMessageEl) return;
+    if (!originalMessageEl) {
+      if (onCompleteRef.current) {
+        onCompleteRef.current();
+      }
+      return;
+    }
 
     if (isSync) {
       const syncContent = originalMessageEl.innerHTML.trim();
@@ -88,22 +93,27 @@ export const useMessageProcessor = (
     }
 
     const process = async () => {
-      console.log('[log plugin] useMessageProcessor hook process():', {
-        imageCropActive,
-        imageCropAspectRatio,
-        imageCropVAlign,
-        imageCropHAlign,
-        imageCropHeight
-      });
-      let result = '';
-      if (allowHtmlRendering) {
-        result = await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules);
-      } else {
-        result = await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
-      }
-      setProcessedContent(result);
-      if (onCompleteRef.current) {
-        onCompleteRef.current();
+      try {
+        console.log('[log plugin] useMessageProcessor hook process():', {
+          imageCropActive,
+          imageCropAspectRatio,
+          imageCropVAlign,
+          imageCropHAlign,
+          imageCropHeight
+        });
+        let result = '';
+        if (allowHtmlRendering) {
+          result = await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules);
+        } else {
+          result = await processMessageContent(originalMessageEl, embedImagesAsBlob, color, imageScale, replacementRules, imageAlign, imageStyle, imageCropActive, imageCropAspectRatio, imageCropVAlign, imageCropHAlign, imageCropHeight);
+        }
+        setProcessedContent(result);
+      } catch (error) {
+        console.error('[log plugin] Error processing message content:', error);
+      } finally {
+        if (onCompleteRef.current) {
+          onCompleteRef.current();
+        }
       }
     };
 

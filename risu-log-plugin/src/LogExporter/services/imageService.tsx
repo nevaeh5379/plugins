@@ -203,8 +203,8 @@ const resolveAssetUrls = async (
     options: LogExportSettings
 ): Promise<{ avatarUrl: string; bannerUrl: string }> => {
     const avatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
-    const bannerUrl = (options as Record<string, unknown>).headerBannerUrl
-        ? await imageUrlToBlob((options as Record<string, unknown>).headerBannerUrl as string)
+    const bannerUrl = options.headerBannerUrl
+        ? await imageUrlToBlob(options.headerBannerUrl)
         : '';
     return { avatarUrl, bannerUrl };
 };
@@ -307,7 +307,7 @@ const renderChunkAsReactComponent = async (
     chatName: string,
     resolvedAvatarUrl: string,
     resolvedBannerUrl: string,
-    htmlOptions: Record<string, unknown>,
+    htmlOptions: Partial<LogExportSettings>,
     onProgressUpdate: (update: { message?: string }) => void,
     chunkIndex: number,
     totalChunks: number
@@ -325,19 +325,19 @@ const renderChunkAsReactComponent = async (
             selectedThemeKey: htmlOptions.theme as ThemeKey | undefined,
             selectedColorKey: htmlOptions.color as ColorKey | undefined,
             color: htmlOptions.color as ColorPalette | undefined,
-            showAvatar: htmlOptions.showAvatar as boolean | undefined,
-            showHeader: htmlOptions.showHeader as boolean | undefined,
-            showHeaderIcon: htmlOptions.showHeaderIcon as boolean | undefined,
-            headerTags: htmlOptions.headerTags as string | undefined,
-            headerLayout: htmlOptions.headerLayout as 'default' | 'compact' | 'banner' | 'smart' | 'cover' | undefined,
+            showAvatar: htmlOptions.showAvatar,
+            showHeader: htmlOptions.showHeader,
+            showHeaderIcon: htmlOptions.showHeaderIcon,
+            headerTags: htmlOptions.headerTags,
+            headerLayout: htmlOptions.headerLayout,
             headerBannerUrl: resolvedBannerUrl,
-            headerBannerBlur: htmlOptions.headerBannerBlur as boolean | undefined,
-            headerBannerAlign: htmlOptions.headerBannerAlign as number | undefined,
-            showFooter: htmlOptions.showFooter as boolean | undefined,
-            footerLeft: htmlOptions.footerLeft as string | undefined,
-            footerCenter: htmlOptions.footerCenter as string | undefined,
-            footerRight: htmlOptions.footerRight as string | undefined,
-            showBubble: htmlOptions.showBubble as boolean | undefined,
+            headerBannerBlur: htmlOptions.headerBannerBlur,
+            headerBannerAlign: htmlOptions.headerBannerAlign,
+            showFooter: htmlOptions.showFooter,
+            footerLeft: htmlOptions.footerLeft,
+            footerCenter: htmlOptions.footerCenter,
+            footerRight: htmlOptions.footerRight,
+            showBubble: htmlOptions.showBubble,
             embedImagesAsBlob: true,
             globalSettings: globalSettings,
             onReady: onReady,
@@ -345,9 +345,19 @@ const renderChunkAsReactComponent = async (
                 ? 16 * Number(htmlOptions.htmlScaleFactor)
                 : Number(htmlOptions.previewFontSize || 16),
             containerWidth: htmlOptions.previewWidth as number | undefined,
-            imageScale: Number(htmlOptions.imageScale),
+            imageScale: htmlOptions.imageScale !== undefined ? Number(htmlOptions.imageScale) : 100,
+            imageAlign: htmlOptions.imageAlign || 'left',
+            imageStyle: htmlOptions.imageStyle || 'none',
+            imageCropActive: !!htmlOptions.imageCropActive,
+            imageCropAspectRatio: htmlOptions.imageCropAspectRatio || 'original',
+            imageCropVAlign: htmlOptions.imageCropVAlign !== undefined ? Number(htmlOptions.imageCropVAlign) : 50,
+            imageCropHAlign: htmlOptions.imageCropHAlign !== undefined ? Number(htmlOptions.imageCropHAlign) : 50,
+            imageCropHeight: htmlOptions.imageCropHeight !== undefined ? Number(htmlOptions.imageCropHeight) : 1,
+            isForArca: !!htmlOptions.isForArca,
+            allowHtmlRendering: !!htmlOptions.allowHtmlRendering,
+            disableAnimations: !!htmlOptions.disableAnimations,
             isForImageExport: true,
-            replacementRules: htmlOptions.replacementRules as import('../../types').ReplacementRule[] | undefined,
+            replacementRules: htmlOptions.replacementRules,
         };
 
         onProgressUpdate({
@@ -516,7 +526,7 @@ const processNodeArray = async (
     backgroundColor: string,
     resolvedAvatarUrl: string,
     resolvedBannerUrl: string,
-    htmlOptions: Record<string, unknown>,
+    htmlOptions: Partial<LogExportSettings>,
     onProgressStart: (message: string, total: number) => void,
     onProgressUpdate: (update: { message?: string; current?: number }) => void,
     onProgressEnd: () => void
@@ -643,7 +653,7 @@ export const saveAsImage = async (
                 onProgressStart,
                 onProgressUpdate,
                 onProgressEnd,
-                (htmlOptions as Record<string, unknown>).previewWidth as number | undefined
+                htmlOptions.previewWidth
             );
             return;
         }
@@ -660,13 +670,20 @@ export const saveAsImage = async (
             bgColor,
             resolvedAvatarUrl,
             resolvedBannerUrl,
-            htmlOptions as Record<string, unknown>,
+            htmlOptions,
             onProgressStart,
             onProgressUpdate,
             onProgressEnd
         );
     } catch (e) {
         console.error('Error in saveAsImage:', e);
+        if (options.onProgressEnd) {
+            try {
+                options.onProgressEnd();
+            } catch (err) {
+                console.error('Error calling onProgressEnd in catch block:', err);
+            }
+        }
     }
 };
 
@@ -762,6 +779,16 @@ export const downloadImagesAsZip = async (
                 isForArca: true,
                 embedImagesAsBlob: false,
                 globalSettings: globalSettings,
+                allowHtmlRendering: false,
+                disableAnimations: true,
+                imageCropActive: false,
+                imageCropAspectRatio: 'original',
+                imageCropVAlign: 50,
+                imageCropHAlign: 50,
+                imageCropHeight: 1,
+                imageScale: 100,
+                imageAlign: 'left',
+                imageStyle: 'none',
             });
             const tempDiv = document.createElement('div');
             try {
@@ -783,6 +810,16 @@ export const downloadImagesAsZip = async (
                     isForArca: false,
                     embedImagesAsBlob: false,
                     globalSettings: globalSettings,
+                    allowHtmlRendering: false,
+                    disableAnimations: true,
+                    imageCropActive: false,
+                    imageCropAspectRatio: 'original',
+                    imageCropVAlign: 50,
+                    imageCropHAlign: 50,
+                    imageCropHeight: 1,
+                    imageScale: 100,
+                    imageAlign: 'left',
+                    imageStyle: 'none',
                 });
                 tempDiv.innerHTML = html;
 

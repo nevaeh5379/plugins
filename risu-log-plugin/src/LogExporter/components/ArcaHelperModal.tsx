@@ -4,6 +4,7 @@ import { createZipFromMediaList } from '../../services/zipService';
 import { copyToClipboard } from '../services/fileService';
 import type { CharInfo, ArcaImage } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
+import { getExportHtmlStyles } from '../services/logGenerator';
 import { Modal, Steps, Button, Alert, Input, Spin } from 'antd';
 import { DownloadOutlined, FileAddOutlined, CopyOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
@@ -69,6 +70,16 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         globalSettings,
         isForExport: true,
         isForArca: true,
+        allowHtmlRendering: !!settings.allowHtmlRendering,
+        disableAnimations: !!settings.disableAnimations,
+        imageCropActive: !!settings.imageCropActive,
+        imageCropAspectRatio: settings.imageCropAspectRatio || 'original',
+        imageCropVAlign: settings.imageCropVAlign !== undefined ? Number(settings.imageCropVAlign) : 50,
+        imageCropHAlign: settings.imageCropHAlign !== undefined ? Number(settings.imageCropHAlign) : 50,
+        imageCropHeight: settings.imageCropHeight !== undefined ? Number(settings.imageCropHeight) : 1,
+        imageScale: settings.imageScale !== undefined ? Number(settings.imageScale) : 100,
+        imageAlign: settings.imageAlign || 'left',
+        imageStyle: settings.imageStyle || 'none',
       });
 
       const tempDiv = document.createElement('div');
@@ -131,7 +142,8 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         }
       }
 
-      setBaseHtml(tempDiv.innerHTML);
+      const cssStyles = await getExportHtmlStyles(settings);
+      setBaseHtml(`<style>${cssStyles}</style>\n${tempDiv.innerHTML}`);
       setImages(collectedImages);
 
       if (collectedImages.length > 0) {

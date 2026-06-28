@@ -246,11 +246,7 @@ async function generateForceHoverCss(): Promise<string> {
     return Array.from(newRules).join('\n');
 }
 
-export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
-    // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
-    const parentStyles = await getParentPageStyles();
-
-    const getThemeCssVariables = async () => {
+export const getThemeCssVariables = async () => {
         let colors: Record<string, string> = {};
         try {
             const res = await Risuai.getColorScheme();
@@ -325,7 +321,7 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         return cssText;
     };
 
-    const getComprehensivePageCSS = async () => {
+export const getComprehensivePageCSS = async () => {
         const cssTexts = new Set<string>();
         for (const sheet of Array.from(document.styleSheets)) {
             try {
@@ -344,6 +340,31 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         });
         return Array.from(cssTexts).join('\n');
     };
+
+export const getExportHtmlStyles = async (settings: LogExportSettings): Promise<string> => {
+    const parentStyles = await getParentPageStyles();
+    const themeCss = await getThemeCssVariables();
+    const compCss = await getComprehensivePageCSS();
+    
+    let extraCss = '';
+    if (settings.disableAnimations) {
+        extraCss += `
+            *, *::before, *::after {
+                animation: none !important;
+                transition: none !important;
+            }
+        `;
+    }
+    if (settings.customCss) {
+        extraCss += '\n' + settings.customCss;
+    }
+    
+    return `${themeCss}\n${parentStyles.join('\n')}\n${compCss}\n${extraCss}`;
+};
+
+export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
+    // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
+    const parentStyles = await getParentPageStyles();
 
     const scaleMode = settings.htmlScaleMode || 'font';
     const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;

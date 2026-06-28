@@ -14,7 +14,7 @@ import PreviewPanel from './components/PreviewPanel';
 import ArcaHelperModal from './components/ArcaHelperModal';
 
 import Actionbar from './components/Actionbar';
-import { generateMarkdownLog, generateTextLog, generateHtmlPreview } from './services/logGenerator';
+import { generateMarkdownLog, generateTextLog, generateHtmlPreview, getExportHtmlStyles } from './services/logGenerator';
 import { getLogHtml } from './services/htmlGenerator';
 import { collectUIClasses, filterWithCustomClasses, getNameFromNode } from './utils/domUtils';
 import type { UIClassInfo } from './utils/domUtils';
@@ -41,14 +41,14 @@ interface Settings {
   footerLeft?: string;
   footerCenter?: string;
   footerRight?: string;
-  imageScale?: number;
-  imageAlign?: 'left' | 'center' | 'right';
-  imageStyle?: ImageStyle;
-  imageCropActive?: boolean;
-  imageCropAspectRatio?: string;
-  imageCropVAlign?: number;
-  imageCropHAlign?: number;
-  imageCropHeight?: number;
+  imageScale: number;
+  imageAlign: 'left' | 'center' | 'right';
+  imageStyle: ImageStyle;
+  imageCropActive: boolean;
+  imageCropAspectRatio: string;
+  imageCropVAlign: number;
+  imageCropHAlign: number;
+  imageCropHeight: number;
   embedImages?: boolean;
   expandHover?: boolean;
   imageResolution?: number | 'auto';
@@ -65,7 +65,9 @@ interface Settings {
   splitImage?: 'none' | 'chunk' | 'message';
   maxImageHeight?: number;
   replacementRules?: ReplacementRule[];
-  disableAnimations?: boolean;
+  disableAnimations: boolean;
+  isForArca: boolean;
+  allowHtmlRendering: boolean;
   [key: string]: unknown;
 }
 
@@ -169,9 +171,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         isEditable: false,
         splitImage: 'none',
         maxImageHeight: 10000,
-        customFilters: {},
         replacementRules: [],
         disableAnimations: true,
+        isForArca: false,
+        allowHtmlRendering: false,
       };
 
     const [savedSettings, setSavedSettings] = useState<Settings>(defaultSettings);
@@ -427,18 +430,20 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
         globalSettings: globalSettings,
         fontSize: savedSettings.htmlScaleFactor !== undefined ? 16 * savedSettings.htmlScaleFactor : savedSettings.previewFontSize,
         containerWidth: savedSettings.previewWidth,
-        imageScale: savedSettings.imageScale,
-        imageAlign: savedSettings.imageAlign,
-        imageStyle: savedSettings.imageStyle,
-        imageCropActive: savedSettings.imageCropActive,
-        imageCropAspectRatio: savedSettings.imageCropAspectRatio,
-        imageCropVAlign: savedSettings.imageCropVAlign,
-        imageCropHAlign: savedSettings.imageCropHAlign,
-        imageCropHeight: savedSettings.imageCropHeight,
+        imageScale: savedSettings.imageScale !== undefined ? Number(savedSettings.imageScale) : 100,
+        imageAlign: savedSettings.imageAlign || 'left',
+        imageStyle: savedSettings.imageStyle || 'none',
+        imageCropActive: !!savedSettings.imageCropActive,
+        imageCropAspectRatio: savedSettings.imageCropAspectRatio || 'original',
+        imageCropVAlign: savedSettings.imageCropVAlign !== undefined ? Number(savedSettings.imageCropVAlign) : 50,
+        imageCropHAlign: savedSettings.imageCropHAlign !== undefined ? Number(savedSettings.imageCropHAlign) : 50,
+        imageCropHeight: savedSettings.imageCropHeight !== undefined ? Number(savedSettings.imageCropHeight) : 1,
         isEditable: savedSettings.isEditable,
         onMessageUpdate: handleMessageUpdate,
         replacementRules: savedSettings.replacementRules,
-        disableAnimations: savedSettings.disableAnimations,
+        disableAnimations: !!savedSettings.disableAnimations,
+        isForArca: !!savedSettings.isForArca,
+        allowHtmlRendering: !!savedSettings.allowHtmlRendering,
         preCollectedAvatarMap: preCollectedAvatarMap,
     }), [
         finalNodes,
@@ -490,7 +495,9 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
 
     const getPreviewContentForExport = async () => {
         if (savedSettings.format === 'basic' || !savedSettings.format) {
-            return await getLogHtml({...logContainerProps, nodes: nodesForExport, isEditable: false, embedImagesAsBlob: true });
+            const logHtml = await getLogHtml({...logContainerProps, nodes: nodesForExport, isEditable: false, embedImagesAsBlob: true });
+            const styles = await getExportHtmlStyles(savedSettings);
+            return `<style>${styles}</style>\n${logHtml}`;
         } else if (savedSettings.format === 'html') {
             const htmlLog = await generateHtmlPreview(nodesForExport, savedSettings, preCollectedAvatarMap);
             return htmlLog.replace('</style>', `
@@ -667,6 +674,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                         charName={charName}
                                         chatName={chatName}
                                         getPreviewContent={getPreviewContentForExport}
+                                        otherFormatContent={otherFormatContent}
                                         messageNodes={nodesForExport}
                                         settings={savedSettings}
                                         backgroundColor={backgroundColor}
@@ -728,6 +736,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, on
                                                  messageNodes={nodesForExport}
                                                  settings={savedSettings}
                                                  backgroundColor={backgroundColor}
+                                                 otherFormatContent={otherFormatContent}
                                                  color={colorPalette}
                                                  charAvatarUrl={charAvatarUrl}
                                                  onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
