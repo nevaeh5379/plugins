@@ -12,6 +12,7 @@ import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
 import { imageUrlToBlob, fetchToBlobNative, hexToString } from '../utils/imageUtils';
+import { createOffscreenContainer } from '../utils/domUtils';
 import { message } from 'antd';
 import {
     captureElementToBlob,
@@ -52,24 +53,25 @@ const waitForMedia = async (element: HTMLElement) => {
 };
 
 /**
- * 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합합니다.
+ * 분할된 섹션을 순회하며 캡처하는 공통 로직
  */
-const splitAndMergeAsOneFile = async (
+const forEachSection = async (
     element: HTMLElement,
     maxHeight: number,
     resolution: number,
     format: ImageFormat,
     imageLibrary: ImageLibrary,
     bgColor: string,
-    onProgressUpdate: (update: { message?: string }) => void
-): Promise<Blob> => {
+    preserveWebpAsset: boolean,
+    onProgressUpdate: (update: { message?: string }) => void,
+    onSectionBlob: (blob: Blob, index: number, totalSections: number) => Promise<void>
+): Promise<void> => {
     const totalHeight = element.offsetHeight;
     const totalWidth = element.offsetWidth;
     const numSections = Math.ceil(totalHeight / maxHeight);
 
     onProgressUpdate({ message: `큰 이미지 분할 캡처 중 (${numSections}개 섹션)...` });
 
-    const blobs: Blob[] = [];
     for (let i = 0; i < numSections; i++) {
         const startY = i * maxHeight;
         const sectionHeight = Math.min(maxHeight, totalHeight - startY);
@@ -80,15 +82,16 @@ const splitAndMergeAsOneFile = async (
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
 
             const blob = await captureElementToBlob(
-                wrapper, format, imageLibrary, bgColor, resolution, true
+                wrapper, format, imageLibrary, bgColor, resolution, preserveWebpAsset
             );
 
             console.log(`[Log Exporter] Section ${i + 1} captured: ${blob.type} (requested: image/${format})`);
-            blobs.push(blob);
+            await onSectionBlob(blob, i, numSections);
         });
     }
+};
 
-    // 포맷에 따라 바이너리 레벨 병합 사용
+const mergeBlobsByFormat = async (blobs: Blob[], format: ImageFormat, onProgressUpdate: (update: { message?: string }) => void): Promise<Blob> => {
     onProgressUpdate({ message: `이미지 병합 중...` });
     if (format === 'png') {
         console.log('[Log Exporter] Using PNG binary merge (no Canvas!)');
@@ -100,6 +103,27 @@ const splitAndMergeAsOneFile = async (
         console.log('[Log Exporter] Using WebP merge (PNG binary merge + WebP conversion)');
         return await mergeWebPsBinary(blobs);
     }
+};
+
+/**
+ * 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합합니다.
+ */
+const splitAndMergeAsOneFile = async (
+    element: HTMLElement,
+    maxHeight: number,
+    resolution: number,
+    format: ImageFormat,
+    imageLibrary: ImageLibrary,
+    bgColor: string,
+    onProgressUpdate: (update: { message?: string }) => void
+): Promise<Blob> => {
+    const blobs: Blob[] = [];
+    await forEachSection(
+        element, maxHeight, resolution, format, imageLibrary, bgColor, true,
+        onProgressUpdate,
+        async (blob) => { blobs.push(blob); }
+    );
+    return mergeBlobsByFormat(blobs, format, onProgressUpdate);
 };
 
 /**
@@ -118,25 +142,10 @@ const splitAndSaveAsSeparateFiles = async (
     basePart: number,
     totalBaseParts: number
 ): Promise<void> => {
-    const totalHeight = element.offsetHeight;
-    const totalWidth = element.offsetWidth;
-    const numSections = Math.ceil(totalHeight / maxHeight);
-
-    onProgressUpdate({ message: `큰 이미지 분할 저장 중 (${numSections}개 섹션)...` });
-
-    for (let i = 0; i < numSections; i++) {
-        const startY = i * maxHeight;
-        const sectionHeight = Math.min(maxHeight, totalHeight - startY);
-
-        const wrapper = createSectionWrapper(element, startY, sectionHeight, totalWidth, bgColor);
-
-        await withTempWrapper(wrapper, async () => {
-            onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
-
-            const blob = await captureElementToBlob(
-                wrapper, format, imageLibrary, bgColor, resolution, false
-            );
-
+    await forEachSection(
+        element, maxHeight, resolution, format, imageLibrary, bgColor, false,
+        onProgressUpdate,
+        async (blob, i, numSections) => {
             if (!blob) throw new Error('Failed to capture section');
 
             const sectionNumber = totalBaseParts > 1 ? `${basePart + 1}_${i + 1}` : `${i + 1}`;
@@ -144,8 +153,8 @@ const splitAndSaveAsSeparateFiles = async (
 
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 파일 저장 중...` });
             await downloadBlob(blob, filename);
-        });
-    }
+        }
+    );
 };
 
 /**
@@ -262,12 +271,7 @@ export const saveAsImage = async (
             if (splitImage === 'message') {
                 let currentChunk: HTMLElement[] = [];
                 let currentHeight = 0;
-                const tempRenderDiv = document.createElement('div');
-                tempRenderDiv.style.position = 'absolute';
-                tempRenderDiv.style.top = '-9999px';
-                tempRenderDiv.style.left = '-9999px';
-                tempRenderDiv.style.width = `${htmlOptions.previewWidth || 900}px`;
-                document.body.appendChild(tempRenderDiv);
+                const { container: tempRenderDiv, remove: removeRenderDiv } = createOffscreenContainer(htmlOptions.previewWidth || 900);
 
                 for (const node of nodesToChunk) {
                     const nodeClone = node.cloneNode(true) as HTMLElement;
@@ -287,7 +291,7 @@ export const saveAsImage = async (
                 if (currentChunk.length > 0) {
                     chunks.push({ nodes: currentChunk });
                 }
-                document.body.removeChild(tempRenderDiv);
+                removeRenderDiv();
             } else {
                 chunks.push({ nodes: nodesToChunk });
             }
@@ -318,11 +322,7 @@ export const saveAsImage = async (
             const chunks = getChunks([singleElement], resolutionForChunking);
 
             onProgressStart(`이미지 생성 중...`, chunks.length);
-            const container = document.createElement('div');
-            container.style.position = 'absolute';
-            container.style.top = '-9999px';
-            container.style.left = '-9999px';
-            document.body.appendChild(container);
+            const { container, remove } = createOffscreenContainer();
 
             try {
                 for (let i = 0; i < chunks.length; i++) {
@@ -347,16 +347,12 @@ export const saveAsImage = async (
                 }
             } finally {
                 onProgressEnd();
-                document.body.removeChild(container);
+                remove();
             }
             return;
         }
 
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.top = '-9999px';
-        container.style.left = '-9999px';
-        document.body.appendChild(container);
+        const { container, remove } = createOffscreenContainer();
 
         try {
             const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
@@ -432,7 +428,7 @@ export const saveAsImage = async (
             message.error('이미지 준비 중 오류가 발생했습니다.');
         } finally {
             onProgressEnd();
-            document.body.removeChild(container);
+            remove();
         }
     } catch (e) {
         console.error('Error in saveAsImage:', e);

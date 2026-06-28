@@ -199,6 +199,19 @@ export function filterWithCustomClasses(node: HTMLElement, selectedClasses: stri
     return tempEl;
 }
 
+export function createOffscreenContainer(width?: number): { container: HTMLDivElement; remove: () => void } {
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.top = '-9999px';
+  container.style.left = '-9999px';
+  if (width) container.style.width = `${width}px`;
+  document.body.appendChild(container);
+  return {
+    container,
+    remove: () => document.body.removeChild(container),
+  };
+}
+
 export const applyReplacements = (root: HTMLElement, rules?: ReplacementRule[]) => {
     if (!rules || rules.length === 0) return;
 

@@ -113,14 +113,16 @@ export const useMessageProcessor = (
   return processedContent;
 };
 
-const processRawHtmlContent = async (originalMessageEl: Element, embedImages: boolean, replacementRules?: ReplacementRule[]): Promise<string> => {
-    const clonedContentEl = originalMessageEl.cloneNode(true) as HTMLElement;
-    clonedContentEl.querySelectorAll('button, .log-exporter-msg-btn-group').forEach(btn => btn.remove());
+type BgHandler = (element: HTMLElement, bgUrl: string, embedImages: boolean) => Promise<void>;
 
-    const mediaPromises = Array.from(clonedContentEl.querySelectorAll('img, [style*="background-image"]')).map(async (el) => {
-        const element = el as HTMLElement;
-        if (element.tagName === 'IMG') {
-            const img = element as HTMLImageElement;
+const embedImagesInElement = async (
+    element: HTMLElement,
+    embedImages: boolean,
+    onBackgroundImage: BgHandler
+): Promise<void> => {
+    const mediaPromises = Array.from(element.querySelectorAll('img, [style*="background-image"]')).map(async (el) => {
+        if (el.tagName === 'IMG') {
+            const img = el as HTMLImageElement;
             if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
                 try {
                     img.src = await imageUrlToBlob(img.src);
@@ -130,21 +132,40 @@ const processRawHtmlContent = async (originalMessageEl: Element, embedImages: bo
                 }
             }
         } else {
-            const style = element.getAttribute('style');
+            const style = el.getAttribute('style');
             const bgUrl = style ? extractBackgroundImageUrl(style) : null;
-            if (bgUrl && embedImages && !bgUrl.startsWith('data:') && !bgUrl.startsWith('blob:')) {
-                try {
-                    const convertedUrl = await imageUrlToBlob(bgUrl);
-                    element.style.backgroundImage = `url("${convertedUrl}")`;
-                } catch (e) {
-                    console.error('[log plugin] Failed to embed background image as blob:', bgUrl, e);
-                    showWarning(`배경 이미지 임베딩 실패: ${bgUrl.substring(0, 80)}${bgUrl.length > 80 ? '...' : ''}`);
-                }
+            if (bgUrl) {
+                await onBackgroundImage(el as HTMLElement, bgUrl, embedImages);
             }
         }
     });
-
     await Promise.all(mediaPromises);
+};
+
+const keepBackgroundImage: BgHandler = async (element, bgUrl, embedImages) => {
+    if (embedImages && !bgUrl.startsWith('data:') && !bgUrl.startsWith('blob:')) {
+        try {
+            const convertedUrl = await imageUrlToBlob(bgUrl);
+            element.style.backgroundImage = `url("${convertedUrl}")`;
+        } catch (e) {
+            console.error('[log plugin] Failed to embed background image as blob:', bgUrl, e);
+            showWarning(`배경 이미지 임베딩 실패: ${bgUrl.substring(0, 80)}${bgUrl.length > 80 ? '...' : ''}`);
+        }
+    }
+};
+
+const replaceBackgroundWithImg: BgHandler = async (element, bgUrl, embedImages) => {
+    const img = document.createElement('img');
+    img.src = embedImages ? await imageUrlToBlob(bgUrl) : bgUrl;
+    element.parentNode?.insertBefore(img, element);
+    element.remove();
+};
+
+const processRawHtmlContent = async (originalMessageEl: Element, embedImages: boolean, replacementRules?: ReplacementRule[]): Promise<string> => {
+    const clonedContentEl = originalMessageEl.cloneNode(true) as HTMLElement;
+    clonedContentEl.querySelectorAll('button, .log-exporter-msg-btn-group').forEach(btn => btn.remove());
+
+    await embedImagesInElement(clonedContentEl, embedImages, keepBackgroundImage);
 
     applyReplacements(clonedContentEl, replacementRules);
 
@@ -200,29 +221,7 @@ const processMessageContent = async (
     const contentSourceEl = originalMessageEl.cloneNode(true) as HTMLElement;
     contentSourceEl.querySelectorAll('script, style, .log-exporter-msg-btn-group').forEach(el => el.remove());
 
-    const mediaPromises = Array.from(contentSourceEl.querySelectorAll('img, [style*="background-image"]')).map(async (el) => {
-        if (el.tagName === 'IMG') {
-            const img = el as HTMLImageElement;
-            if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
-                try {
-                    img.src = await imageUrlToBlob(img.src);
-                } catch (e) {
-                    console.error('[log plugin] Failed to embed image as blob:', img.src, e);
-                    showWarning(`이미지 임베딩 실패: ${img.src.substring(0, 80)}${img.src.length > 80 ? '...' : ''}`);
-                }
-            }
-        } else {
-            const style = el.getAttribute('style');
-            const bgUrl = style ? extractBackgroundImageUrl(style) : null;
-            if (bgUrl) {
-                const img = document.createElement('img');
-                img.src = embedImages ? await imageUrlToBlob(bgUrl) : bgUrl;
-                el.parentNode?.insertBefore(img, el);
-                el.remove();
-            }
-        }
-    });
-    await Promise.all(mediaPromises);
+    await embedImagesInElement(contentSourceEl, embedImages, replaceBackgroundWithImg);
 
     // 이미지 스케일, 정렬 및 스타일 적용
     const alignValue = imageAlign || 'left';
