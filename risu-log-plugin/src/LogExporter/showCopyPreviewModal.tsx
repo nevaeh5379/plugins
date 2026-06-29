@@ -2,9 +2,9 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client';
 import './showCopyPreviewModal.css';
 import type { RisuCharacter } from '../types/risuai';
-import type { ColorPalette, GlobalSettings, LogContainerProps } from '../types';
+import type { ColorPalette, GlobalSettings, LogContainerProps, ThemeInfo } from '../types';
 import { ConfigProvider, Spin, Button, Drawer, message } from 'antd';
-import { SettingOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
+import { SettingOutlined, CloseOutlined, EditOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 
 import SettingsTabs from './components/SettingsTabs';
 import PreviewPanel from './components/PreviewPanel';
@@ -219,6 +219,9 @@ interface PreviewContentProps {
   onInvertSelection: () => void;
   onDimensionsChange: (dims: EstimatedImageSize) => void;
   isConverting: boolean;
+  onSettingChange: (key: string, value: unknown) => void;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 function PreviewContent({
@@ -234,6 +237,9 @@ function PreviewContent({
   onInvertSelection,
   onDimensionsChange,
   isConverting,
+  onSettingChange,
+  themes,
+  colors,
 }: PreviewContentProps) {
   return (
     <PreviewPanel
@@ -249,6 +255,9 @@ function PreviewContent({
       onInvertSelection={onInvertSelection}
       onDimensionsChange={onDimensionsChange}
       isConverting={isConverting}
+      onSettingChange={onSettingChange}
+      themes={themes}
+      colors={colors}
     />
   );
 }
@@ -353,8 +362,6 @@ function SettingsDrawerContent({
       onTabChange={onTabChange}
       settings={settings}
       onSettingChange={onSettingChange}
-      themes={THEMES}
-      colors={COLORS}
       participants={participants}
       globalSettings={globalSettings}
       onGlobalSettingChange={onGlobalSettingChange}
@@ -415,7 +422,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
   // ── UI State ──
   const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('export');
+  const [activeTab, setActiveTab] = useState('filter');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
 
   // ── Message Update Handler ──
   const handleMessageUpdate = useCallback((index: number, newHtml: string) => {
@@ -705,6 +713,9 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                   onInvertSelection={selection.invertSelection}
                   onDimensionsChange={setEstimatedImageSize}
                   isConverting={converting}
+                  onSettingChange={handleSettingChange}
+                  themes={THEMES}
+                  colors={COLORS}
                 />
                 <div className="mobile-action-bar">
                   <ActionbarContent
@@ -734,8 +745,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
             ) : (
               /* ── Desktop Layout ── */
               <div className="log-exporter-modal-content" style={{
-                display: 'grid',
-                gridTemplateColumns: '450px 1fr',
+                display: 'flex',
                 height: 'calc(100% - 71px)',
                 overflow: 'hidden',
               }}>
@@ -743,20 +753,49 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                   display: 'flex',
                   flexDirection: 'column',
                   height: '100%',
-                  borderRight: '1px solid var(--border-color)',
+                  width: isSettingsOpen ? '450px' : '0px',
+                  borderRight: isSettingsOpen ? '1px solid var(--border-color)' : '0px solid transparent',
                   background: 'var(--bg-secondary)',
-                  overflow: 'hidden',
+                  overflow: 'visible',
+                  flexShrink: 0,
+                  position: 'relative',
                 }}>
-                  <SettingsDrawerContent
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
-                    settings={settings}
-                    onSettingChange={handleSettingChange}
-                    participants={modalState.participants}
-                    globalSettings={globalSettings}
-                    onGlobalSettingChange={handleGlobalSettingChange}
-                    uiClasses={modalState.uiClasses}
-                    imageSizeWarning={imageSizeWarning}
+                  <div style={{ width: '450px', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+                    <SettingsDrawerContent
+                      activeTab={activeTab}
+                      onTabChange={setActiveTab}
+                      settings={settings}
+                      onSettingChange={handleSettingChange}
+                      participants={modalState.participants}
+                      globalSettings={globalSettings}
+                      onGlobalSettingChange={handleGlobalSettingChange}
+                      uiClasses={modalState.uiClasses}
+                      imageSizeWarning={imageSizeWarning}
+                    />
+                  </div>
+                  <Button
+                    className="sidebar-toggle-handle"
+                    icon={isSettingsOpen ? <LeftOutlined /> : <RightOutlined />}
+                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                    style={{
+                      position: 'absolute',
+                      right: isSettingsOpen ? '-10px' : '-18px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      zIndex: 100,
+                      borderRadius: '0 8px 8px 0',
+                      width: '18px',
+                      height: '48px',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderLeft: 'none',
+                      backgroundColor: 'var(--bg-secondary)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-secondary)',
+                      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
+                    }}
                   />
                 </div>
                 <div className="desktop-preview-panel" style={{
@@ -765,6 +804,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                   flexDirection: 'column',
                   height: '100%',
                   position: 'relative',
+                  flex: 1,
                 }}>
                   <PreviewContent
                     logContainerProps={logContainerProps}
@@ -779,6 +819,9 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                     onInvertSelection={selection.invertSelection}
                     onDimensionsChange={setEstimatedImageSize}
                     isConverting={converting}
+                    onSettingChange={handleSettingChange}
+                    themes={THEMES}
+                    colors={COLORS}
                   />
                   <div className="desktop-floating-action-bar">
                     <ActionbarContent

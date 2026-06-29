@@ -101,7 +101,6 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
 
           <Divider />
           <div className="tab-section">
-            <Title level={5} className="tab-section-title">표시 옵션</Title>
             <SettingToggle
               label="아바타"
               description="프로필 이미지 표시"

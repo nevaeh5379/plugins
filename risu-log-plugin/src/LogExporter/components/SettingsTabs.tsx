@@ -1,12 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Tabs } from 'antd';
-import { ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined } from '@ant-design/icons';
+import { FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined } from '@ant-design/icons';
 import type { UIClassInfo } from '../utils/domUtils';
-import type { ThemeInfo, ColorPalette } from '../../types';
 import type { ReplacementRule } from '../../types';
 
-import ExportTab from './ExportTab';
 import FilterTab from './FilterTab';
 import ReplacementTab from './ReplacementTab';
 import AdvancedTab from './AdvancedTab';
@@ -17,8 +15,6 @@ export interface SettingsTabsProps {
   onTabChange: (key: string) => void;
   settings: any;
   onSettingChange: (key: string, value: any) => void;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
   participants: Set<string>;
   globalSettings: any;
   onGlobalSettingChange: (key: string, value: any) => void;
@@ -31,8 +27,6 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
   onTabChange,
   settings,
   onSettingChange,
-  themes,
-  colors,
   participants,
   globalSettings,
   onGlobalSettingChange,
@@ -40,23 +34,6 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
   imageSizeWarning,
 }) => {
   const items = [
-    {
-      key: 'export',
-      label: (
-        <span>
-          <ExportOutlined />
-          내보내기
-        </span>
-      ),
-      children: (
-        <ExportTab
-          settings={settings}
-          onSettingChange={onSettingChange}
-          themes={themes}
-          colors={colors}
-        />
-      ),
-    },
     {
       key: 'filter',
       label: (
