@@ -11,7 +11,7 @@ const themeConfig: ThemeConfig = {
   // Avatar
   avatarSize: 44,
   avatarRadius: '50%',
-  avatarBorder: true,
+  avatarBorder: false,
 
   // Name
   showName: true,

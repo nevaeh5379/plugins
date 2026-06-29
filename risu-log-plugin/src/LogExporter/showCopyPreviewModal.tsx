@@ -154,6 +154,8 @@ function buildLogContainerProps(
     isForArca: settings.isForArca,
     allowHtmlRendering: settings.allowHtmlRendering,
     preCollectedAvatarMap,
+    avatarPosition: settings.avatarPosition,
+    avatarShape: settings.avatarShape,
   };
 }
 

@@ -355,6 +355,19 @@ export const getExportHtmlStyles = async (settings: LogExportSettings): Promise<
             }
         `;
     }
+    if (settings.theme === 'log') {
+        extraCss += `
+            .chat-message-container .prose, 
+            .chat-message-container .chattext,
+            .chat-message-container .prose > *,
+            .chat-message-container .chattext > * {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin-left: 0 !important;
+                padding-left: 0 !important;
+            }
+        `;
+    }
     if (settings.customCss) {
         extraCss += '\n' + settings.customCss;
     }

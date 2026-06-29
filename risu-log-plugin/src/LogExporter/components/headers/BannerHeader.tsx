@@ -31,6 +31,7 @@ const BannerHeader: React.FC<LogHeaderProps> = ({
         <h1 style={{
           color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)',
           margin: '0 0 0.2em 0', fontSize: '1.8em', fontWeight: 700,
+          objectPosition: 'top',
         }}>{charInfo.name}</h1>
         <p style={{ opacity: 0.85, margin: '0 0 0.8em 0', fontSize: '0.95em' }}>{charInfo.chatName}</p>
         <HeaderTags tags={tags} color={color} variant="banner" />

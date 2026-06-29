@@ -49,6 +49,8 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
     isForImageExport,
     isForExport,
     disableAnimations,
+    avatarPosition,
+    avatarShape,
   } = props;
 
   const [avatarMap, setAvatarMap] = useState<Map<string, string>>(preCollectedAvatarMap || new Map());
@@ -130,9 +132,9 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
       backgroundColor: color.background,
       borderRadius: selectedThemeKey === 'log' ? '8px' : '12px',
       overflow: 'hidden',
-      padding: selectedThemeKey === 'log' ? 0 : '24px 32px',
-      border: selectedThemeKey === 'log' ? 'none' : `1px solid ${color.border}`,
-      boxShadow: selectedThemeKey === 'log' ? 'none' : (color.shadow || 'none'),
+      padding: selectedThemeKey === 'log' ? '12px 0' : '24px 32px',
+      border: `1px solid ${color.border}`,
+      boxShadow: color.shadow || 'none',
   };
 
   return (
@@ -151,6 +153,19 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
           .raw-message-wrapper .chattext {
             font-size: 1em !important;
             line-height: inherit;
+          }
+        `}</style>
+      )}
+      {selectedThemeKey === 'log' && (
+        <style>{`
+          .chat-message-container .prose, 
+          .chat-message-container .chattext,
+          .chat-message-container .prose > *,
+          .chat-message-container .chattext > * {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
           }
         `}</style>
       )}
@@ -201,6 +216,8 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
             onRendered={() => handleMessageRendered(index)}
             replacementRules={props.replacementRules}
             fontSize={fontSize}
+            avatarPosition={avatarPosition}
+            avatarShape={avatarShape}
           />
         ))}
       </main>

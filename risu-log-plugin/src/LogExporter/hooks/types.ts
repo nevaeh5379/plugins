@@ -44,6 +44,8 @@ export interface LogExporterSettings {
   isForArca: boolean;
   allowHtmlRendering: boolean;
   customFilters: Record<string, boolean>;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 export const DEFAULT_SETTINGS: LogExporterSettings = {
@@ -90,6 +92,8 @@ export const DEFAULT_SETTINGS: LogExporterSettings = {
   isForArca: false,
   allowHtmlRendering: false,
   customFilters: {},
+  avatarPosition: 'opposite',
+  avatarShape: 'theme',
 };
 
 export interface ProgressState {

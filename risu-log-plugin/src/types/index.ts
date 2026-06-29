@@ -95,6 +95,8 @@ export interface LogContainerProps extends ImageDisplayOptions {
   imageScale: number;
   imageAlign: 'left' | 'center' | 'right';
   imageStyle: ImageStyle;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 // 메시지 컴포넌트 Props
@@ -129,6 +131,8 @@ export interface MessageProps extends ImageDisplayOptions {
   imageScale: number;
   imageAlign: 'left' | 'center' | 'right';
   imageStyle: ImageStyle;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 export type LogNode = HTMLElement;
@@ -222,6 +226,8 @@ export interface LogExportSettings extends ImageDisplayOptions {
   onProgressEnd?: () => void;
   // External data
   charAvatarUrl?: string;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 

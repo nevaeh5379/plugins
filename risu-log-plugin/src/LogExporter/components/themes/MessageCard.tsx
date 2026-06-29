@@ -10,7 +10,7 @@ interface MessageCardProps {
   // Pre-computed values from useMessageCard
   baseSize: string;
   messageHtml: string;
-  contentRef: React.RefObject<HTMLDivElement | null>;
+  contentRef: (node: HTMLDivElement | null) => void;
   isUser: boolean;
   name: string;
   handleBlur: (e: React.FocusEvent<HTMLDivElement>) => void;
