@@ -53,6 +53,7 @@ const CoverHeader: React.FC<LogHeaderProps> = ({
               objectFit: 'cover', border: `4px solid ${color.background}`,
               boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
               backgroundColor: color.cardBg,
+               objectPosition: 'top',
             }} />
           </div>
         )}

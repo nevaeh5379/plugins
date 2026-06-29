@@ -23,8 +23,9 @@ const BannerHeader: React.FC<LogHeaderProps> = ({
       {showHeaderIcon !== false && (
         <img src={avatarSrc} data-log-exporter-avatar="true" style={{
           width: '82px', height: '82px', borderRadius: '50%',
-          objectFit: 'cover', border: `3px solid ${color.avatarBorder}`,
+          objectFit: 'cover',
           boxShadow: '0 2px 10px rgba(0,0,0,0.4)', flexShrink: 0,
+           objectPosition: 'top',
         }} alt="Avatar" />
       )}
       <div style={{ textAlign: 'left' }}>

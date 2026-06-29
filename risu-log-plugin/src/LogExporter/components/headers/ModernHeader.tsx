@@ -21,6 +21,7 @@ const ModernHeader: React.FC<LogHeaderProps> = ({ charInfo, color, headerTags })
           width: '72px', height: '72px', borderRadius: '12px',
           objectFit: 'cover', display: 'block',
           border: `1px solid ${color.border}`,
+           objectPosition: 'top',
         }} />
         <div style={{
           position: 'absolute', bottom: '-3px', right: '-3px',

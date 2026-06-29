@@ -32,14 +32,15 @@ const Avatar: React.FC<AvatarProps> = ({ avatarSrc, name, isUser, isForArca, sho
 
   if (isForArca || isForExport) {
     if (!avatarSrc) return renderPlaceholder();
-    return <img {...{ [AVATAR_ATTR]: '' }} data-user={isUser} style={fullStyle} src={avatarSrc} />;
+    return <img {...{ [AVATAR_ATTR]: '' }} data-user={isUser} style={{ ...fullStyle, objectPosition: 'top' }} src={avatarSrc} />;
   }
 
   if (avatarSrc) {
-    return <div {...{ [AVATAR_ATTR]: '' }} style={{
+    return <img {...{ [AVATAR_ATTR]: '' }} style={{
       ...fullStyle,
       backgroundImage: `url('${avatarSrc}')`,
-      backgroundSize: 'cover', backgroundPosition: 'center',
+      backgroundSize: 'cover', backgroundPosition: 'top',
+      objectPosition: 'top',
     }} />;
   }
 
