@@ -52,8 +52,8 @@ const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewCon
 
     const handleSaveHtml = async () => {
         const content = await getPreviewContent();
-        const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
-        const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
+        const safeCharName = charName.replace(/[/?%*:"<>]/g, '-');
+        const safeChatName = chatName.replace(/[/?%*:"<>]/g, '-');
         const filename = `Risu_Log_${safeCharName}_${safeChatName}.html`;
         saveAsFile(filename, content, 'text/html;charset=utf-8');
     };

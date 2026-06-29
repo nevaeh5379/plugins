@@ -118,7 +118,7 @@ export const useMessageProcessor = (
     };
 
     process();
-  }, [originalMessageEl, depsKey, isSync]);
+  }, [originalMessageEl, depsKey, isSync, allowHtmlRendering, color, embedImagesAsBlob, imageAlign, imageCropActive, imageCropAspectRatio, imageCropHAlign, imageCropHeight, imageCropVAlign, imageScale, imageStyle, processedContent, replacementRules]);
 
   return processedContent;
 };

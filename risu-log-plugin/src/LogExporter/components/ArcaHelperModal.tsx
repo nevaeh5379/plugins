@@ -126,7 +126,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
           
           const urlLower = src.toLowerCase();
           const isWebM = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
-          let extension = isWebM && settings.convertWebM ? 'webp' : ((el as HTMLElement).dataset.extension || 'jpg');
+          const extension = isWebM && settings.convertWebM ? 'webp' : ((el as HTMLElement).dataset.extension || 'jpg');
           const filename = `${String(mediaCounter).padStart(3, '0')}.${extension}`;
 
           collectedImages.push({ url: src, filename, isWebM });
@@ -148,7 +148,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
 
       if (collectedImages.length > 0) {
         const blob = await createZipFromMediaList(collectedImages, { convertWebM: settings.convertWebM });
-        const safeCharName = charInfo.name.replace(/[\/\?%\*:|"<>]/g, '-');
+        const safeCharName = charInfo.name.replace(/[/?%*:"<>]/g, '-');
         const zipFilename = `Arca_Images_${safeCharName}.zip`;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);

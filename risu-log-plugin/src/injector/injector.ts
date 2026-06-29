@@ -43,7 +43,7 @@ const INJECTOR_CSS = `
 `
 
 // 모듈 상태
-let rangeSelection = {
+const rangeSelection = {
   active: false,
   startIndex: -1
 }
@@ -126,8 +126,8 @@ async function createMsgBtnGroup(
   )
   await fromHereBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(fromHereBtn, e))) return
-    (e as any).preventDefault?.()
-    (e as any).stopPropagation?.()
+    ;(e as any).preventDefault?.()
+    ;(e as any).stopPropagation?.()
 
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index })
@@ -141,8 +141,8 @@ async function createMsgBtnGroup(
   )
   await onlyThisBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(onlyThisBtn, e))) return
-    (e as any).preventDefault?.()
-    (e as any).stopPropagation?.()
+    ;(e as any).preventDefault?.()
+    ;(e as any).stopPropagation?.()
 
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index, singleMessage: true })
@@ -156,8 +156,8 @@ async function createMsgBtnGroup(
   )
   await rangeBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(rangeBtn, e))) return
-    (e as any).preventDefault?.()
-    (e as any).stopPropagation?.()
+    ;(e as any).preventDefault?.()
+    ;(e as any).stopPropagation?.()
 
     if (!rangeSelection.active) {
       await clearRange(rootDoc)
@@ -235,7 +235,7 @@ export async function openExportModalForCurrentChat(): Promise<void> {
 // mutations 내용 검사 대신 단순 재주입 트리거(디바운스)로 회피합니다.
 let reinjectTimer: ReturnType<typeof setTimeout> | null = null
 
-async function onMutation(_mutations: SafeClassArray<SafeMutationRecord>): Promise<void> {
+async function onMutation(): Promise<void> {
   try {
     // 디바운스: 연속 DOM 변경 시 한 번만 재주입
     if (reinjectTimer) clearTimeout(reinjectTimer)

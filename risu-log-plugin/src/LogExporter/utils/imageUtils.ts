@@ -150,7 +150,7 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
  * @returns data URL 문자열. 실패 시 원본 URL 반환.
  */
 const promiseWithTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string = 'Timeout'): Promise<T> => {
-  let timeoutId: any;
+  let timeoutId: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
   });
