@@ -373,6 +373,34 @@ const renderChunkAsReactComponent = async (
 // Capture & Save
 // --------------------------------------------------------------------
 
+/** 분할 전략에 따른 캡처 결과를 가져옵니다. */
+const captureWithStrategy = async (
+    element: HTMLElement,
+    finalMaxHeight: number,
+    resolution: number,
+    format: ImageFormat,
+    imageLibrary: ImageLibrary,
+    backgroundColor: string,
+    splitImage: string,
+    onProgressUpdate: (update: { message?: string }) => void
+): Promise<{ blob: Blob | null; isSeparateFiles: boolean }> => {
+    if (splitImage === 'chunk') {
+        const blob = await splitAndMergeAsOneFile(
+            element, finalMaxHeight, resolution, format,
+            imageLibrary, backgroundColor, onProgressUpdate
+        );
+        return { blob, isSeparateFiles: false };
+    }
+    if (splitImage === 'message') {
+        return { blob: null, isSeparateFiles: true };
+    }
+    // 전체 캡처
+    const blob = await captureElement(
+        element, format, imageLibrary, backgroundColor, resolution
+    );
+    return { blob, isSeparateFiles: false };
+};
+
 /** 단일 요소 캡처 → (필요시 분할/병합) → 다운로드 */
 const captureAndSaveElement = async (
     element: HTMLElement,
@@ -395,43 +423,35 @@ const captureAndSaveElement = async (
     const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
     const isTooTall = element.offsetHeight > finalMaxHeight;
 
-    let blob: Blob | null = null;
-
-    if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
-        if (splitImage === 'chunk') {
-            blob = await splitAndMergeAsOneFile(
-                element,
-                finalMaxHeight,
-                resolution,
-                format,
-                imageLibrary as ImageLibrary,
-                backgroundColor,
-                onProgressUpdate
-            );
-        } else {
-            await splitAndSaveAsSeparateFiles(
-                element,
-                finalMaxHeight,
-                resolution,
-                format,
-                imageLibrary as ImageLibrary,
-                backgroundColor,
-                onProgressUpdate,
-                sanitizeFilename(charName),
-                sanitizeFilename(chatName),
-                part,
-                totalParts
-            );
-            return;
-        }
-    } else {
-        blob = await captureElement(
-            element,
-            format,
-            imageLibrary as ImageLibrary,
-            backgroundColor,
-            resolution
+    if (!isTooTall || splitImage === 'none') {
+        // 분할 없이 전체 캡처
+        const blob = await captureElement(
+            element, format, imageLibrary as ImageLibrary,
+            backgroundColor, resolution
         );
+        if (!blob) throw new Error('Failed to generate image blob.');
+        onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
+        await sleep(50);
+        await downloadBlob(blob, filename);
+        return;
+    }
+
+    // 분할 필요
+    const { blob, isSeparateFiles } = await captureWithStrategy(
+        element, finalMaxHeight, resolution, format,
+        imageLibrary as ImageLibrary, backgroundColor,
+        splitImage, onProgressUpdate
+    );
+
+    if (isSeparateFiles) {
+        await splitAndSaveAsSeparateFiles(
+            element, finalMaxHeight, resolution, format,
+            imageLibrary as ImageLibrary, backgroundColor,
+            onProgressUpdate,
+            sanitizeFilename(charName), sanitizeFilename(chatName),
+            part, totalParts
+        );
+        return;
     }
 
     if (!blob) {
@@ -444,10 +464,93 @@ const captureAndSaveElement = async (
 };
 
 // --------------------------------------------------------------------
+// 공통 캡처 파이프라인
+// --------------------------------------------------------------------
+
+/** 각 chunk에 대해 캡처 작업을 실행하는 공통 루프 */
+const runCapturePipeline = async (
+    chunks: { nodes: HTMLElement[] }[],
+    onProgressStart: (message: string, total: number) => void,
+    onProgressEnd: () => void,
+    onChunk: (
+        container: HTMLElement,
+        elementFromChunk: HTMLElement,
+        index: number,
+        total: number
+    ) => Promise<void>,
+    hasReactRender: boolean = false
+): Promise<void> => {
+    onProgressStart(`이미지 생성 중...`, chunks.length);
+    if (hasReactRender) await sleep(50);
+
+    const { container, remove } = createOffscreenContainer();
+
+    try {
+        for (let i = 0; i < chunks.length; i++) {
+            await onChunk(container, chunks[i].nodes[0], i, chunks.length);
+        }
+    } catch (error) {
+        console.error('Error preparing images:', error);
+        if (hasReactRender) {
+            message.error('이미지 준비 중 오류가 발생했습니다.');
+        }
+    } finally {
+        onProgressEnd();
+        remove();
+    }
+};
+
+/** 단일 요소 캡처 → (필요시 분할/병합) → 다운로드 */
+const performCaptureAndSave = async (
+    elementToRender: HTMLElement,
+    initialImageResolution: number | 'auto',
+    format: ImageFormat,
+    imageLibrary: string,
+    splitImage: string,
+    userMaxImageHeight: number,
+    charName: string,
+    chatName: string,
+    backgroundColor: string,
+    part: number,
+    totalParts: number,
+    onProgressUpdate: (update: { message?: string }) => void
+): Promise<void> => {
+    const finalResolution = computeFinalResolution(
+        initialImageResolution,
+        elementToRender.offsetHeight,
+        onProgressUpdate
+    );
+
+    // auto 모드일 때 해상도 정보 출력
+    if (initialImageResolution === 'auto') {
+        const height = elementToRender.offsetHeight;
+        onProgressUpdate({
+            message: `[${part + 1}/${totalParts}] 자동 해상도 결정: ${height}px -> ${finalResolution}x`,
+        });
+    }
+
+    await waitForMedia(elementToRender);
+    await captureAndSaveElement(
+        elementToRender,
+        finalResolution,
+        part,
+        totalParts,
+        format,
+        imageLibrary,
+        splitImage,
+        userMaxImageHeight,
+        charName,
+        chatName,
+        backgroundColor,
+        onProgressUpdate
+    );
+};
+
+// --------------------------------------------------------------------
 // Pipeline: single node
 // --------------------------------------------------------------------
 
-/** 단일 HTMLElement export 파이프라인 */
+/** 단일 노드 export 파이프라인 */
 const processSingleNode = async (
     node: HTMLElement,
     format: ImageFormat,
@@ -471,42 +574,21 @@ const processSingleNode = async (
         previewWidth
     );
 
-    onProgressStart(`이미지 생성 중...`, chunks.length);
-    const { container, remove } = createOffscreenContainer();
-
-    try {
-        for (let i = 0; i < chunks.length; i++) {
-            const elementToRender = chunks[i].nodes[0];
-
+    await runCapturePipeline(
+        chunks,
+        onProgressStart,
+        onProgressEnd,
+        async (container, elementToRender, i, total) => {
             container.innerHTML = '';
             container.appendChild(elementToRender);
-
-            const finalResolution = computeFinalResolution(
-                initialImageResolution,
-                elementToRender.offsetHeight,
-                onProgressUpdate
-            );
-
-            await waitForMedia(elementToRender);
-            await captureAndSaveElement(
-                elementToRender,
-                finalResolution,
-                i,
-                chunks.length,
-                format,
-                imageLibrary,
-                splitImage,
-                userMaxImageHeight,
-                charName,
-                chatName,
-                backgroundColor,
-                onProgressUpdate
+            await performCaptureAndSave(
+                elementToRender, initialImageResolution, format,
+                imageLibrary, splitImage, userMaxImageHeight,
+                charName, chatName, backgroundColor,
+                i, total, onProgressUpdate
             );
         }
-    } finally {
-        onProgressEnd();
-        remove();
-    }
+    );
 };
 
 // --------------------------------------------------------------------
@@ -538,68 +620,33 @@ const processNodeArray = async (
         initialImageResolution
     );
 
-    onProgressStart(`이미지 생성 중...`, chunks.length);
-    await sleep(50);
-
-    const { container, remove } = createOffscreenContainer();
-
-    try {
-        for (let i = 0; i < chunks.length; i++) {
+    await runCapturePipeline(
+        chunks,
+        onProgressStart,
+        onProgressEnd,
+        async (container, _elementFromChunk, i, total) => {
             const chunkNodes = chunks[i].nodes;
             await sleep(50);
 
             const elementToRender = await renderChunkAsReactComponent(
-                container,
-                chunkNodes,
-                charName,
-                chatName,
-                resolvedAvatarUrl,
-                resolvedBannerUrl,
-                htmlOptions,
-                onProgressUpdate,
-                i,
-                chunks.length
+                container, chunkNodes,
+                charName, chatName,
+                resolvedAvatarUrl, resolvedBannerUrl,
+                htmlOptions, onProgressUpdate,
+                i, total
             );
-            if (!elementToRender) continue;
+            if (!elementToRender) return;
 
-            const finalResolution = computeFinalResolution(
-                initialImageResolution,
-                elementToRender.offsetHeight,
-                onProgressUpdate
-            );
-
-            // auto 모드일 때 해상도 정보 출력
-            if (initialImageResolution === 'auto') {
-                const height = elementToRender.offsetHeight;
-                onProgressUpdate({
-                    message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x`,
-                });
-            }
-
-            await waitForMedia(elementToRender);
-            await captureAndSaveElement(
-                elementToRender,
-                finalResolution,
-                i,
-                chunks.length,
-                format,
-                imageLibrary,
-                splitImage,
-                userMaxImageHeight,
-                charName,
-                chatName,
-                backgroundColor,
-                onProgressUpdate
+            await performCaptureAndSave(
+                elementToRender, initialImageResolution, format,
+                imageLibrary, splitImage, userMaxImageHeight,
+                charName, chatName, backgroundColor,
+                i, total, onProgressUpdate
             );
             container.innerHTML = '';
-        }
-    } catch (error) {
-        console.error('Error preparing images:', error);
-        message.error('이미지 준비 중 오류가 발생했습니다.');
-    } finally {
-        onProgressEnd();
-        remove();
-    }
+        },
+        true // hasReactRender
+    );
 };
 
 // --------------------------------------------------------------------
@@ -687,6 +734,170 @@ export const saveAsImage = async (
     }
 };
 
+// ──────────────────────────────────────────────
+// ZIP 다운로드 유틸
+// ──────────────────────────────────────────────
+
+/** URL에서 파일 확장자를 감지합니다. */
+const detectExtension = (src: string, isVideo: boolean): string => {
+    const urlPath = src.split(/[?#]/)[0];
+    const filenamePart = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+
+    // 16진수 인코딩된 확장자 (SW 이미지)
+    const hexDotIndex = filenamePart.lastIndexOf('2e');
+    if (hexDotIndex !== -1 && hexDotIndex > 0) {
+        try {
+            const hexExt = filenamePart.substring(hexDotIndex + 2);
+            const decodedExt = hexToString(hexExt);
+            if (decodedExt.match(/^[a-z0-9]{1,5}$/i)) {
+                return decodedExt;
+            }
+        } catch {
+            // ignore
+        }
+    }
+
+    // 일반 파일 확장자
+    const lastDotIndex = urlPath.lastIndexOf('.');
+    if (lastDotIndex !== -1 && urlPath.length - lastDotIndex <= 5) {
+        const ext = urlPath.substring(lastDotIndex + 1).toLowerCase();
+        if (ext) return ext;
+    }
+
+    // 기본값
+    return isVideo ? 'mp4' : 'png';
+};
+
+/** 미디어 요소를 ZIP에 추가합니다. Promise를 반환하여 모든 추가가 완료될 때까지 대기할 수 있습니다. */
+const addMediaToZip = (
+    el: HTMLImageElement | HTMLVideoElement,
+    zip: JSZip,
+    mediaCounter: { current: number },
+    convertWebM: boolean,
+    addedUrls: Set<string>
+): Promise<void> => {
+    const isVideo = el.tagName === 'VIDEO';
+    const src = isVideo ? (el.querySelector('source')?.src || el.src) : el.src;
+
+    if (!src || src.startsWith('data:')) return Promise.resolve();
+    if (addedUrls.has(src)) return Promise.resolve();
+    addedUrls.add(src);
+
+    mediaCounter.current++;
+    const baseFilename = `media_${String(mediaCounter.current).padStart(3, '0')}`;
+
+    return fetchToBlobNative(src)
+        .then(async (blob) => {
+            const urlLower = src.toLowerCase();
+            const isWebMFromUrl = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
+            const isWebMFromMime = blob.type.includes('webm');
+            const isWebM = isWebMFromUrl || isWebMFromMime;
+
+            if (convertWebM && isVideo && isWebM) {
+                console.log(`[Log Exporter] WebM file detected, converting to WebP: ${baseFilename}`);
+                try {
+                    const file = new File([blob], 'video.webm', { type: 'video/webm' });
+                    const webpBlob = await convertWebMToAnimatedWebP(file, null, null, 80);
+                    zip.file(`${baseFilename}.webp`, webpBlob);
+                    return;
+                } catch (e) {
+                    console.error(`[Log Exporter] WebM conversion failed, saving original:`, e);
+                }
+            }
+
+            const extension = detectExtension(src, isVideo);
+            zip.file(`${baseFilename}.${extension}`, blob);
+        })
+        .catch(e => console.warn(`Failed to process/compress media: ${src}`, e));
+};
+
+/** HTML에서 img/video 요소를 수집하여 ZIP에 추가합니다. */
+const collectMediaFromHtml = async (
+    html: string,
+    zip: JSZip,
+    options: {
+        mediaCounter: { current: number };
+        convertWebM: boolean;
+        addedUrls: Set<string>;
+    }
+): Promise<void> => {
+    const tempDiv = document.createElement('div');
+    try {
+        tempDiv.innerHTML = html;
+        const elements = Array.from(tempDiv.querySelectorAll('img, video'));
+        await Promise.all(
+            elements.map(el =>
+                addMediaToZip(el as HTMLImageElement | HTMLVideoElement, zip, options.mediaCounter, options.convertWebM, options.addedUrls)
+            )
+        );
+    } finally {
+        tempDiv.innerHTML = '';
+    }
+};
+
+/** 아바타 이미지를 ZIP에 추가합니다. */
+const collectAvatarsForZip = async (
+    tempDiv: HTMLDivElement,
+    charName: string,
+    globalSettings: import('../../types').GlobalSettings,
+    zip: JSZip,
+    mediaCounter: { current: number },
+    addedUrls: Set<string>
+): Promise<void> => {
+    const avatarMap = await collectCharacterAvatars(Array.from(tempDiv.children), charName, false, globalSettings);
+    const promises: Promise<void>[] = [];
+    for (const avatarUrl of avatarMap.values()) {
+        const fakeImg = document.createElement('img');
+        fakeImg.src = avatarUrl;
+        promises.push(addMediaToZip(fakeImg, zip, mediaCounter, false, addedUrls));
+    }
+    await Promise.all(promises);
+};
+
+/** ZIP 파일 생성 및 다운로드 */
+const finalizeZipDownload = async (
+    zip: JSZip,
+    charInfo: CharInfo,
+    sequentialNaming: boolean
+): Promise<void> => {
+    const content = await zip.generateAsync({ type: "blob" });
+    const safeCharName = charInfo.name.replace(/[/?%*:|"<>]/g, '-');
+    const safeChatName = charInfo.chatName.replace(/[/?%*:|"<>]/g, '-');
+    const zipFilename = `Risu_Log_Media_${safeCharName}_${safeChatName}${sequentialNaming ? '_Arca' : ''}.zip`;
+
+    await downloadBlob(content, zipFilename);
+};
+
+/** LogHtml 옵션 생성 헬퍼 */
+const createLogHtmlOptions = (
+    baseOptions: {
+        nodes: Element[];
+        charInfo: CharInfo;
+        showAvatar: boolean;
+        globalSettings: import('../../types').GlobalSettings;
+    },
+    extra: { isForArca: boolean }
+): Omit<import('../../types').LogContainerProps, 'onReady'> => ({
+    nodes: baseOptions.nodes,
+    charInfo: baseOptions.charInfo,
+    selectedThemeKey: 'basic',
+    selectedColorKey: 'dark',
+    showAvatar: baseOptions.showAvatar,
+    isForArca: extra.isForArca,
+    embedImagesAsBlob: false,
+    globalSettings: baseOptions.globalSettings,
+    allowHtmlRendering: false,
+    disableAnimations: true,
+    imageCropActive: false,
+    imageCropAspectRatio: 'original',
+    imageCropVAlign: 50,
+    imageCropHAlign: 50,
+    imageCropHeight: 1,
+    imageScale: 100,
+    imageAlign: 'left',
+    imageStyle: 'none',
+});
+
 export const downloadImagesAsZip = async (
     nodes: Element[],
     charInfo: CharInfo,
@@ -697,158 +908,38 @@ export const downloadImagesAsZip = async (
     console.log(`[Log Exporter] downloadImagesAsZip: Media ZIP download started`);
     try {
         const zip = new JSZip();
-        const mediaPromises: Promise<void>[] = [];
-        let mediaCounter = 0;
+        const mediaCounter = { current: 0 };
         const addedUrls = new Set<string>();
 
-        const addMediaToZip = (el: HTMLImageElement | HTMLVideoElement) => {
-            const isVideo = el.tagName === 'VIDEO';
-            const src = isVideo ? (el.querySelector('source')?.src || el.src) : (el as HTMLImageElement).src;
-
-            if (!src || src.startsWith('data:')) return;
-            if (!sequentialNaming && addedUrls.has(src)) return;
-            addedUrls.add(src);
-
-            mediaCounter++;
-            const baseFilename = `media_${String(mediaCounter).padStart(3, '0')}`;
-
-            mediaPromises.push(
-                fetchToBlobNative(src)
-                    .then(async (blob) => {
-                        const urlLower = src.toLowerCase();
-                        const isWebMFromUrl = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
-                        const isWebMFromMime = blob.type.includes('webm');
-                        const isWebM = isWebMFromUrl || isWebMFromMime;
-
-                        if (convertWebM && isVideo && isWebM) {
-                            console.log(`[Log Exporter] WebM file detected, converting to WebP: ${baseFilename}`);
-                            try {
-                                const file = new File([blob], 'video.webm', { type: 'video/webm' });
-                                const webpBlob = await convertWebMToAnimatedWebP(file, null, null, 80);
-                                zip.file(`${baseFilename}.webp`, webpBlob);
-                                return;
-                            } catch (e) {
-                                console.error(`[Log Exporter] WebM conversion failed, saving original:`, e);
-                            }
-                        }
-
-                        let extension: string | null = null;
-                        const urlPath = src.split(/[?#]/)[0];
-                        const filenamePart = urlPath.substring(urlPath.lastIndexOf('/') + 1);
-
-                        const hexDotIndex = filenamePart.lastIndexOf('2e');
-                        if (hexDotIndex !== -1 && hexDotIndex > 0) {
-                            try {
-                                const hexExt = filenamePart.substring(hexDotIndex + 2);
-                                const decodedExt = hexToString(hexExt);
-                                if (decodedExt.match(/^[a-z0-9]{1,5}$/i)) {
-                                    extension = decodedExt;
-                                }
-                            } catch (e) {
-                                console.warn('Failed to decode hex extension', e);
-                            }
-                        }
-
-                        if (!extension) {
-                            const lastDotIndex = urlPath.lastIndexOf('.');
-                            if (lastDotIndex !== -1 && urlPath.length - lastDotIndex <= 5) {
-                                extension = urlPath.substring(lastDotIndex + 1).toLowerCase();
-                            }
-                        }
-
-                        if (!extension) {
-                            console.error(`Could not find extension from URL, using default. URL: ${src}`);
-                            extension = isVideo ? 'mp4' : 'png';
-                        }
-
-                        const filename = `${baseFilename}.${extension}`;
-                        zip.file(filename, blob);
-                    })
-                    .catch(e => console.warn(`Failed to process/compress media: ${src}`, e))
-            );
-        };
+        const globalSettings = await loadGlobalSettings();
+        const baseOptions = { nodes, charInfo, showAvatar, globalSettings };
 
         if (sequentialNaming) {
-            const globalSettings = await loadGlobalSettings();
-            const baseHtml = await getLogHtml({
-                nodes: nodes,
-                charInfo: charInfo,
-                selectedThemeKey: 'basic',
-                selectedColorKey: 'dark',
-                showAvatar: showAvatar,
-                isForArca: true,
-                embedImagesAsBlob: false,
-                globalSettings: globalSettings,
-                allowHtmlRendering: false,
-                disableAnimations: true,
-                imageCropActive: false,
-                imageCropAspectRatio: 'original',
-                imageCropVAlign: 50,
-                imageCropHAlign: 50,
-                imageCropHeight: 1,
-                imageScale: 100,
-                imageAlign: 'left',
-                imageStyle: 'none',
+            const html = await getLogHtml(createLogHtmlOptions(baseOptions, { isForArca: true }));
+            await collectMediaFromHtml(html, zip, {
+                mediaCounter,
+                convertWebM,
+                addedUrls,
             });
-            const tempDiv = document.createElement('div');
-            try {
-                tempDiv.innerHTML = baseHtml;
-                tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
-            } finally {
-                tempDiv.innerHTML = '';
-            }
         } else {
-            const globalSettings = await loadGlobalSettings();
+            const html = await getLogHtml(createLogHtmlOptions(baseOptions, { isForArca: false }));
             const tempDiv = document.createElement('div');
             try {
-                const html = await getLogHtml({
-                    nodes: nodes,
-                    charInfo: charInfo,
-                    selectedThemeKey: 'basic',
-                    selectedColorKey: 'dark',
-                    showAvatar: showAvatar,
-                    isForArca: false,
-                    embedImagesAsBlob: false,
-                    globalSettings: globalSettings,
-                    allowHtmlRendering: false,
-                    disableAnimations: true,
-                    imageCropActive: false,
-                    imageCropAspectRatio: 'original',
-                    imageCropVAlign: 50,
-                    imageCropHAlign: 50,
-                    imageCropHeight: 1,
-                    imageScale: 100,
-                    imageAlign: 'left',
-                    imageStyle: 'none',
-                });
                 tempDiv.innerHTML = html;
-
                 if (showAvatar) {
-                    const avatarMap = await collectCharacterAvatars(Array.from(tempDiv.children), charInfo.name, false, globalSettings);
-                    for (const avatarUrl of avatarMap.values()) {
-                        const fakeImg = document.createElement('img');
-                        fakeImg.src = avatarUrl;
-                        addMediaToZip(fakeImg);
-                    }
+                    await collectAvatarsForZip(tempDiv, charInfo.name, globalSettings, zip, mediaCounter, addedUrls);
                 }
-                tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+                await collectMediaFromHtml(html, zip, {
+                    mediaCounter,
+                    convertWebM,
+                    addedUrls,
+                });
             } finally {
                 tempDiv.innerHTML = '';
             }
         }
 
-        if (mediaPromises.length === 0) {
-            message.warning('다운로드할 이미지나 비디오가 로그에 없습니다.');
-            return;
-        }
-
-        await Promise.all(mediaPromises);
-        const content = await zip.generateAsync({ type: "blob" });
-        const safeCharName = charInfo.name.replace(/[/?%*:|"<>]/g, '-');
-        const safeChatName = charInfo.chatName.replace(/[/?%*:|"<>]/g, '-');
-        const zipFilename = `Risu_Log_Media_${safeCharName}_${safeChatName}${sequentialNaming ? '_Arca' : ''}.zip`;
-
-        await downloadBlob(content, zipFilename);
+        await finalizeZipDownload(zip, charInfo, sequentialNaming);
     } catch (error) {
         console.error('[Log Exporter] Error creating ZIP file:', error);
         message.error('미디어 ZIP 파일 생성 중 오류가 발생했습니다.');
