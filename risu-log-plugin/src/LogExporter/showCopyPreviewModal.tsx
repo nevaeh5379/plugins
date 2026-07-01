@@ -343,6 +343,8 @@ interface SettingsDrawerProps {
   onGlobalSettingChange: (key: string, value: unknown) => void;
   uiClasses: import('./utils/domUtils').UIClassInfo[];
   imageSizeWarning: string;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 function SettingsDrawerContent({
@@ -355,6 +357,8 @@ function SettingsDrawerContent({
   onGlobalSettingChange,
   uiClasses,
   imageSizeWarning,
+  themes,
+  colors,
 }: SettingsDrawerProps) {
   return (
     <SettingsTabs
@@ -367,6 +371,8 @@ function SettingsDrawerContent({
       onGlobalSettingChange={onGlobalSettingChange}
       uiClasses={uiClasses}
       imageSizeWarning={imageSizeWarning}
+      themes={themes}
+      colors={colors}
     />
   );
 }
@@ -771,6 +777,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                       onGlobalSettingChange={handleGlobalSettingChange}
                       uiClasses={modalState.uiClasses}
                       imageSizeWarning={imageSizeWarning}
+                      themes={THEMES}
+                      colors={COLORS}
                     />
                   </div>
                   <Button
@@ -904,6 +912,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
           onGlobalSettingChange={handleGlobalSettingChange}
           uiClasses={modalState.uiClasses}
           imageSizeWarning={imageSizeWarning}
+          themes={THEMES}
+          colors={COLORS}
         />
       </Drawer>
     </ConfigProvider>

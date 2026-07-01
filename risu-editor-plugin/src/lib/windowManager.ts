@@ -24,7 +24,7 @@
  * absolutely-positioned, draggable, resizable windows.
  */
 
-export type LayoutMode = 'fullscreen' | 'windowed'
+export type LayoutMode = 'fullscreen' | 'windowed' | 'sidebar'
 
 export interface WindowRect {
   x: number

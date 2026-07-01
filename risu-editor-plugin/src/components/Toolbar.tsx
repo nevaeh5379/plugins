@@ -16,10 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 import React from 'react'
-import { FaRedo, FaColumns, FaCog } from "react-icons/fa"
+import { LuMenu, LuX, LuRotateCw, LuSettings, LuMaximize2, LuMinimize2 } from 'react-icons/lu'
 import { MenuBar } from './MenuBar'
-import { FaX, FaBars } from 'react-icons/fa6'
-import { VscScreenFull, VscScreenNormal } from 'react-icons/vsc'
 import type { LayoutMode } from '../lib/windowManager'
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
@@ -95,7 +93,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onClick={onToggleSidebar}
           title="Toggle sidebar"
         >
-          <FaBars />
+          <LuMenu size={16} />
         </button>
         <span className="re-toolbar-title">Risu Editor</span>
         <MenuBar 
@@ -137,11 +135,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClick={onToggleLayoutMode}
             title={layoutMode === 'windowed' ? '전체화면 모드로 전환' : '창 모드로 전환'}
           >
-            {layoutMode === 'windowed' ? <VscScreenFull /> : <VscScreenNormal />}
+            {layoutMode === 'windowed' ? <LuMaximize2 size={16} /> : <LuMinimize2 size={16} />}
           </button>
         )}
         <button className="re-btn re-btn-icon" onClick={onClose} title="Close editor">
-          <FaX />
+          <LuX size={16} />
         </button>
       </div>
     </div>

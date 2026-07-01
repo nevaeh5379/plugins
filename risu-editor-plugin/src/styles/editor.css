@@ -1626,3 +1626,177 @@ select.re-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============================================================================
+   Backdrop Transparency & Sidebar Layout Options
+   ============================================================================ */
+
+/* 투명 Backdrop 모드 */
+.re-app.re-transparent-mode:not(.re-layout-sidebar) {
+  background: rgba(15, 23, 42, var(--re-backdrop-opacity, 0.2)) !important;
+  backdrop-filter: blur(8px);
+}
+
+.re-app.re-transparent-mode:not(.re-layout-sidebar) .re-main {
+  background: transparent !important;
+}
+
+/* Sidebar Layout: 메인 화면 오른쪽에 달라붙는 컴패니언 에디터 */
+.re-app.re-layout-sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 450px !important;
+  height: 100vh !important;
+  border-left: 1px solid var(--re-border) !important;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.5) !important;
+  background: var(--re-bg-editor) !important;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  z-index: 999999 !important;
+}
+
+.re-app.re-layout-sidebar .re-toolbar {
+  height: 40px !important;
+}
+
+.re-app.re-layout-sidebar .re-main {
+  height: calc(100% - 72px) !important; /* statusbar + toolbar */
+}
+
+/* 사이드바 레이아웃에서는 파일 익스플로러 폭을 좁히거나 숨겨서 에디터 공간을 더 확보 */
+.re-app.re-layout-sidebar .re-sidebar-wrapper {
+  width: 140px !important;
+  min-width: 140px !important;
+}
+
+/* 상태표시줄 투명도 조절 UI */
+.re-statusbar-backdrop-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid var(--re-border-light);
+}
+
+.re-statusbar-btn {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--re-border-light);
+  border-radius: 3px;
+  color: var(--re-fg-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.re-statusbar-btn:hover {
+  background: var(--re-bg-hover);
+  color: var(--re-fg-bright);
+}
+
+.re-statusbar-btn.active {
+  background: var(--re-accent);
+  border-color: var(--re-accent);
+  color: white;
+}
+
+.re-statusbar-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.re-statusbar-slider {
+  width: 70px;
+  height: 4px;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.re-statusbar-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: var(--re-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.re-statusbar-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.re-statusbar-slider-value {
+  font-size: 10px;
+  color: var(--re-fg-muted);
+  min-width: 45px;
+}
+
+/* 레이아웃 제어 그룹 */
+.re-statusbar-layout-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.re-statusbar-label {
+  font-size: 11px;
+  color: var(--re-fg-muted);
+}
+
+.re-statusbar-btn-group {
+  display: flex;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--re-border-light);
+}
+
+.re-statusbar-btn-group .re-statusbar-btn {
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid var(--re-border-light);
+  gap: 3px;
+}
+
+.re-statusbar-btn-group .re-statusbar-btn:last-child {
+  border-right: none;
+}
+
+/* 주입되는 퀵 에디터 📝 버튼 디자인 (RisuAI 메인 UI에서 어우러지도록) */
+.re-injected-quick-edit-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 4px !important;
+  color: #94a3b8 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+}
+
+.re-injected-quick-edit-btn:hover {
+  background: #3b82f6 !important;
+  border-color: #60a5fa !important;
+  color: #ffffff !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5) !important;
+}
+
+.re-injected-quick-edit-btn:active {
+  transform: scale(0.95) !important;
+}
+

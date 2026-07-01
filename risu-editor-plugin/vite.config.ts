@@ -56,7 +56,7 @@ export default defineConfig({
     cssCodeSplit: false,
     // Drop down from esnext so esbuild lowers any stray import.meta usage.
     target: 'es2020',
-    minify: 'esbuild',
+    minify: false,
     outDir: 'dist',
   },
   define: {

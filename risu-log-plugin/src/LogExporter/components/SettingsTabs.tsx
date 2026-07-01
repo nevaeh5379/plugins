@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Tabs } from 'antd';
-import { FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined } from '@ant-design/icons';
+import { FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined, BgColorsOutlined } from '@ant-design/icons';
 import type { UIClassInfo } from '../utils/domUtils';
-import type { ReplacementRule } from '../../types';
+import type { ReplacementRule, ThemeInfo, ColorPalette } from '../../types';
 
 import FilterTab from './FilterTab';
 import ReplacementTab from './ReplacementTab';
+import StyleTab from './StyleTab';
 import AdvancedTab from './AdvancedTab';
 import PluginGlobalSettings from './PluginGlobalSettings';
 
@@ -20,6 +21,8 @@ export interface SettingsTabsProps {
   onGlobalSettingChange: (key: string, value: any) => void;
   uiClasses: UIClassInfo[];
   imageSizeWarning?: string;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 const SettingsTabs: React.FC<SettingsTabsProps> = ({
@@ -32,6 +35,8 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
   onGlobalSettingChange,
   uiClasses,
   imageSizeWarning,
+  themes,
+  colors,
 }) => {
   const items = [
     {
@@ -65,6 +70,23 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
         <ReplacementTab
           rules={(settings.replacementRules as ReplacementRule[]) || []}
           onRulesChange={(rules) => onSettingChange('replacementRules', rules)}
+        />
+      ),
+    },
+    {
+      key: 'style',
+      label: (
+        <span>
+          <BgColorsOutlined />
+          스타일
+        </span>
+      ),
+      children: (
+        <StyleTab
+          settings={settings}
+          onSettingChange={onSettingChange}
+          themes={themes}
+          colors={colors}
         />
       ),
     },

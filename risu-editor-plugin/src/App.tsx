@@ -30,6 +30,7 @@ import {
   characterToVFS,
   vfsToCharacter,
   findNode,
+  findNodeByField,
   findParentNode,
   getModifiedFiles,
   countFiles,
@@ -170,6 +171,10 @@ const AppContent: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('fullscreen')
+  const [backdropOpacity, setBackdropOpacity] = useState<number>(0.2)
+  const [enableBackdrop, setEnableBackdrop] = useState<boolean>(true)
+  const pendingFilePathRef = useRef<string | null>(null)
+  const pendingFileFieldRef = useRef<string | null>(null)
   const [windows, setWindows] = useState<WindowState[]>([])
   const [explorerWindowOpen, setExplorerWindowOpen] = useState(false)
   const { settings } = useSettings()
@@ -238,22 +243,6 @@ const AppContent: React.FC = () => {
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  useEffect(() => {
-    const handler = () => { loadData() }
-    window.addEventListener('risu-editor:reload', handler)
-    return () => window.removeEventListener('risu-editor:reload', handler)
-  }, [loadData])
-
-  useEffect(() => {
-    if (panes.length > 0 && !panes.some(p => p.id === activePaneId)) {
-      setActivePaneId(panes[0].id)
-    }
-  }, [panes, activePaneId])
-
   // ─── File selection ──────────────────────────────────────────────────────
 
   const handleFileSelect = useCallback(
@@ -296,6 +285,74 @@ const AppContent: React.FC = () => {
     },
     [activePaneId, isMobile, layoutMode]
   )
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    const handler = () => { loadData() }
+    window.addEventListener('risu-editor:reload', handler)
+    return () => window.removeEventListener('risu-editor:reload', handler)
+  }, [loadData])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path?: string; field?: string }>
+      const path = customEvent.detail?.path
+      const field = customEvent.detail?.field
+      if (!path && !field) return
+      
+      pendingFilePathRef.current = path || null
+      pendingFileFieldRef.current = field || null
+      
+      if (vfsRootRef.current) {
+        let node = null
+        if (field) {
+          node = findNodeByField(vfsRootRef.current, field)
+        }
+        if (!node && path) {
+          node = findNode(vfsRootRef.current, path)
+        }
+        
+        if (node) {
+          handleFileSelect(node)
+        }
+      } else {
+        loadData()
+      }
+    }
+    window.addEventListener('risu-editor:open-file', handler)
+    return () => window.removeEventListener('risu-editor:open-file', handler)
+  }, [loadData, handleFileSelect])
+
+  useEffect(() => {
+    if (vfsRoot && (pendingFilePathRef.current || pendingFileFieldRef.current)) {
+      const targetField = pendingFileFieldRef.current
+      const targetPath = pendingFilePathRef.current
+      pendingFileFieldRef.current = null
+      pendingFilePathRef.current = null
+      
+      let node = null
+      if (targetField) {
+        node = findNodeByField(vfsRoot, targetField)
+      }
+      if (!node && targetPath) {
+        node = findNode(vfsRoot, targetPath)
+      }
+      
+      if (node) {
+        handleFileSelect(node)
+      }
+    }
+  }, [vfsRoot, handleFileSelect])
+
+  useEffect(() => {
+    if (panes.length > 0 && !panes.some(p => p.id === activePaneId)) {
+      setActivePaneId(panes[0].id)
+    }
+  }, [panes, activePaneId])
+
 
   // ─── Tab management ──────────────────────────────────────────────────────
 
@@ -802,7 +859,11 @@ const AppContent: React.FC = () => {
           clearTimeout(autoSaveTimerRef.current)
           autoSaveTimerRef.current = null
         }
-        performSave()
+        performSave().then(() => {
+          if (!IS_DEV) {
+            hideEditor()
+          }
+        })
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'W') {
         e.preventDefault()
@@ -1220,7 +1281,28 @@ const AppContent: React.FC = () => {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="re-app re-fade-in">
+    <div 
+      className={`re-app re-fade-in${enableBackdrop ? ' re-transparent-mode' : ''}${layoutMode === 'sidebar' ? ' re-layout-sidebar' : ''}`}
+      style={{
+        '--re-backdrop-opacity': backdropOpacity,
+      } as React.CSSProperties}
+    >
+      {layoutMode === 'sidebar' && (
+        <div 
+          className="re-sidebar-layout-backdrop" 
+          onClick={handleClose}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: 'calc(100vw - 450px)',
+            height: '100vh',
+            cursor: 'pointer',
+            background: 'transparent',
+            zIndex: 1
+          }}
+        />
+      )}
       <Toolbar
         characterName={originalChar?.name ?? ''}
         autoSaveStatus={autoSaveStatus}
@@ -1326,11 +1408,18 @@ const AppContent: React.FC = () => {
         </>
       )}
       <StatusBar
-            filePath={panes.find(p => p.id === activePaneId)?.activeTabPath || null}
-            language={getActiveFileForPane(panes.find(p => p.id === activePaneId) || panes[0])?.language ?? null}
-            totalFiles={totalFiles}
-            autoSaveStatus={autoSaveStatus}
-          />
+        filePath={panes.find(p => p.id === activePaneId)?.activeTabPath || null}
+        language={getActiveFileForPane(panes.find(p => p.id === activePaneId) || panes[0])?.language ?? null}
+        totalFiles={totalFiles}
+        autoSaveStatus={autoSaveStatus}
+        backdropOpacity={backdropOpacity}
+        setBackdropOpacity={setBackdropOpacity}
+        enableBackdrop={enableBackdrop}
+        setEnableBackdrop={setEnableBackdrop}
+        layoutMode={layoutMode}
+        setLayoutMode={setLayoutMode}
+        onToggleLayoutMode={handleToggleLayoutMode}
+      />
     </div>
   )
 }

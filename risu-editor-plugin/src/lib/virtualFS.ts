@@ -539,6 +539,17 @@ export function findNode(root: VFSNode, path: string): VFSNode | null {
   return null
 }
 
+export function findNodeByField(root: VFSNode, field: string): VFSNode | null {
+  if (root.mapping && root.mapping.field === field) return root
+  if (root.children) {
+    for (const child of root.children) {
+      const found = findNodeByField(child, field)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 export function findParentNode(root: VFSNode, path: string): VFSNode | null {
   if (root.children) {
     for (const child of root.children) {

@@ -1,21 +1,6 @@
-/**
- * risup-editor-plugin, a RisuAI plugin for editing character lorebooks, prompts, and settings
- * Copyright (C) 2026 nevaeh5379
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
 import React from 'react'
+import type { LayoutMode } from '../lib/windowManager'
+import { LuEye, LuEyeOff, LuMaximize2, LuLayoutGrid, LuColumns2 } from 'react-icons/lu'
 
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'unsaved'
 
@@ -24,6 +9,13 @@ interface StatusBarProps {
   language: string | null
   totalFiles: number
   autoSaveStatus: AutoSaveStatus
+  backdropOpacity?: number
+  setBackdropOpacity?: (opacity: number) => void
+  enableBackdrop?: boolean
+  setEnableBackdrop?: (enable: boolean) => void
+  layoutMode?: LayoutMode
+  setLayoutMode?: (mode: LayoutMode) => void
+  onToggleLayoutMode?: () => void
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -31,6 +23,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   language,
   totalFiles,
   autoSaveStatus,
+  backdropOpacity = 0.2,
+  setBackdropOpacity,
+  enableBackdrop = true,
+  setEnableBackdrop,
+  layoutMode = 'fullscreen',
+  setLayoutMode,
+  onToggleLayoutMode,
 }) => {
   const getStatusText = () => {
     switch (autoSaveStatus) {
@@ -52,7 +51,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       case 'unsaved':
         return 'modified'
       case 'saving':
-        return 'modified'
+        return 'saving'
       default:
         return ''
     }
@@ -62,8 +61,71 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     <div className="re-statusbar">
       <div className="re-statusbar-left">
         <span className={`re-statusbar-item ${getStatusClass()}`}>{getStatusText()}</span>
+        
+        {/* Backdrop 투명도 컨트롤 */}
+        {setEnableBackdrop && setBackdropOpacity && (
+          <div className="re-statusbar-backdrop-control">
+            <button
+              className={`re-statusbar-btn ${enableBackdrop ? 'active' : ''}`}
+              onClick={() => setEnableBackdrop(!enableBackdrop)}
+              title="배경 투명화 토글"
+            >
+              {enableBackdrop ? <LuEye size={14} /> : <LuEyeOff size={14} />}
+              <span style={{ marginLeft: '4px' }}>배경 투명화</span>
+            </button>
+            {enableBackdrop && (
+              <div className="re-statusbar-slider-container">
+                <input
+                  type="range"
+                  min="0.05"
+                  max="0.9"
+                  step="0.05"
+                  value={backdropOpacity}
+                  onChange={(e) => setBackdropOpacity(parseFloat(e.target.value))}
+                  title="배경 불투명도 조절"
+                  className="re-statusbar-slider"
+                />
+                <span className="re-statusbar-slider-value">{Math.round((1 - backdropOpacity) * 100)}% 투명</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      
       <div className="re-statusbar-right">
+        {/* 레이아웃 모드 단추 */}
+        {setLayoutMode && (
+          <div className="re-statusbar-layout-control">
+            <span className="re-statusbar-label">레이아웃:</span>
+            <div className="re-statusbar-btn-group">
+              <button
+                className={`re-statusbar-btn ${layoutMode === 'fullscreen' ? 'active' : ''}`}
+                onClick={() => setLayoutMode('fullscreen')}
+                title="전체화면 모드"
+              >
+                <LuMaximize2 size={13} />
+                <span>전체화면</span>
+              </button>
+              <button
+                className={`re-statusbar-btn ${layoutMode === 'sidebar' ? 'active' : ''}`}
+                onClick={() => setLayoutMode('sidebar')}
+                title="사이드 패널 모드"
+              >
+                <LuColumns2 size={13} />
+                <span>사이드바</span>
+              </button>
+              <button
+                className={`re-statusbar-btn ${layoutMode === 'windowed' ? 'active' : ''}`}
+                onClick={() => setLayoutMode('windowed')}
+                title="멀티 윈도우 모드"
+              >
+                <LuLayoutGrid size={13} />
+                <span>윈도우</span>
+              </button>
+            </div>
+          </div>
+        )}
+        
         {filePath && (
           <>
             <span className="re-statusbar-item">{language?.toUpperCase() || 'TEXT'}</span>
