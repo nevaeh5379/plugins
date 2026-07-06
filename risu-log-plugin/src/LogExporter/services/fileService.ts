@@ -19,11 +19,52 @@ export const copyToClipboard = (text: string) => {
             message.success('클립보드에 HTML 형식으로 복사되었습니다.');
         }).catch(err => {
             console.error('클립보드 복사 실패:', err);
-            message.success('클립보드에 저장 실패했습니다.');
+            fallbackCopyToClipboard(text);
         });
     } else {
-        console.error('클립보드 복사 실패:');
-        message.success('클립보드에 저장 실패했습니다.');
+        fallbackCopyToClipboard(text);
+    }
+};
+
+const fallbackCopyToClipboard = (text: string) => {
+    try {
+        const container = document.createElement('div');
+        container.innerHTML = text;
+        
+        // Avoid scrolling to bottom
+        container.style.position = 'fixed';
+        container.style.top = '0';
+        container.style.left = '0';
+        container.style.opacity = '0';
+        
+        document.body.appendChild(container);
+        
+        // Select the content
+        const range = document.createRange();
+        range.selectNodeContents(container);
+        
+        const selection = window.getSelection();
+        if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            const successful = document.execCommand('copy');
+            selection.removeAllRanges();
+            document.body.removeChild(container);
+            
+            if (successful) {
+                message.success('클립보드에 HTML 형식으로 복사되었습니다. (대체 방식)');
+                return;
+            }
+        } else {
+            document.body.removeChild(container);
+        }
+        
+        console.error('대체 복사 명령어 실패');
+        message.error('클립보드 복사에 실패했습니다. RisuAI 상위 문서(iframe)의 클립보드 쓰기 권한 허용이 필요합니다.');
+    } catch (err) {
+        console.error('대체 클립보드 복사 중 에러:', err);
+        message.error('클립보드 복사에 실패했습니다. RisuAI 상위 문서(iframe)의 클립보드 쓰기 권한 허용이 필요합니다.');
     }
 };
 

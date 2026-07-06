@@ -101,47 +101,13 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
 
           <Divider />
           <div className="tab-section">
+            <Title level={5} className="tab-section-title">표시 옵션</Title>
             <SettingToggle
               label="아바타"
               description="프로필 이미지 표시"
               checked={settings.showAvatar}
               onChange={(v) => onSettingChange('showAvatar', v)}
             />
-            {settings.showAvatar !== false && (
-              <div className="setting-subgroup">
-                <div className="setting-field">
-                  <Text className="setting-field-label">아바타 위치</Text>
-                  <Select
-                    value={settings.avatarPosition || 'opposite'}
-                    onChange={(val) => onSettingChange('avatarPosition', val)}
-                    style={{ width: '100%' }}
-                    options={[
-                      { value: 'opposite', label: '말풍선 옆 - 기본 (상대 좌 / 유저 우)' },
-                      { value: 'left', label: '말풍선 옆 - 항상 좌측' },
-                      { value: 'right', label: '말풍선 옆 - 항상 우측' },
-                      { value: 'opposite-top', label: '이름 옆 - 기본 (상대 좌 / 유저 우)' },
-                      { value: 'top-left', label: '이름 옆 - 항상 좌측' },
-                      { value: 'top-right', label: '이름 옆 - 항상 우측' },
-                    ]}
-                  />
-                </div>
-                <div className="setting-field">
-                  <Text className="setting-field-label">아바타 모양</Text>
-                  <Select
-                    value={settings.avatarShape || 'theme'}
-                    onChange={(val) => onSettingChange('avatarShape', val)}
-                    style={{ width: '100%' }}
-                    options={[
-                      { value: 'theme', label: '테마 기본값' },
-                      { value: 'circle', label: '동그라미' },
-                      { value: 'square', label: '네모' },
-                      { value: 'rounded', label: '둥근 네모' },
-                      { value: 'squircle', label: '애매한 네모 (스쿼클)' },
-                    ]}
-                  />
-                </div>
-              </div>
-            )}
             <SettingToggle
               label="말풍선"
               description="메시지 말풍선 스타일"

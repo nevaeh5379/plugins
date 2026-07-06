@@ -4,7 +4,7 @@ import type { ReplacementRule, GlobalSettings } from '../../types';
 // Assuming global settings are loaded and passed in.
 export const getNameFromNode = (node: HTMLElement, globalSettings: GlobalSettings, charName = 'Assistant'): string => {
     const escapeSelector = (selector: string) => {
-        return selector.replace(/[!"#$%&'()*+,./:;<=>?@[\]^`{|}~]/g, '$&');
+        return selector.replace(/[!"#$%&'()*+,./:;<=>?@[\]^`{|}~]/g, '\$&');
     };
 
     if (globalSettings && Array.isArray(globalSettings.participantNameClasses)) {
@@ -16,8 +16,8 @@ export const getNameFromNode = (node: HTMLElement, globalSettings: GlobalSetting
                 if (el && el.textContent && el.textContent.trim()) {
                     return el.textContent.trim();
                 }
-            } catch {
-                console.warn(`[Log Exporter] Invalid class selector for participant name: ${cls}`);
+            } catch (e) {
+                console.warn(`[Log Exporter] Invalid class selector for participant name: ${cls}`, e);
             }
         }
     }
@@ -240,7 +240,7 @@ export const applyReplacements = (root: HTMLElement, rules?: ReplacementRule[]) 
                          modified = true;
                      }
                 }
-            } catch {
+            } catch (e) {
                 // ignore invalid regex
             }
         });

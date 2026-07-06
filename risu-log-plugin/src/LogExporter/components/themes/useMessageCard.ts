@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useRef, useEffect } from 'react';
 import type { MessageProps } from '../../../types';
 import { useMessageProcessor } from '../../hooks/useMessageProcessor';
 import { getNameFromNode } from '../../utils/domUtils';
@@ -8,7 +8,7 @@ import { CHAT_CONTENT_SELECTOR } from '../constants';
 export interface UseMessageCardResult {
   baseSize: string;
   messageHtml: string;
-  contentRef: (node: HTMLDivElement | null) => void;
+  contentRef: React.RefObject<HTMLDivElement | null>;
   isUser: boolean;
   name: string;
   avatarSrc: string | undefined;
@@ -47,9 +47,11 @@ export function useMessageCard(
     imageCropHeight
   );
 
-  const contentRef = useCallback((node: HTMLDivElement | null) => {
-    if (node && messageHtml !== node.innerHTML) {
-      node.innerHTML = messageHtml;
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (contentRef.current && messageHtml !== contentRef.current.innerHTML) {
+      contentRef.current.innerHTML = messageHtml;
     }
   }, [messageHtml]);
 

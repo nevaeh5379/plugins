@@ -73,8 +73,6 @@ const arePropsEqual = (prevProps: MessageProps, nextProps: MessageProps) => {
   if (prevProps.isSelected !== nextProps.isSelected) return false;
   if (prevProps.themeKey !== nextProps.themeKey) return false;
   if (prevProps.showAvatar !== nextProps.showAvatar) return false;
-  if (prevProps.avatarPosition !== nextProps.avatarPosition) return false;
-  if (prevProps.avatarShape !== nextProps.avatarShape) return false;
   if (prevProps.showBubble !== nextProps.showBubble) return false;
   if (prevProps.isEditable !== nextProps.isEditable) return false;
   if (prevProps.fontSize !== nextProps.fontSize) return false;

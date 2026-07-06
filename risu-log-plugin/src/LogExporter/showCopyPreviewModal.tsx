@@ -1,96 +1,111 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import './showCopyPreviewModal.css';
+import { processChatLog, serializeNodes } from '../services/chatData';
+import { THEMES, COLORS, CHAT_CONTENT_SELECTOR } from './components/constants';
 import type { RisuCharacter } from '../types/risuai';
-import type { ColorPalette, GlobalSettings, LogContainerProps, ThemeInfo } from '../types';
-import { ConfigProvider, Spin, Button, Drawer, message } from 'antd';
-import { SettingOutlined, CloseOutlined, EditOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import type { ThemeKey, ColorKey, ImageStyle } from '../types';
+import { ConfigProvider, theme, Spin, Button, Drawer, message } from 'antd';
+import { SettingOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons';
 
 import SettingsTabs from './components/SettingsTabs';
 import PreviewPanel from './components/PreviewPanel';
 import ArcaHelperModal from './components/ArcaHelperModal';
+
 import Actionbar from './components/Actionbar';
-import { THEMES, COLORS, CHAT_CONTENT_SELECTOR } from './components/constants';
-import { clearBlobUrlCache } from './utils/imageUtils';
-import { saveAsFile } from './services/fileService';
-import { loadGlobalSettings } from './services/settingsService';
-import {
-  generateMarkdownLog,
-  generateTextLog,
-  generateHtmlPreview,
-  getExportHtmlStyles,
-} from './services/logGenerator';
+import { generateMarkdownLog, generateTextLog, generateHtmlPreview } from './services/logGenerator';
 import { getLogHtml } from './services/htmlGenerator';
+import { collectUIClasses, filterWithCustomClasses, getNameFromNode } from './utils/domUtils';
+import type { UIClassInfo } from './utils/domUtils';
+import type { ReplacementRule } from '../types';
+import { loadAllCharSettings, loadGlobalSettings, saveCharSettings, saveGlobalSettings } from './services/settingsService';
+import { saveAsFile } from './services/fileService';
+import { clearBlobUrlCache } from './utils/imageUtils';
 
-// Hooks
-import type { LogExporterSettings, CharInfoState, EstimatedImageSize } from './hooks/types';
-import { useWindowWidth } from './hooks/useWindowWidth';
-import { useProgress } from './hooks/useProgress';
-import { useSelection } from './hooks/useSelection';
-import { useSettings } from './hooks/useSettings';
-import { useImageSizeWarning } from './hooks/useImageSizeWarning';
-import { useFilteredNodes } from './hooks/useLogData';
-import { useTheme } from './hooks/useTheme';
-
-// Re-export types
-export type { LogExporterSettings, CharInfoState, EstimatedImageSize } from './hooks/types';
-
-// ─── Modal State Interface ───────────────────────────────────────────────────
-
-interface ModalState {
-  charInfo: CharInfoState;
-  messageNodes: HTMLElement[];
-  character: RisuCharacter | null;
-  participants: Set<string>;
-  uiClasses: import('./utils/domUtils').UIClassInfo[];
-  preCollectedAvatarMap: Map<string, string>;
-  isLoading: boolean;
-  error: string | null;
+interface Settings {
+  format?: 'basic' | 'html' | 'markdown' | 'text';
+  theme?: ThemeKey;
+  color?: ColorKey;
+  customCss?: string;
+  showAvatar?: boolean;
+  showBubble?: boolean;
+  showHeader?: boolean;
+  showHeaderIcon?: boolean;
+  headerTags?: string;
+  headerLayout?: 'default' | 'compact' | 'banner';
+  headerBannerUrl?: string;
+  headerBannerBlur?: boolean;
+  headerBannerAlign?: number;
+  showFooter?: boolean;
+  footerLeft?: string;
+  footerCenter?: string;
+  footerRight?: string;
+  imageScale?: number;
+  imageAlign?: 'left' | 'center' | 'right';
+  imageStyle?: ImageStyle;
+  imageCropActive?: boolean;
+  imageCropAspectRatio?: string;
+  imageCropVAlign?: number;
+  imageCropHAlign?: number;
+  imageCropHeight?: number;
+  embedImages?: boolean;
+  expandHover?: boolean;
+  imageResolution?: number | 'auto';
+  imageLibrary?: 'html-to-image' | 'dom-to-image' | 'snapdom';
+  imageFormat?: 'png' | 'jpeg' | 'webp';
+  previewFontSize?: number;
+  htmlScaleFactor?: number;
+  htmlScaleMode?: 'font' | 'full';
+  previewWidth?: number;
+  rawHtmlView?: boolean;
+  showArcaHelper?: boolean;
+  customFilters?: { [key: string]: boolean };
+  isEditable?: boolean;
+  splitImage?: 'none' | 'chunk' | 'message';
+  maxImageHeight?: number;
+  replacementRules?: ReplacementRule[];
+  disableAnimations?: boolean;
+  [key: string]: unknown;
 }
 
-// ─── Data Loading Helper ─────────────────────────────────────────────────────
 
-async function loadModalData(
-  options: Record<string, unknown>,
-  globalSettings: GlobalSettings,
-): Promise<Omit<ModalState, 'isLoading' | 'error'>> {
-  const { processChatLog, serializeNodes } = await import('../services/chatData');
-  const { collectUIClasses, getNameFromNode } = await import('./utils/domUtils');
+interface ShowCopyPreviewModalProps {
+  options?: Record<string, unknown>;
+  onClose: () => void;
+}
 
-  const {
-    charName,
-    chatName,
-    charAvatarUrl,
-    messageNodes: safeNodes,
-    character,
-    avatarMap,
-  } = await processChatLog(undefined, options as { startIndex?: number; endIndex?: number; singleMessage?: boolean });
+const useWindowWidth = () => {
+    const [width, setWidth] = useState(window.innerWidth || 1200);
 
-  const htmlStrings = await serializeNodes(safeNodes);
-  const nodes = parseHtmlToElements(htmlStrings);
+    useEffect(() => {
+      const handleResize = () => {
+        setWidth(window.innerWidth);
+      };
+      window.addEventListener('resize', handleResize);
+      handleResize();
 
-  const mapObj = new Map<string, string>();
-  if (avatarMap) {
-    Object.entries(avatarMap).forEach(([k, v]) => mapObj.set(k, String(v)));
-  }
+      // iframe이 display: none에서 block으로 전환될 때 width를 정확히 잡기 위해 마운트 직후 수차례 재측정
+      const timers = [
+        setTimeout(handleResize, 50),
+        setTimeout(handleResize, 150),
+        setTimeout(handleResize, 300)
+      ];
 
-  const newParticipants = new Set<string>();
-  nodes.forEach((node: HTMLElement) => {
-    const name = getNameFromNode(node, globalSettings, charName);
-    if (name) newParticipants.add(name);
-  });
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        timers.forEach(clearTimeout);
+      };
+    }, []);
 
-  return {
-    charInfo: { charName, chatName, charAvatarUrl },
-    messageNodes: nodes,
-    character,
-    participants: newParticipants,
-    uiClasses: collectUIClasses(nodes),
-    preCollectedAvatarMap: mapObj,
+    return width;
   };
-}
 
+// SafeElement[]의 outerHTML을 받아 iframe 내 표준 HTMLElement[]로 재구성
 function parseHtmlToElements(htmlStrings: string[]): HTMLElement[] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<div></div>', 'text/html');
+  const container = doc.body.firstElementChild as HTMLElement;
   const nodes: HTMLElement[] = [];
   for (const html of htmlStrings) {
     const tmp = document.createElement('div');
@@ -101,887 +116,752 @@ function parseHtmlToElements(htmlStrings: string[]): HTMLElement[] {
       nodes.push(tmp);
     }
   }
+  void container;
   return nodes;
 }
 
-// ─── Props Builder ───────────────────────────────────────────────────────────
+const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options, onClose }) => {
+    const [charName, setCharName] = useState('');
+    const [chatName, setChatName] = useState('');
+    const [charAvatarUrl, setCharAvatarUrl] = useState('');
+    const [messageNodes, setMessageNodes] = useState<HTMLElement[]>([]);
+    const [character, setCharacter] = useState<RisuCharacter | null>(null);
+    const [participants, setParticipants] = useState<Set<string>>(new Set());
+    const [uiClasses, setUiClasses] = useState<UIClassInfo[]>([]);
+    const [preCollectedAvatarMap, setPreCollectedAvatarMap] = useState<Map<string, string>>(new Map());
 
-function buildLogContainerProps(
-  nodes: HTMLElement[],
-  charInfo: CharInfoState,
-  settings: LogExporterSettings,
-  globalSettings: GlobalSettings,
-  colorPalette: ColorPalette,
-  handleMessageUpdate: (index: number, newHtml: string) => void,
-  preCollectedAvatarMap: Map<string, string>,
-): Omit<LogContainerProps, 'onReady'> {
-  return {
-    nodes,
-    charInfo: { name: charInfo.charName, chatName: charInfo.chatName, avatarUrl: charInfo.charAvatarUrl },
-    selectedThemeKey: settings.theme,
-    selectedColorKey: settings.color,
-    color: colorPalette,
-    customCss: settings.customCss,
-    showAvatar: settings.showAvatar,
-    showHeader: settings.showHeader,
-    showHeaderIcon: settings.showHeaderIcon,
-    headerTags: settings.headerTags,
-    headerLayout: settings.headerLayout,
-    headerBannerUrl: settings.headerBannerUrl,
-    headerBannerBlur: settings.headerBannerBlur,
-    headerBannerAlign: settings.headerBannerAlign,
-    showFooter: settings.showFooter,
-    footerLeft: settings.footerLeft,
-    footerCenter: settings.footerCenter,
-    footerRight: settings.footerRight,
-    showBubble: settings.showBubble,
-    embedImagesAsBlob: true,
-    globalSettings,
-    fontSize: settings.htmlScaleFactor !== undefined ? 16 * settings.htmlScaleFactor : settings.previewFontSize,
-    containerWidth: settings.previewWidth,
-    imageScale: settings.imageScale,
-    imageAlign: settings.imageAlign,
-    imageStyle: settings.imageStyle,
-    imageCropActive: settings.imageCropActive,
-    imageCropAspectRatio: settings.imageCropAspectRatio,
-    imageCropVAlign: settings.imageCropVAlign,
-    imageCropHAlign: settings.imageCropHAlign,
-    imageCropHeight: settings.imageCropHeight,
-    isEditable: settings.isEditable,
-    onMessageUpdate: handleMessageUpdate,
-    replacementRules: settings.replacementRules,
-    disableAnimations: settings.disableAnimations,
-    isForArca: settings.isForArca,
-    allowHtmlRendering: settings.allowHtmlRendering,
-    preCollectedAvatarMap,
-    avatarPosition: settings.avatarPosition,
-    avatarShape: settings.avatarShape,
-  };
-}
+    const defaultSettings: Settings = {
+        format: 'basic',
+        theme: 'basic',
+        color: 'dark',
+        customCss: '',
+        showAvatar: true,
+        showBubble: true,
+        showHeader: true,
+        showHeaderIcon: true,
+        headerTags: '',
+        headerLayout: 'default',
+        headerBannerUrl: '',
+        headerBannerBlur: true,
+        headerBannerAlign: 50,
+        showFooter: true,
+        footerLeft: '',
+        footerCenter: 'Created by Log Plugin',
+        footerRight: '',
+        imageScale: 100,
+        imageAlign: 'left',
+        imageStyle: 'none',
+        imageCropActive: false,
+        imageCropAspectRatio: 'original',
+        imageCropVAlign: 50,
+        imageCropHAlign: 50,
+        imageCropHeight: 1.0,
+        embedImages: true,
+        expandHover: false,
+        imageResolution: 1,
+        imageLibrary: 'html-to-image',
+        imageFormat: 'png',
+        previewFontSize: 16,
+        htmlScaleFactor: 1.0,
+        htmlScaleMode: 'font',
+        previewWidth: 800,
+        rawHtmlView: false,
+        isEditable: false,
+        splitImage: 'none',
+        maxImageHeight: 10000,
+        customFilters: {},
+        replacementRules: [],
+        disableAnimations: true,
+      };
 
-// ─── Sub-Components ──────────────────────────────────────────────────────────
+    const [savedSettings, setSavedSettings] = useState<Settings>(defaultSettings);
+    const [globalSettings, setGlobalSettings] = useState<any>({});
+    const [otherFormatContent, setOtherFormatContent] = useState('');
+    const [isConverting, setIsConverting] = useState(false);
+    const [activeTab, setActiveTab] = useState('export');
+    const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+    const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [progress, setProgress] = useState({ active: false, message: '', current: 0, total: 0 });
+    const [selectedIndices, setSelectedIndices] = useState(new Set<number>());
+    const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+    const [estimatedImageSize, setEstimatedImageSize] = useState<{width: number, height: number, maxMessageHeight: number} | null>(null);
+    const [imageSizeWarning, setImageSizeWarning] = useState<string>('');
+    const [error, setError] = useState<string | null>(null);
 
-interface HeaderBarProps {
-  isMobile: boolean;
-  isEditable: boolean;
-  onClose: () => void;
-  onToggleEditable: () => void;
-  onOpenSettingsDrawer: () => void;
-}
-
-function HeaderBar({ isMobile, isEditable, onClose, onToggleEditable, onOpenSettingsDrawer }: HeaderBarProps) {
-  return (
-    <div className="log-exporter-modal-header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
-      <Button
-        id="log-exporter-close"
-        className="log-exporter-modal-close-btn"
-        type="text"
-        icon={<CloseOutlined />}
-        title="닫기 (Esc)"
-        aria-label="모달 닫기"
-        onClick={onClose}
-        style={{ color: 'var(--text-white)' }}
-      />
-      <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 플러그인</span>
-      <Button
-        type="text"
-        icon={<EditOutlined />}
-        onClick={onToggleEditable}
-        style={{ color: isEditable ? 'var(--accent-primary)' : 'var(--text-white)' }}
-        title="로그 편집 활성화 토글"
-      >
-        {!isMobile ? '로그 편집' : null}
-      </Button>
-      {isMobile && (
-        <Button
-          type="text"
-          icon={<SettingOutlined />}
-          onClick={onOpenSettingsDrawer}
-          style={{ color: 'var(--text-white)' }}
-        >
-          설정
-        </Button>
-      )}
-    </div>
-  );
-}
-
-interface PreviewContentProps {
-  logContainerProps: Omit<LogContainerProps, 'onReady'>;
-  settings: LogExporterSettings;
-  otherFormatContent: string;
-  selectedIndices: Set<number>;
-  onSelectionChange: (newSelection: Set<number>) => void;
-  lastSelectedIndex: number | null;
-  onLastSelectedIndexChange: (index: number | null) => void;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
-  onInvertSelection: () => void;
-  onDimensionsChange: (dims: EstimatedImageSize) => void;
-  isConverting: boolean;
-  onSettingChange: (key: string, value: unknown) => void;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
-}
-
-function PreviewContent({
-  logContainerProps,
-  settings,
-  otherFormatContent,
-  selectedIndices,
-  onSelectionChange,
-  lastSelectedIndex,
-  onLastSelectedIndexChange,
-  onSelectAll,
-  onDeselectAll,
-  onInvertSelection,
-  onDimensionsChange,
-  isConverting,
-  onSettingChange,
-  themes,
-  colors,
-}: PreviewContentProps) {
-  return (
-    <PreviewPanel
-      logContainerProps={logContainerProps}
-      settings={settings}
-      otherFormatContent={otherFormatContent}
-      selectedIndices={selectedIndices}
-      onSelectionChange={onSelectionChange}
-      lastSelectedIndex={lastSelectedIndex}
-      onLastSelectedIndexChange={onLastSelectedIndexChange}
-      onSelectAll={onSelectAll}
-      onDeselectAll={onDeselectAll}
-      onInvertSelection={onInvertSelection}
-      onDimensionsChange={onDimensionsChange}
-      isConverting={isConverting}
-      onSettingChange={onSettingChange}
-      themes={themes}
-      colors={colors}
-    />
-  );
-}
-
-interface ActionbarContentProps {
-  charName: string;
-  chatName: string;
-  getPreviewContent: () => Promise<string>;
-  otherFormatContent: string;
-  messageNodes: HTMLElement[];
-  settings: LogExporterSettings;
-  backgroundColor: string;
-  color: ColorPalette;
-  charAvatarUrl: string;
-  onOpenArcaHelper: () => void;
-  onProgressStart: (message: string, total?: number) => void;
-  onProgressUpdate: (update: { current?: number; message?: string }) => void;
-  onProgressEnd: () => void;
-  onSaveLogData: () => void;
-  onLoadLogData: () => void;
-  onDeleteSelected?: () => void;
-  hasSelection: boolean;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
-  onInvertSelection: () => void;
-}
-
-function ActionbarContent({
-  charName,
-  chatName,
-  getPreviewContent,
-  otherFormatContent,
-  messageNodes,
-  settings,
-  backgroundColor,
-  color,
-  charAvatarUrl,
-  onOpenArcaHelper,
-  onProgressStart,
-  onProgressUpdate,
-  onProgressEnd,
-  onSaveLogData,
-  onLoadLogData,
-  onDeleteSelected,
-  hasSelection,
-  onSelectAll,
-  onDeselectAll,
-  onInvertSelection,
-}: ActionbarContentProps) {
-  return (
-    <Actionbar
-      charName={charName}
-      chatName={chatName}
-      getPreviewContent={getPreviewContent}
-      otherFormatContent={otherFormatContent}
-      messageNodes={messageNodes}
-      settings={settings}
-      backgroundColor={backgroundColor}
-      color={color}
-      charAvatarUrl={charAvatarUrl}
-      onOpenArcaHelper={onOpenArcaHelper}
-      onProgressStart={onProgressStart}
-      onProgressUpdate={onProgressUpdate}
-      onProgressEnd={onProgressEnd}
-      onSaveLogData={onSaveLogData}
-      onLoadLogData={onLoadLogData}
-      onDeleteSelected={onDeleteSelected}
-      hasSelection={hasSelection}
-      onSelectAll={onSelectAll}
-      onDeselectAll={onDeselectAll}
-      onInvertSelection={onInvertSelection}
-    />
-  );
-}
-
-interface SettingsDrawerProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  settings: LogExporterSettings;
-  onSettingChange: (key: string, value: unknown) => void;
-  participants: Set<string>;
-  globalSettings: GlobalSettings;
-  onGlobalSettingChange: (key: string, value: unknown) => void;
-  uiClasses: import('./utils/domUtils').UIClassInfo[];
-  imageSizeWarning: string;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
-}
-
-function SettingsDrawerContent({
-  activeTab,
-  onTabChange,
-  settings,
-  onSettingChange,
-  participants,
-  globalSettings,
-  onGlobalSettingChange,
-  uiClasses,
-  imageSizeWarning,
-  themes,
-  colors,
-}: SettingsDrawerProps) {
-  return (
-    <SettingsTabs
-      activeTab={activeTab}
-      onTabChange={onTabChange}
-      settings={settings}
-      onSettingChange={onSettingChange}
-      participants={participants}
-      globalSettings={globalSettings}
-      onGlobalSettingChange={onGlobalSettingChange}
-      uiClasses={uiClasses}
-      imageSizeWarning={imageSizeWarning}
-      themes={themes}
-      colors={colors}
-    />
-  );
-}
-
-// ─── Main Modal Component ────────────────────────────────────────────────────
-
-interface ShowCopyPreviewModalProps {
-  options?: Record<string, unknown>;
-  onClose: () => void;
-}
-
-const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {}, onClose }) => {
-  // ── Hooks ──
-  const width = useWindowWidth();
-  const isMobile = width <= 768;
-
-  const { progress, startProgress, updateProgress, endProgress } = useProgress();
-
-  // ── Modal State ──
-  const [modalState, setModalState] = useState<ModalState>({
-    charInfo: { charName: '', chatName: '', charAvatarUrl: '' },
-    messageNodes: [],
-    character: null,
-    participants: new Set(),
-    uiClasses: [],
-    preCollectedAvatarMap: new Map(),
-    isLoading: true,
-    error: null,
-  });
-
-  // ── Settings ──
-  const { settings, globalSettings, handleSettingChange, handleGlobalSettingChange } = useSettings(modalState.character);
-
-  // ── Theme ──
-  const { uiTheme, colorPalette, backgroundColor, antdTheme, closedRef } = useTheme(settings, globalSettings);
-
-  // ── Filtered Nodes ──
-  const finalNodes = useFilteredNodes(
-    modalState.messageNodes,
-    settings,
-    globalSettings,
-    modalState.charInfo.charName,
-  );
-
-  // ── Selection ──
-  const selection = useSelection(finalNodes);
-  const nodesForExport = selection.getFilteredItems();
-
-  // ── Image Size ──
-  const [estimatedImageSize, setEstimatedImageSize] = useState<EstimatedImageSize | null>(null);
-  const imageSizeWarning = useImageSizeWarning(estimatedImageSize, settings);
-
-  // ── UI State ──
-  const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
-  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('filter');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-
-  // ── Message Update Handler ──
-  const handleMessageUpdate = useCallback((index: number, newHtml: string) => {
-    setModalState(prev => {
-      const newNodes = [...prev.messageNodes];
-      const nodeToUpdate = newNodes[index].cloneNode(true) as HTMLElement;
-      const messageEl = nodeToUpdate.querySelector(CHAT_CONTENT_SELECTOR);
-      if (messageEl) {
-        messageEl.innerHTML = newHtml;
-        newNodes[index] = nodeToUpdate;
-      }
-      return { ...prev, messageNodes: newNodes };
-    });
-  }, []);
-
-  // ── Data Loading ──
-  useEffect(() => {
-    let cancelled = false;
-
-    const init = async () => {
-      setModalState(prev => ({ ...prev, isLoading: true, error: null }));
-      try {
-        const gs = await loadGlobalSettings();
-        const data = await loadModalData(options, gs);
-        if (cancelled) return;
-        setModalState(prev => ({ ...prev, ...data, isLoading: false }));
-      } catch (err: unknown) {
-        if (cancelled) return;
-        const errorMsg = err instanceof Error ? err.stack || err.message : String(err);
-        console.error('[Log Exporter] Modal open error:', err);
-        setModalState(prev => ({ ...prev, isLoading: false, error: errorMsg }));
-      }
+    const handleSelectionChange = (newSelection: Set<number>) => {
+        setSelectedIndices(newSelection);
     };
 
-    init();
-    return () => { cancelled = true; };
-  }, [options]);
-
-  // ── Debounced Format Conversion ──
-  const [conversionContent, setConversionContent] = useState('');
-  const [converting, setConverting] = useState(false);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    if (settings.format === 'basic') {
-      setConversionContent('');
-      setConverting(false);
-      return;
-    }
-
-    setConverting(true);
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-
-    debounceTimerRef.current = setTimeout(async () => {
-      try {
-        let content: string;
-
-        if (settings.format === 'html') {
-          content = await generateHtmlPreview(nodesForExport as HTMLElement[], settings, modalState.preCollectedAvatarMap);
-          content = content.replace('</style>', `
-            .x-risu-asset-table,
-            .x-risu-asset-table table {
-              width: 100% !important;
-              table-layout: fixed !important;
-              word-break: break-all;
-            }
-            .x-risu-asset-table img {
-              max-width: 100% !important;
-              height: auto !important;
-              display: block;
-              margin: 0 auto;
-            }
-          </style>`);
-        } else if (settings.format === 'markdown') {
-          content = await generateMarkdownLog(nodesForExport as HTMLElement[], modalState.charInfo.charName, settings);
-        } else if (settings.format === 'text') {
-          content = await generateTextLog(nodesForExport as HTMLElement[], modalState.charInfo.charName, settings);
-        } else {
-          content = '';
-        }
-
-        if (settings.format === 'markdown' || settings.format === 'text') {
-          const style = `font-size: ${settings.previewFontSize || 16}px; max-width: ${settings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: #1a1b26; color: #c0caf5; border-radius: 8px;`;
-          setConversionContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`);
-        } else {
-          setConversionContent(content);
-        }
-      } catch (err) {
-        console.error('[Log Exporter] Format conversion error:', err);
-      } finally {
-        setConverting(false);
-      }
-    }, 300);
-
-    return () => {
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    const handleLastSelectedIndexChange = (index: number | null) => {
+        setLastSelectedIndex(index);
     };
-  }, [finalNodes, selection.selectedIndices, settings, globalSettings, modalState.charInfo.charName, nodesForExport, modalState.preCollectedAvatarMap]);
 
-  // ── Export Content Builder ──
-  const getPreviewContentForExport = useCallback(async () => {
-    if (settings.format === 'basic') {
-      const logHtml = await getLogHtml(buildLogContainerProps(
-        nodesForExport as HTMLElement[],
-        modalState.charInfo,
-        settings,
+    const handleSelectAll = () => {
+        const allIndices = new Set(messageNodes.map((_, i) => i));
+        setSelectedIndices(allIndices);
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedIndices(new Set());
+        setLastSelectedIndex(null);
+    };
+
+    const handleInvertSelection = () => {
+        const allIndices = new Set(messageNodes.map((_, i) => i));
+        const newSelection = new Set(
+            [...allIndices].filter(i => !selectedIndices.has(i))
+        );
+        setSelectedIndices(newSelection);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedIndices.size === 0) return;
+        const newNodes = messageNodes.filter((_, i) => !selectedIndices.has(i));
+        setMessageNodes(newNodes);
+        setSelectedIndices(new Set());
+        setLastSelectedIndex(null);
+    };
+
+    const handleProgressStart = (message: string, total = 0) => {
+        setProgress({ active: true, message, current: 0, total });
+    };
+    const handleProgressUpdate = (update: { current?: number; message?: string }) => {
+        setProgress(p => ({ ...p, ...update }));
+    };
+    const handleProgressEnd = () => {
+        setProgress({ active: false, message: '', current: 0, total: 0 });
+    };
+
+    const width = useWindowWidth();
+    const isMobile = width <= 768;
+    const isTablet = width > 768 && width <= 1024;
+
+    const themeInfo = THEMES[savedSettings.theme || 'basic'] || THEMES.basic;
+    const colorPalette = savedSettings.theme === 'basic' ? (COLORS[savedSettings.color || 'dark'] || COLORS.dark) : (themeInfo.color || COLORS.dark);
+    const backgroundColor = colorPalette.background;
+
+    const handleSettingChange = (key: string, value: any) => {
+        const newSettings = { ...savedSettings, [key]: value };
+        setSavedSettings(newSettings);
+    };
+
+    // 전역 설정 변경: 상태 + pluginStorage에 저장
+    const handleGlobalSettingChange = (key: string, value: any) => {
+        const newSettings = { ...globalSettings, [key]: value };
+        setGlobalSettings(newSettings);
+        saveGlobalSettings(newSettings);
+    };
+
+    const handleMessageUpdate = useCallback((index: number, newHtml: string) => {
+        setMessageNodes(currentNodes => {
+            const newNodes = [...currentNodes];
+            const nodeToUpdate = newNodes[index].cloneNode(true) as HTMLElement;
+            const messageEl = nodeToUpdate.querySelector(CHAT_CONTENT_SELECTOR);
+            if (messageEl) {
+                messageEl.innerHTML = newHtml;
+                newNodes[index] = nodeToUpdate;
+                return newNodes;
+            }
+            return currentNodes;
+        });
+    }, []);
+
+    const handleSaveLogData = () => {
+        const data = {
+            charName,
+            chatName,
+            charAvatarUrl,
+            messageNodes: messageNodes.map(node => node.outerHTML),
+        };
+        const content = JSON.stringify(data, null, 2);
+        const safeCharName = charName.replace(/[\\/\?%\\*:|"<>]/g, '-');
+        const safeChatName = chatName.replace(/[\\/\?%\\*:|"<>]/g, '-');
+        const filename = `Risu_Log_Data_${safeCharName}_${safeChatName}.json`;
+        saveAsFile(filename, content, 'application/json;charset=utf-8');
+    };
+
+    const handleLoadLogData = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+
+            const content = await file.text();
+            try {
+                const data = JSON.parse(content);
+                if (data.charName && data.chatName && data.charAvatarUrl && Array.isArray(data.messageNodes)) {
+                    setCharName(data.charName);
+                    setChatName(data.chatName);
+                    setCharAvatarUrl(data.charAvatarUrl);
+
+                    const newNodes = data.messageNodes.map((html: string) => {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = html;
+                        return tempDiv.firstChild as HTMLElement;
+                    });
+                    setMessageNodes(newNodes);
+                    message.success('로그 데이터를 성공적으로 불러왔습니다.');
+                } else {
+                    message.error('잘못된 형식의 로그 데이터 파일입니다.');
+                }
+            } catch (err) {
+                message.error('로그 데이터 파일을 읽는 데 실패했습니다.');
+                console.error(err);
+            }
+        };
+        input.click();
+    };
+
+    // 캐릭터별 설정 저장 (pluginStorage)
+    useEffect(() => {
+        if (character?.chaId && Object.keys(savedSettings).length > 0) {
+            saveCharSettings(String(character.chaId), savedSettings);
+        }
+    }, [savedSettings, character]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                // v3.0: processChatLog이 SafeElement[] 반환 → outerHTML로 직렬화 후 iframe 내 HTMLElement로 재구성
+                const { charName, chatName, charAvatarUrl, messageNodes: safeNodes, character, avatarMap } = await processChatLog(undefined, options);
+                const htmlStrings = await serializeNodes(safeNodes);
+                const nodes = parseHtmlToElements(htmlStrings);
+
+                setCharName(charName);
+                setChatName(chatName);
+                setCharAvatarUrl(charAvatarUrl);
+                setMessageNodes(nodes);
+                setCharacter(character);
+
+                const mapObj = new Map<string, string>();
+                if (avatarMap) {
+                    Object.entries(avatarMap).forEach(([k, v]) => {
+                        mapObj.set(k, String(v));
+                    });
+                }
+                setPreCollectedAvatarMap(mapObj);
+
+                const allCharSettings = await loadAllCharSettings();
+                const charSettings = character ? allCharSettings[String(character.chaId)] || {} : {};
+                setSavedSettings({ ...defaultSettings, ...charSettings });
+
+                const loadedGlobalSettings = await loadGlobalSettings();
+                setGlobalSettings(loadedGlobalSettings);
+
+                const newParticipants = new Set<string>();
+                nodes.forEach((node: HTMLElement) => {
+                    const name = getNameFromNode(node, loadedGlobalSettings, charName);
+                    if (name) newParticipants.add(name);
+                });
+                setParticipants(newParticipants);
+
+                setUiClasses(collectUIClasses(nodes));
+
+            } catch (err: any) {
+                console.error('[Log Exporter] Modal open error:', err);
+                setError(err?.stack || String(err));
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [options]);
+
+    const activeFilters = useMemo(() => {
+        return savedSettings.customFilters ? Object.entries(savedSettings.customFilters).filter(([, checked]) => checked).map(([key]) => key) : [];
+    }, [savedSettings.customFilters]);
+
+    const finalNodes = useMemo(() => {
+        return messageNodes
+            .map(node => {
+                if (activeFilters.length > 0) {
+                    return filterWithCustomClasses(node, activeFilters, globalSettings);
+                }
+                return node;
+            })
+            .filter(node => {
+                const isMessageNode = node.querySelector(CHAT_CONTENT_SELECTOR);
+                if (isMessageNode) {
+                    const name = getNameFromNode(node as HTMLElement, globalSettings, charName);
+                    if (globalSettings?.filteredParticipants?.includes(name)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+    }, [messageNodes, activeFilters, globalSettings, charName]);
+
+    const nodesForExport = useMemo(() => {
+        return selectedIndices.size > 0
+            ? finalNodes.filter((_, i) => selectedIndices.has(i))
+            : finalNodes;
+    }, [finalNodes, selectedIndices]);
+
+    const logContainerProps = useMemo(() => ({
+        nodes: finalNodes,
+        charInfo: { name: charName, chatName: chatName, avatarUrl: charAvatarUrl },
+        selectedThemeKey: savedSettings.theme || 'basic',
+        selectedColorKey: savedSettings.color || 'dark',
+        color: colorPalette,
+        customCss: savedSettings.customCss,
+        showAvatar: savedSettings.showAvatar,
+        showHeader: savedSettings.showHeader,
+        showHeaderIcon: savedSettings.showHeaderIcon,
+        headerTags: savedSettings.headerTags,
+        headerLayout: savedSettings.headerLayout,
+        headerBannerUrl: savedSettings.headerBannerUrl,
+        headerBannerBlur: savedSettings.headerBannerBlur,
+        headerBannerAlign: savedSettings.headerBannerAlign,
+        showFooter: savedSettings.showFooter,
+        footerLeft: savedSettings.footerLeft,
+        footerCenter: savedSettings.footerCenter,
+        footerRight: savedSettings.footerRight,
+        showBubble: savedSettings.showBubble,
+        embedImagesAsBlob: true,
+        globalSettings: globalSettings,
+        fontSize: savedSettings.htmlScaleFactor !== undefined ? 16 * savedSettings.htmlScaleFactor : savedSettings.previewFontSize,
+        containerWidth: savedSettings.previewWidth,
+        imageScale: savedSettings.imageScale,
+        imageAlign: savedSettings.imageAlign,
+        imageStyle: savedSettings.imageStyle,
+        imageCropActive: savedSettings.imageCropActive,
+        imageCropAspectRatio: savedSettings.imageCropAspectRatio,
+        imageCropVAlign: savedSettings.imageCropVAlign,
+        imageCropHAlign: savedSettings.imageCropHAlign,
+        imageCropHeight: savedSettings.imageCropHeight,
+        isEditable: savedSettings.isEditable,
+        onMessageUpdate: handleMessageUpdate,
+        replacementRules: savedSettings.replacementRules,
+        disableAnimations: savedSettings.disableAnimations,
+        preCollectedAvatarMap: preCollectedAvatarMap,
+    }), [
+        finalNodes,
+        charName, chatName, charAvatarUrl,
+        savedSettings,
         globalSettings,
         colorPalette,
-        handleMessageUpdate,
-        modalState.preCollectedAvatarMap,
-      ));
-      const styles = await getExportHtmlStyles(settings);
-      return `<style>${styles}</style>\n${logHtml}`;
-    }
-    return conversionContent;
-  }, [settings, nodesForExport, modalState.charInfo, globalSettings, colorPalette, handleMessageUpdate, modalState.preCollectedAvatarMap, conversionContent]);
+        handleMessageUpdate
+    ]);
 
-  // ── File I/O ──
-  const handleSaveLogData = useCallback(() => {
-    const data = {
-      charName: modalState.charInfo.charName,
-      chatName: modalState.charInfo.chatName,
-      charAvatarUrl: modalState.charInfo.charAvatarUrl,
-      messageNodes: modalState.messageNodes.map(node => node.outerHTML),
-    };
-    const content = JSON.stringify(data, null, 2);
-    const safeCharName = modalState.charInfo.charName.replace(/[\\/?%*:|"<>]/g, '-');
-    const safeChatName = modalState.charInfo.chatName.replace(/[\\/?%*:|"<>]/g, '-');
-    saveAsFile(`Risu_Log_Data_${safeCharName}_${safeChatName}.json`, content, 'application/json;charset=utf-8');
-  }, [modalState]);
+    const handleDimensionsChange = useCallback((dims: { width: number, height: number, maxMessageHeight: number }) => {
+        setEstimatedImageSize(dims);
+    }, []);
 
-  const handleLoadLogData = useCallback(async () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.style.display = 'none';
-    document.body.appendChild(input);
-
-    input.addEventListener('change', async () => {
-      const file = input.files?.[0];
-      document.body.removeChild(input);
-      if (!file) return;
-
-      const content = await file.text();
-      try {
-        const data = JSON.parse(content);
-        if (data.charName && data.chatName && data.charAvatarUrl && Array.isArray(data.messageNodes)) {
-          const newNodes = data.messageNodes.map((html: string) => {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-            return tempDiv.firstChild as HTMLElement;
-          });
-          setModalState(prev => ({
-            ...prev,
-            charInfo: { charName: data.charName, chatName: data.chatName, charAvatarUrl: data.charAvatarUrl },
-            messageNodes: newNodes,
-          }));
-          message.success('로그 데이터를 성공적으로 불러왔습니다.');
-        } else {
-          message.error('잘못된 형식의 로그 데이터 파일입니다.');
+    useEffect(() => {
+        if (!estimatedImageSize) {
+            setImageSizeWarning('');
+            return;
         }
-      } catch {
-        message.error('로그 데이터 파일을 읽는 데 실패했습니다.');
-      }
-    });
 
-    input.click();
-  }, []);
+        const MAX_DIMENSION = 16384;
+        const resolution = savedSettings.imageResolution === 'auto' ? 1 : (Number(savedSettings.imageResolution) || 1);
 
-  // ── Delete Selected ──
-  const handleDeleteSelected = useCallback(() => {
-    const newNodes = selection.deleteSelected();
-    setModalState(prev => ({ ...prev, messageNodes: newNodes }));
-  }, [selection]);
+        const finalWidth = estimatedImageSize.width * resolution;
+        const finalHeight = estimatedImageSize.height * resolution;
 
-  // ── Close Handler ──
-  const handleClose = useCallback(async () => {
-    if (closedRef.current) return;
-    closedRef.current = true;
-    clearBlobUrlCache();
-    await Risuai.hideContainer();
-    onClose();
-  }, [closedRef, onClose]);
+        let warnings = [];
+        if (finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION) {
+            let warning = `예상 이미지 크기(${Math.round(finalWidth)}x${Math.round(finalHeight)}px)가 브라우저 한계를 초과할 수 있습니다.`;
+            if (savedSettings.splitImage === 'none') {
+                warning += " '긴 이미지 분할' 옵션 사용을 권장합니다.";
+            }
+            if (savedSettings.imageResolution === 'auto') {
+                warning += " '자동' 해상도는 현재 1x로 계산됩니다.";
+            }
+            warnings.push(warning);
+        }
 
-  // ── ESC Key Handler ──
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
+        if (savedSettings.splitImage !== 'none' && estimatedImageSize.maxMessageHeight > (savedSettings.maxImageHeight || 10000)) {
+            if (savedSettings.splitImage === 'chunk') {
+                warnings.push(`분할 최대 높이(${savedSettings.maxImageHeight || 10000}px)보다 긴 로그가 있습니다. 여러 섹션으로 분할 캡처 후 하나의 이미지 파일로 병합됩니다.`);
+            } else {
+                warnings.push(`분할 최대 높이(${savedSettings.maxImageHeight || 10000}px)보다 긴 메시지가 있습니다. 해당 메시지는 여러 섹션으로 분할하여 개별 파일로 저장됩니다.`);
+            }
+        }
+
+        setImageSizeWarning(warnings.join(' '));
+    }, [estimatedImageSize, savedSettings.imageResolution, savedSettings.splitImage, savedSettings.maxImageHeight]);
+
+    const getPreviewContentForExport = async () => {
+        if (savedSettings.format === 'basic' || !savedSettings.format) {
+            return await getLogHtml({...logContainerProps, nodes: nodesForExport, isEditable: false, embedImagesAsBlob: true });
+        } else if (savedSettings.format === 'html') {
+            const htmlLog = await generateHtmlPreview(nodesForExport, savedSettings, preCollectedAvatarMap);
+            return htmlLog.replace('</style>', `
+              .x-risu-asset-table,
+              .x-risu-asset-table table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                word-break: break-all;
+              }
+              .x-risu-asset-table img {
+                max-width: 100% !important;
+                height: auto !important;
+                display: block;
+                margin: 0 auto;
+              }
+            </style>`);
+        } else if (savedSettings.format === 'markdown') {
+            return await generateMarkdownLog(nodesForExport, charName, savedSettings);
+        } else if (savedSettings.format === 'text') {
+            return await generateTextLog(nodesForExport, charName, savedSettings);
+        }
+        return '';
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [handleClose]);
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) handleClose();
-  };
+    useEffect(() => {
+        if (savedSettings.format === 'basic' || !savedSettings.format) {
+            setOtherFormatContent('');
+            setIsConverting(false);
+            return;
+        }
 
-  // ── Log Container Props ──
-  const logContainerProps = useMemo(() =>
-    buildLogContainerProps(
-      finalNodes as unknown as HTMLElement[],
-      modalState.charInfo,
-      settings,
-      globalSettings,
-      colorPalette,
-      handleMessageUpdate,
-      modalState.preCollectedAvatarMap,
-    ),
-    [finalNodes, modalState.charInfo, settings, globalSettings, colorPalette, handleMessageUpdate, modalState.preCollectedAvatarMap],
-  );
+        setIsConverting(true);
+        // Apply a 300ms debounce to prevent heavy conversion workloads from locking the main thread 
+        // when users are dragging setting sliders (e.g., font size, layout configurations).
+        const handler = setTimeout(async () => {
+            try {
+                const content = await getPreviewContentForExport();
+                if (savedSettings.format === 'markdown' || savedSettings.format === 'text') {
+                    const style = `font-size: ${savedSettings.previewFontSize || 16}px; max-width: ${savedSettings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: #1a1b26; color: #c0caf5; border-radius: 8px;`;
+                    setOtherFormatContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`);
+                } else {
+                    setOtherFormatContent(content);
+                }
+            } catch (err) {
+                console.error('[Log Exporter] Format conversion error:', err);
+            } finally {
+                setIsConverting(false);
+            }
+        }, 300);
 
-  // ── Error View ──
-  if (modalState.error) {
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [finalNodes, selectedIndices, savedSettings, globalSettings, charName]);
+
+    const handleClose = async () => {
+        clearBlobUrlCache();
+        // iframe을 먼저 숨겨 사용자 클릭이 iframe에 닿지 않도록 한 뒤
+        // React를 정리합니다. 순서가 중요: hideContainer → unmount → remove.
+        await Risuai.hideContainer();
+        onClose();
+    };
+
+    // ESC 단축키로 닫기 (중복 호출 방지)
+    const closedRef = { current: false };
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !closedRef.current) {
+                closedRef.current = true;
+                handleClose();
+            }
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, []);
+
+    const uiTheme = globalSettings.uiTheme || 'dark';
+    useEffect(() => {
+        document.body.setAttribute('data-theme', uiTheme);
+        const rootEl = document.getElementById('log-exporter-react-modal-root');
+        if (rootEl) {
+            rootEl.setAttribute('data-theme', uiTheme);
+        }
+    }, [uiTheme]);
+
+    const antTheme = {
+        algorithm: uiTheme === 'light' ? theme.defaultAlgorithm : theme.darkAlgorithm,
+        token: {
+            colorPrimary: '#61afef',
+            motion: false,
+        }
+    };
+
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            handleClose();
+        }
+    };
+
+    if (error) {
+        return (
+            <ConfigProvider theme={antTheme}>
+                <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
+                    <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()} style={{ padding: '24px', maxWidth: '600px', margin: '40px auto', overflowY: 'auto' }}>
+                        <h3 style={{ color: '#ff4d4f', margin: '0 0 12px 0' }}>[Log Exporter] 오류 발생</h3>
+                        <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-color)', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '4px', maxHeight: '400px', overflowY: 'auto' }}>{error}</pre>
+                        <Button type="primary" danger onClick={handleClose}>닫기</Button>
+                    </div>
+                </div>
+            </ConfigProvider>
+        );
+    }
+
     return (
-      <ConfigProvider theme={antdTheme}>
-        <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
-          <div
-            className="log-exporter-modal"
-            data-theme={uiTheme}
-            onClick={(e) => e.stopPropagation()}
-            style={{ padding: '24px', maxWidth: '600px', margin: '40px auto', overflowY: 'auto' }}
-          >
-            <h3 style={{ color: '#ff4d4f', margin: '0 0 12px 0' }}>[Log Exporter] 오류 발생</h3>
-            <pre style={{
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-color)',
-              padding: '12px',
-              border: '1px solid var(--border-color)',
-              borderRadius: '4px',
-              maxHeight: '400px',
-              overflowY: 'auto',
-            }}>
-              {modalState.error}
-            </pre>
-            <Button type="primary" danger onClick={handleClose}>닫기</Button>
-          </div>
-        </div>
-      </ConfigProvider>
-    );
-  }
+        <ConfigProvider theme={antTheme}>
+            <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
+                {!isArcaHelperOpen && (
+                    <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
+                        <div className="log-exporter-modal-header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+                            <Button 
+                                id="log-exporter-close" 
+                                className="log-exporter-modal-close-btn" 
+                                type="text"
+                                icon={<CloseOutlined />}
+                                title="닫기 (Esc)" 
+                                aria-label="모달 닫기" 
+                                onClick={handleClose}
+                                style={{ color: 'var(--text-white)' }}
+                            />
+                            <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 플러그인</span>
+                            <Button 
+                                type="text"
+                                icon={<EditOutlined />}
+                                onClick={() => handleSettingChange('isEditable', !savedSettings.isEditable)}
+                                style={{ color: savedSettings.isEditable ? 'var(--accent-primary)' : 'var(--text-white)' }}
+                                title="로그 편집 활성화 토글"
+                            >
+                                {(isMobile || isTablet) ? null : '로그 편집'}
+                            </Button>
+                            {(isMobile || isTablet) && (
+                                <Button 
+                                    type="text"
+                                    icon={<SettingOutlined />}
+                                    onClick={() => setIsSettingsDrawerOpen(true)}
+                                    style={{ color: 'var(--text-white)' }}
+                                >
+                                    설정
+                                </Button>
+                            )}
+                        </div>
+                        {isLoading ? (
+                            <div className="desktop-modal-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '12px' }}>
+                                <Spin size="large" />
+                                <p>로그 데이터를 불러오는 중...</p>
+                            </div>
+                        ) : (isMobile || isTablet) ? (
+                            <div className="log-exporter-modal-content mobile-preview-tab" style={{ height: 'calc(100% - 71px)', position: 'relative', overflow: 'hidden' }}>
+                                <PreviewPanel
+                                    logContainerProps={logContainerProps}
+                                    settings={savedSettings}
+                                    otherFormatContent={otherFormatContent}
+                                    selectedIndices={selectedIndices}
+                                    onSelectionChange={handleSelectionChange}
+                                    lastSelectedIndex={lastSelectedIndex}
+                                    onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                    onSelectAll={handleSelectAll}
+                                    onDeselectAll={handleDeselectAll}
+                                    onInvertSelection={handleInvertSelection}
+                                    onDimensionsChange={handleDimensionsChange}
+                                    isConverting={isConverting}
+                                />
+                                <div className="mobile-action-bar">
+                                    <Actionbar
+                                        charName={charName}
+                                        chatName={chatName}
+                                        getPreviewContent={getPreviewContentForExport}
+                                        messageNodes={nodesForExport}
+                                        settings={savedSettings}
+                                        backgroundColor={backgroundColor}
+                                        color={colorPalette}
+                                        charAvatarUrl={charAvatarUrl}
+                                        onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                                        onProgressStart={handleProgressStart}
+                                        onProgressUpdate={handleProgressUpdate}
+                                        onProgressEnd={handleProgressEnd}
+                                        onSaveLogData={handleSaveLogData}
+                                        onLoadLogData={handleLoadLogData}
+                                        onDeleteSelected={handleDeleteSelected}
+                                        hasSelection={selectedIndices.size > 0}
+                                        onSelectAll={handleSelectAll}
+                                        onDeselectAll={handleDeselectAll}
+                                        onInvertSelection={handleInvertSelection}
+                                    />
+                                </div>
+                            </div>
+                        
+                        ) : (
+                            <>
+                                <div className="log-exporter-modal-content" style={{ display: 'grid', gridTemplateColumns: '450px 1fr', height: 'calc(100% - 71px)', overflow: 'hidden' }}>
+                                    <div className="desktop-settings-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                                        <SettingsTabs
+                                            activeTab={activeTab}
+                                            onTabChange={setActiveTab}
+                                            settings={savedSettings}
+                                            onSettingChange={handleSettingChange}
+                                            themes={THEMES}
+                                            colors={COLORS}
+                                            participants={participants}
+                                            globalSettings={globalSettings}
+                                            onGlobalSettingChange={handleGlobalSettingChange}
+                                            uiClasses={uiClasses}
+                                            imageSizeWarning={imageSizeWarning}
+                                        />
+                                    </div>
+                                    <div className="desktop-preview-panel" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+                                         <PreviewPanel
+                                             logContainerProps={logContainerProps}
+                                             settings={savedSettings}
+                                             otherFormatContent={otherFormatContent}
+                                             selectedIndices={selectedIndices}
+                                             onSelectionChange={handleSelectionChange}
+                                             lastSelectedIndex={lastSelectedIndex}
+                                             onLastSelectedIndexChange={handleLastSelectedIndexChange}
+                                             onSelectAll={handleSelectAll}
+                                             onDeselectAll={handleDeselectAll}
+                                             onInvertSelection={handleInvertSelection}
+                                             onDimensionsChange={handleDimensionsChange}
+                                             isConverting={isConverting}
+                                         />
+                                         <div className="desktop-floating-action-bar">
+                                             <Actionbar
+                                                 charName={charName}
+                                                 chatName={chatName}
+                                                 getPreviewContent={getPreviewContentForExport}
+                                                 messageNodes={nodesForExport}
+                                                 settings={savedSettings}
+                                                 backgroundColor={backgroundColor}
+                                                 color={colorPalette}
+                                                 charAvatarUrl={charAvatarUrl}
+                                                 onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                                                 onProgressStart={handleProgressStart}
+                                                 onProgressUpdate={handleProgressUpdate}
+                                                 onProgressEnd={handleProgressEnd}
+                                                 onSaveLogData={handleSaveLogData}
+                                                 onLoadLogData={handleLoadLogData}
+                                                 onDeleteSelected={handleDeleteSelected}
+                                                 hasSelection={selectedIndices.size > 0}
+                                                 onSelectAll={handleSelectAll}
+                                                 onDeselectAll={handleDeselectAll}
+                                                 onInvertSelection={handleInvertSelection}
+                                             />
+                                         </div>
+                                     </div>
+                                 </div>
+                            </>
+                        )}
 
-  // ── Render ──
-  return (
-    <ConfigProvider theme={antdTheme}>
-      <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
-        {!isArcaHelperOpen && (
-          <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
-            <HeaderBar
-              isMobile={isMobile}
-              isEditable={settings.isEditable}
-              onClose={handleClose}
-              onToggleEditable={() => handleSettingChange('isEditable', !settings.isEditable)}
-              onOpenSettingsDrawer={() => setIsSettingsDrawerOpen(true)}
-            />
+                    </div>
+                )}
+                {progress.active && (
+                    <div className="progress-overlay">
+                        <div className="progress-card">
+                            <p className="progress-message">{progress.message}</p>
+                            {progress.total > 0 && (
+                                <span className="progress-count">{progress.current} / {progress.total}</span>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
 
-            {modalState.isLoading ? (
-              <div className="desktop-modal-loading" style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '300px',
-                gap: '12px',
-              }}>
-                <Spin size="large" />
-                <p>로그 데이터를 불러오는 중...</p>
-              </div>
-            ) : isMobile ? (
-              /* ── Mobile Layout ── */
-              <div className="log-exporter-modal-content mobile-preview-tab" style={{
-                height: 'calc(100% - 71px)',
-                position: 'relative',
-                overflow: 'hidden',
-              }}>
-                <PreviewContent
-                  logContainerProps={logContainerProps}
-                  settings={settings}
-                  otherFormatContent={conversionContent}
-                  selectedIndices={selection.selectedIndices}
-                  onSelectionChange={selection.handleSelectionChange}
-                  lastSelectedIndex={selection.lastSelectedIndex}
-                  onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
-                  onSelectAll={selection.selectAll}
-                  onDeselectAll={selection.deselectAll}
-                  onInvertSelection={selection.invertSelection}
-                  onDimensionsChange={setEstimatedImageSize}
-                  isConverting={converting}
-                  onSettingChange={handleSettingChange}
-                  themes={THEMES}
-                  colors={COLORS}
+
+
+            {isArcaHelperOpen && (
+                <ArcaHelperModal
+                    isOpen={isArcaHelperOpen}
+                    onClose={() => setIsArcaHelperOpen(false)}
+                    messageNodes={messageNodes}
+                    charInfo={{ name: charName, chatName: chatName, avatarUrl: charAvatarUrl }}
+                    settings={savedSettings}
+                    globalSettings={globalSettings}
+                    uiTheme={uiTheme}
+                    colorPalette={colorPalette}
                 />
-                <div className="mobile-action-bar">
-                  <ActionbarContent
-                    charName={modalState.charInfo.charName}
-                    chatName={modalState.charInfo.chatName}
-                    getPreviewContent={getPreviewContentForExport}
-                    otherFormatContent={conversionContent}
-                    messageNodes={nodesForExport as unknown as HTMLElement[]}
-                    settings={settings}
-                    backgroundColor={backgroundColor}
-                    color={colorPalette}
-                    charAvatarUrl={modalState.charInfo.charAvatarUrl}
-                    onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                    onProgressStart={startProgress}
-                    onProgressUpdate={updateProgress}
-                    onProgressEnd={endProgress}
-                    onSaveLogData={handleSaveLogData}
-                    onLoadLogData={handleLoadLogData}
-                    onDeleteSelected={handleDeleteSelected}
-                    hasSelection={selection.hasSelection}
-                    onSelectAll={selection.selectAll}
-                    onDeselectAll={selection.deselectAll}
-                    onInvertSelection={selection.invertSelection}
-                  />
-                </div>
-              </div>
-            ) : (
-              /* ── Desktop Layout ── */
-              <div className="log-exporter-modal-content" style={{
-                display: 'flex',
-                height: 'calc(100% - 71px)',
-                overflow: 'hidden',
-              }}>
-                <div className="desktop-settings-panel" style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: '100%',
-                  width: isSettingsOpen ? '450px' : '0px',
-                  borderRight: isSettingsOpen ? '1px solid var(--border-color)' : '0px solid transparent',
-                  background: 'var(--bg-secondary)',
-                  overflow: 'visible',
-                  flexShrink: 0,
-                  position: 'relative',
-                }}>
-                  <div style={{ width: '450px', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                    <SettingsDrawerContent
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      settings={settings}
-                      onSettingChange={handleSettingChange}
-                      participants={modalState.participants}
-                      globalSettings={globalSettings}
-                      onGlobalSettingChange={handleGlobalSettingChange}
-                      uiClasses={modalState.uiClasses}
-                      imageSizeWarning={imageSizeWarning}
-                      themes={THEMES}
-                      colors={COLORS}
-                    />
-                  </div>
-                  <Button
-                    className="sidebar-toggle-handle"
-                    icon={isSettingsOpen ? <LeftOutlined /> : <RightOutlined />}
-                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                    style={{
-                      position: 'absolute',
-                      right: isSettingsOpen ? '-10px' : '-18px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 100,
-                      borderRadius: '0 8px 8px 0',
-                      width: '18px',
-                      height: '48px',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderLeft: 'none',
-                      backgroundColor: 'var(--bg-secondary)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-secondary)',
-                      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
-                    }}
-                  />
-                </div>
-                <div className="desktop-preview-panel" style={{
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: '100%',
-                  position: 'relative',
-                  flex: 1,
-                }}>
-                  <PreviewContent
-                    logContainerProps={logContainerProps}
-                    settings={settings}
-                    otherFormatContent={conversionContent}
-                    selectedIndices={selection.selectedIndices}
-                    onSelectionChange={selection.handleSelectionChange}
-                    lastSelectedIndex={selection.lastSelectedIndex}
-                    onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
-                    onSelectAll={selection.selectAll}
-                    onDeselectAll={selection.deselectAll}
-                    onInvertSelection={selection.invertSelection}
-                    onDimensionsChange={setEstimatedImageSize}
-                    isConverting={converting}
+            )}
+            <Drawer
+                title="설정"
+                placement="right"
+                open={isSettingsDrawerOpen}
+                onClose={() => setIsSettingsDrawerOpen(false)}
+                width="100%"
+                styles={{ body: { padding: 0, background: 'var(--bg-secondary)' } }}
+                getContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
+            >
+                <SettingsTabs
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    settings={savedSettings}
                     onSettingChange={handleSettingChange}
                     themes={THEMES}
                     colors={COLORS}
-                  />
-                  <div className="desktop-floating-action-bar">
-                    <ActionbarContent
-                      charName={modalState.charInfo.charName}
-                      chatName={modalState.charInfo.chatName}
-                      getPreviewContent={getPreviewContentForExport}
-                      otherFormatContent={conversionContent}
-                      messageNodes={nodesForExport as unknown as HTMLElement[]}
-                      settings={settings}
-                      backgroundColor={backgroundColor}
-                      color={colorPalette}
-                      charAvatarUrl={modalState.charInfo.charAvatarUrl}
-                      onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                      onProgressStart={startProgress}
-                      onProgressUpdate={updateProgress}
-                      onProgressEnd={endProgress}
-                      onSaveLogData={handleSaveLogData}
-                      onLoadLogData={handleLoadLogData}
-                      onDeleteSelected={handleDeleteSelected}
-                      hasSelection={selection.hasSelection}
-                      onSelectAll={selection.selectAll}
-                      onDeselectAll={selection.deselectAll}
-                      onInvertSelection={selection.invertSelection}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Progress Overlay */}
-        {progress.active && (
-          <div className="progress-overlay">
-            <div className="progress-card">
-              <p className="progress-message">{progress.message}</p>
-              {progress.total > 0 && (
-                <span className="progress-count">{progress.current} / {progress.total}</span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Arca Helper Modal */}
-      {isArcaHelperOpen && (
-        <ArcaHelperModal
-          isOpen={isArcaHelperOpen}
-          onClose={() => setIsArcaHelperOpen(false)}
-          messageNodes={modalState.messageNodes}
-          charInfo={{
-            name: modalState.charInfo.charName,
-            chatName: modalState.charInfo.chatName,
-            avatarUrl: modalState.charInfo.charAvatarUrl,
-          }}
-          settings={settings}
-          globalSettings={globalSettings}
-          uiTheme={uiTheme}
-          colorPalette={colorPalette}
-        />
-      )}
-
-      {/* Mobile Settings Drawer */}
-      <Drawer
-        title="설정"
-        placement="right"
-        open={isSettingsDrawerOpen}
-        onClose={() => setIsSettingsDrawerOpen(false)}
-        width="100%"
-        styles={{ body: { padding: 0, background: 'var(--bg-secondary)' } }}
-        getContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
-      >
-        <SettingsDrawerContent
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          settings={settings}
-          onSettingChange={handleSettingChange}
-          participants={modalState.participants}
-          globalSettings={globalSettings}
-          onGlobalSettingChange={handleGlobalSettingChange}
-          uiClasses={modalState.uiClasses}
-          imageSizeWarning={imageSizeWarning}
-          themes={THEMES}
-          colors={COLORS}
-        />
-      </Drawer>
-    </ConfigProvider>
-  );
+                    participants={participants}
+                    globalSettings={globalSettings}
+                    onGlobalSettingChange={handleGlobalSettingChange}
+                    uiClasses={uiClasses}
+                    imageSizeWarning={imageSizeWarning}
+                />
+            </Drawer>
+        </ConfigProvider>
+    );
 };
 
-// ─── Modal Lifecycle Manager ─────────────────────────────────────────────────
-
-class ModalManager {
-  private root: ReactDOM.Root | null = null;
-  private container: HTMLDivElement | null = null;
-  private isOpen = false;
-
-  async open(options: Record<string, unknown> = {}): Promise<void> {
-    this.cleanup();
-
-    this.container = document.createElement('div');
-    this.container.id = 'log-exporter-react-modal-root';
-    document.body.appendChild(this.container);
-
-    this.root = ReactDOM.createRoot(this.container);
-    this.isOpen = true;
-
-    const handleClose = async (): Promise<void> => {
-      if (!this.isOpen) return;
-      this.isOpen = false;
-      await Risuai.hideContainer();
-      this.cleanup();
-    };
-
-    this.root.render(
-      React.createElement(React.StrictMode, null,
-        React.createElement(ShowCopyPreviewModal, { options, onClose: handleClose }),
-      ),
-    );
-
-    await Risuai.showContainer('fullscreen');
-    window.focus();
-    this.container?.focus();
-  }
-
-  private cleanup(): void {
-    if (this.root) {
-      this.root.unmount();
-      this.root = null;
-    }
-    if (this.container) {
-      this.container.remove();
-      this.container = null;
-    }
-    this.isOpen = false;
-  }
-}
-
-const modalManager = new ModalManager();
+let root: ReactDOM.Root | null = null;
+let container: HTMLDivElement | null = null;
+let isModalOpen = false;
 
 /**
- * Show the log exporter modal in fullscreen iframe mode.
+ * 로그 내보내기 모달을 iframe 내부에서 풀스크린으로 엽니다.
  * v3.0: iframe DOM에 React 렌더 → Risuai.showContainer('fullscreen')
  */
-async function showCopyPreviewModal(options: {
+export const showCopyPreviewModal = async (options: {
   startIndex?: number;
   endIndex?: number;
   singleMessage?: boolean;
-} = {}): Promise<void> {
-  await modalManager.open(options);
-}
+} = {}): Promise<void> => {
+  // 이미 열려있으면 먼저 닫기
+  if (root) {
+    root.unmount();
+    root = null;
+  }
+  if (container) {
+    container.remove();
+    container = null;
+  }
+  isModalOpen = false;
 
-// eslint-disable-next-line react-refresh/only-export-components
-export { showCopyPreviewModal };
+  // iframe 내부 document에 컨테이너 생성
+  container = document.createElement('div');
+  container.id = 'log-exporter-react-modal-root';
+  document.body.appendChild(container);
+
+  root = ReactDOM.createRoot(container);
+  isModalOpen = true;
+
+  const handleClose = async () => {
+    if (!isModalOpen) return;
+    isModalOpen = false;
+    // iframe을 먼저 숨겨 클릭이 iframe에 닿지 않도록 한 뒤 React 정리
+    await Risuai.hideContainer();
+    if (root) {
+      root.unmount();
+      root = null;
+    }
+    if (container) {
+      container.remove();
+      container = null;
+    }
+  };
+
+  root.render(
+    <React.StrictMode>
+      <ShowCopyPreviewModal options={options} onClose={handleClose} />
+    </React.StrictMode>
+  );
+
+  // iframe 전체화면 표시 (v3.0)
+  await Risuai.showContainer('fullscreen');
+  window.focus();
+  if (container) {
+    container.focus();
+  }
+};
+
 export default ShowCopyPreviewModal;

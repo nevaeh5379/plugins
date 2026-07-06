@@ -2,7 +2,7 @@ import { getNameFromNode, applyReplacements } from '../utils/domUtils';
 import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { loadGlobalSettings } from './settingsService';
 import { showWarning } from '../utils/notify';
-import type { LogExportSettings, ColorPalette, ThemeInfo, ReplacementRule } from '../../types';
+import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
 
 // CSS 변수 목록 (중복 제거)
 const THEME_CSS_VARIABLES = [
@@ -246,7 +246,11 @@ async function generateForceHoverCss(): Promise<string> {
     return Array.from(newRules).join('\n');
 }
 
-export const getThemeCssVariables = async () => {
+export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
+    // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
+    const parentStyles = await getParentPageStyles();
+
+    const getThemeCssVariables = async () => {
         let colors: Record<string, string> = {};
         try {
             const res = await Risuai.getColorScheme();
@@ -321,7 +325,7 @@ export const getThemeCssVariables = async () => {
         return cssText;
     };
 
-export const getComprehensivePageCSS = async () => {
+    const getComprehensivePageCSS = async () => {
         const cssTexts = new Set<string>();
         for (const sheet of Array.from(document.styleSheets)) {
             try {
@@ -341,12 +345,197 @@ export const getComprehensivePageCSS = async () => {
         return Array.from(cssTexts).join('\n');
     };
 
-export const getExportHtmlStyles = async (settings: LogExportSettings): Promise<string> => {
-    const parentStyles = await getParentPageStyles();
-    const themeCss = await getThemeCssVariables();
-    const compCss = await getComprehensivePageCSS();
-    
+    const scaleMode = settings.htmlScaleMode || 'font';
+    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
+
+    const scaleValue = (val: string): string => {
+        return val.replace(/(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match, p1, p2) => {
+            const num = parseFloat(p1);
+            if (p2 === 'px' && Math.abs(num) <= 1) return match;
+            return `${Number((num * scaleFactor).toFixed(4))}${p2}`;
+        });
+    };
+
+    const scaleInlineStyles = (node: HTMLElement) => {
+        const processElement = (el: HTMLElement) => {
+            if (!el.style) return;
+            for (let i = 0; i < el.style.length; i++) {
+                const prop = el.style[i];
+                if (prop === 'background-image' || prop === 'background') continue;
+                const val = el.style.getPropertyValue(prop);
+                if (val) {
+                    const newVal = scaleValue(val);
+                    if (newVal !== val) {
+                        el.style.setProperty(prop, newVal, el.style.getPropertyPriority(prop));
+                    }
+                }
+            }
+        };
+
+        processElement(node);
+        node.querySelectorAll('*').forEach(el => processElement(el as HTMLElement));
+    };
+
+    const scaleStylesheetCSSOM = (cssText: string): string => {
+        const tempStyle = document.createElement('style');
+        tempStyle.textContent = cssText;
+        document.head.appendChild(tempStyle);
+
+        const sheet = tempStyle.sheet;
+        if (!sheet) {
+            document.head.removeChild(tempStyle);
+            return cssText;
+        }
+
+        const processRules = (rules: CSSRuleList) => {
+            for (let i = 0; i < rules.length; i++) {
+                const rule = rules[i];
+                if (rule instanceof CSSStyleRule) {
+                    const style = rule.style;
+                    for (let j = 0; j < style.length; j++) {
+                        const prop = style[j];
+                        if (prop === 'background-image' || prop === 'background') continue;
+                        const val = style.getPropertyValue(prop);
+                        if (val) {
+                            const newVal = scaleValue(val);
+                            if (newVal !== val) {
+                                style.setProperty(prop, newVal, style.getPropertyPriority(prop));
+                            }
+                        }
+                    }
+                } else if (rule instanceof CSSMediaRule) {
+                    processRules(rule.cssRules);
+                } else if (rule instanceof CSSKeyframesRule) {
+                    for (let j = 0; j < rule.cssRules.length; j++) {
+                        const kfRule = rule.cssRules[j];
+                        if (kfRule instanceof CSSKeyframeRule) {
+                            const style = kfRule.style;
+                            for (let k = 0; k < style.length; k++) {
+                                const prop = style[k];
+                                const val = style.getPropertyValue(prop);
+                                if (val) {
+                                    const newVal = scaleValue(val);
+                                    if (newVal !== val) {
+                                        style.setProperty(prop, newVal, style.getPropertyPriority(prop));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        try {
+            processRules(sheet.cssRules);
+            const result = Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
+            document.head.removeChild(tempStyle);
+            return result;
+        } catch (e) {
+            console.error('[log plugin] scaleStylesheetCSSOM error:', e);
+            document.head.removeChild(tempStyle);
+            return cssText;
+        }
+    };
+
+    const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
+        const clonedNode = node.cloneNode(true) as HTMLElement;
+
+        // Remove RisuAI's utility buttons, model badges, and custom injected buttons
+        clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
+
+        // 이름 폰트 색상 강제 지정 (CSS 우선순위 이슈 및 테마 클래스 누락 방지)
+        clonedNode.querySelectorAll('.text-textcolor, .text-textcolor span').forEach(el => {
+            (el as HTMLElement).style.setProperty('color', 'var(--risu-theme-textcolor)', 'important');
+        });
+
+        // 아바타 이미지 강제 치환 (샌드박스 파일 접근/보안 에러 방지)
+        const globalSettings = await loadGlobalSettings();
+        const name = getNameFromNode(clonedNode, globalSettings, '');
+        if (name && avatarMap) {
+            let avatarDataUrl = '';
+            if (avatarMap instanceof Map) {
+                avatarDataUrl = avatarMap.get(name) || avatarMap.get(name.trim()) || '';
+            } else {
+                avatarDataUrl = avatarMap[name] || avatarMap[name.trim()] || '';
+            }
+
+            if (avatarDataUrl) {
+                // 본문 바깥 영역의 <img> 태그 교체
+                clonedNode.querySelectorAll('img').forEach(img => {
+                    if (!img.closest('.prose, .chattext')) {
+                        (img as HTMLImageElement).src = avatarDataUrl;
+                    }
+                });
+
+                // 본문 바깥 영역의 background-image 스타일 요소 교체
+                clonedNode.querySelectorAll<HTMLElement>('[style*="background"]').forEach(el => {
+                    if (!el.closest('.prose, .chattext')) {
+                        const styleAttr = el.getAttribute('style');
+                        if (styleAttr) {
+                            const newStyle = styleAttr.replace(/url\(['"]?[^'"]+?['"]?\)/g, `url('${avatarDataUrl}')`)
+                                                     .replace(/url\(&quot;[^&]+?&quot;\)/g, `url('${avatarDataUrl}')`);
+                            el.setAttribute('style', newStyle);
+                        }
+                    }
+                });
+            }
+        }
+
+        if (settings.embedImages !== false) {
+            for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
+                if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+                    try {
+                        img.src = await imageUrlToBlob(img.src);
+                    } catch (e) {
+                        console.warn(`Blob conversion error for ${img.src}:`, e);
+                    }
+                }
+            }
+
+            // 가상 DOM 에서 style 속성 파서 한계를 우회하기 위해 getAttribute/setAttribute를 활용한 속성 문자열 파싱
+            for (const el of Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'))) {
+                const styleAttr = el.getAttribute('style');
+                if (styleAttr) {
+                    const originalUrl = extractBackgroundImageUrl(styleAttr);
+                    if (originalUrl) {
+                        if (!originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
+                            try {
+                                const dataUrl = await imageUrlToBlob(originalUrl);
+                                const newStyle = styleAttr.replace(originalUrl, dataUrl);
+                                el.setAttribute('style', newStyle);
+                                console.log('[log plugin] Successfully replaced background url in style attribute:', originalUrl.substring(0, 50));
+                            } catch (e) {
+                                console.warn(`Background image blob conversion error for ${originalUrl}:`, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (settings.replacementRules && settings.replacementRules.length > 0) {
+            // Apply replacements to the message content within the cloned node
+            const messageEl = clonedNode.querySelector('.prose, .chattext');
+            if (messageEl) {
+                applyReplacements(messageEl as HTMLElement, settings.replacementRules);
+            }
+        }
+
+        // Scale inline styles for full scaling mode
+        if (scaleMode === 'full' && scaleFactor !== 1.0) {
+            scaleInlineStyles(clonedNode);
+        }
+
+        return clonedNode.outerHTML;
+    }));
+
+    let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
+
     let extraCss = '';
+    if (settings.expandHover) {
+        extraCss += await generateForceHoverCss();
+    }
     if (settings.disableAnimations) {
         extraCss += `
             *, *::before, *::after {
@@ -355,285 +544,25 @@ export const getExportHtmlStyles = async (settings: LogExportSettings): Promise<
             }
         `;
     }
-    if (settings.theme === 'log') {
+
+    if (scaleMode === 'font' && scaleFactor !== 1.0) {
         extraCss += `
-            .chat-message-container .prose, 
-            .chat-message-container .chattext,
-            .chat-message-container .prose > *,
-            .chat-message-container .chattext > * {
-                max-width: 100% !important;
-                width: 100% !important;
-                margin-left: 0 !important;
-                padding-left: 0 !important;
+            .prose, .chattext {
+                font-size: ${scaleFactor}em !important;
             }
         `;
     }
-    if (settings.customCss) {
-        extraCss += '\n' + settings.customCss;
-    }
-    
-    return `${themeCss}\n${parentStyles.join('\n')}\n${compCss}\n${extraCss}`;
-};
 
-// ──────────────────────────────────────────────
-// CSS 스케일링 유틸
-// ──────────────────────────────────────────────
-
-/** CSS 값에서 px/rem 수치를 스케일 팩터만큼 곱합니다. */
-const createScaleValueFn = (scaleFactor: number) => {
-    return (val: string): string => {
-        return val.replace(/(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match, p1, p2) => {
-            const num = parseFloat(p1);
-            if (p2 === 'px' && Math.abs(num) <= 1) return match;
-            return `${Number((num * scaleFactor).toFixed(4))}${p2}`;
-        });
-    };
-};
-
-/** 노드의 인라인 스타일을 스케일합니다. */
-const scaleInlineStyles = (node: HTMLElement, scaleValue: (val: string) => string): void => {
-    const processElement = (el: HTMLElement) => {
-        if (!el.style) return;
-        for (let i = 0; i < el.style.length; i++) {
-            const prop = el.style[i];
-            if (prop === 'background-image' || prop === 'background') continue;
-            const val = el.style.getPropertyValue(prop);
-            if (val) {
-                const newVal = scaleValue(val);
-                if (newVal !== val) {
-                    el.style.setProperty(prop, newVal, el.style.getPropertyPriority(prop));
-                }
-            }
-        }
-    };
-    processElement(node);
-    node.querySelectorAll('*').forEach(el => processElement(el as HTMLElement));
-};
-
-/** CSSOM 스타일시트의 규칙을 스케일합니다. */
-const scaleStylesheetCSSOM = (cssText: string, scaleValue: (val: string) => string): string => {
-    const tempStyle = document.createElement('style');
-    tempStyle.textContent = cssText;
-    document.head.appendChild(tempStyle);
-
-    const sheet = tempStyle.sheet;
-    if (!sheet) {
-        document.head.removeChild(tempStyle);
-        return cssText;
-    }
-
-    const processRules = (rules: CSSRuleList) => {
-        for (let i = 0; i < rules.length; i++) {
-            const rule = rules[i];
-            if (rule instanceof CSSStyleRule) {
-                const style = rule.style;
-                for (let j = 0; j < style.length; j++) {
-                    const prop = style[j];
-                    if (prop === 'background-image' || prop === 'background') continue;
-                    const val = style.getPropertyValue(prop);
-                    if (val) {
-                        const newVal = scaleValue(val);
-                        if (newVal !== val) {
-                            style.setProperty(prop, newVal, style.getPropertyPriority(prop));
-                        }
-                    }
-                }
-            } else if (rule instanceof CSSMediaRule) {
-                processRules(rule.cssRules);
-            } else if (rule instanceof CSSKeyframesRule) {
-                for (let j = 0; j < rule.cssRules.length; j++) {
-                    const kfRule = rule.cssRules[j];
-                    if (kfRule instanceof CSSKeyframeRule) {
-                        const style = kfRule.style;
-                        for (let k = 0; k < style.length; k++) {
-                            const prop = style[k];
-                            const val = style.getPropertyValue(prop);
-                            if (val) {
-                                const newVal = scaleValue(val);
-                                if (newVal !== val) {
-                                    style.setProperty(prop, newVal, style.getPropertyPriority(prop));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    try {
-        processRules(sheet.cssRules);
-        const result = Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
-        document.head.removeChild(tempStyle);
-        return result;
-    } catch (e) {
-        console.error('[log plugin] scaleStylesheetCSSOM error:', e);
-        document.head.removeChild(tempStyle);
-        return cssText;
-    }
-};
-
-/** 노드를 복제하고 불필요한 UI 요소를 제거합니다. */
-const cloneAndCleanNode = (node: HTMLElement): HTMLElement => {
-    const cloned = node.cloneNode(true) as HTMLElement;
-    cloned.querySelectorAll(
-        'button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end'
-    ).forEach(el => el.remove());
-    return cloned;
-};
-
-/** 이름 폰트 색상을 강제 지정합니다. */
-const forceNameFontColor = (clonedNode: HTMLElement): void => {
-    clonedNode.querySelectorAll('.text-textcolor, .text-textcolor span').forEach(el => {
-        (el as HTMLElement).style.setProperty('color', 'var(--risu-theme-textcolor)', 'important');
-    });
-};
-
-/** 아바타 이미지를 data URL로 치환합니다. */
-const replaceAvatarImages = async (
-    clonedNode: HTMLElement,
-    name: string,
-    avatarMap: Map<string, string> | Record<string, string> | undefined
-): Promise<void> => {
-    if (!name || !avatarMap) return;
-
-    const avatarDataUrl = avatarMap instanceof Map
-        ? avatarMap.get(name) || avatarMap.get(name.trim()) || ''
-        : avatarMap[name] || avatarMap[name.trim()] || '';
-
-    if (!avatarDataUrl) return;
-
-    // 본문 바깥 <img> 태그 교체
-    clonedNode.querySelectorAll('img').forEach(img => {
-        if (!img.closest('.prose, .chattext')) {
-            (img as HTMLImageElement).src = avatarDataUrl;
-        }
-    });
-
-    // 본문 바깥 background-image 스타일 요소 교체
-    clonedNode.querySelectorAll<HTMLElement>('[style*="background"]').forEach(el => {
-        if (!el.closest('.prose, .chattext')) {
-            const styleAttr = el.getAttribute('style');
-            if (styleAttr) {
-                const newStyle = styleAttr
-                    .replace(/url\(['"]?[^'"]+?['"]?\)/g, `url('${avatarDataUrl}')`)
-                    .replace(/url\(&quot;[^&]+?&quot;\)/g, `url('${avatarDataUrl}')`);
-                el.setAttribute('style', newStyle);
-            }
-        }
-    });
-};
-
-/** 노드 내 이미지를 blob URL로 임베딩합니다. */
-const embedImagesInNode = async (clonedNode: HTMLElement): Promise<void> => {
-    // <img> 태그 임베딩
-    for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
-        if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
-            try {
-                img.src = await imageUrlToBlob(img.src);
-            } catch (e) {
-                console.warn(`Blob conversion error for ${img.src}:`, e);
-            }
-        }
-    }
-
-    // background-image 스타일 임베딩 (문자열 파싱 우회)
-    for (const el of Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'))) {
-        const styleAttr = el.getAttribute('style');
-        if (styleAttr) {
-            const originalUrl = extractBackgroundImageUrl(styleAttr);
-            if (originalUrl && !originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
-                try {
-                    const dataUrl = await imageUrlToBlob(originalUrl);
-                    const newStyle = styleAttr.replace(originalUrl, dataUrl);
-                    el.setAttribute('style', newStyle);
-                    console.log('[log plugin] Successfully replaced background url in style attribute:', originalUrl.substring(0, 50));
-                } catch (e) {
-                    console.warn(`Background image blob conversion error for ${originalUrl}:`, e);
-                }
-            }
-        }
-    }
-};
-
-/** 메시지 콘텐츠에 replacement rules 를 적용합니다. */
-const applyReplacementsToNode = (
-    clonedNode: HTMLElement,
-    replacementRules: ReplacementRule[] | undefined
-): void => {
-    if (!replacementRules || replacementRules.length === 0) return;
-    const messageEl = clonedNode.querySelector('.prose, .chattext');
-    if (messageEl) {
-        applyReplacements(messageEl as HTMLElement, replacementRules);
-    }
-};
-
-/** CSS 스타일 조립 (테마 + parent + comprehensive + extra) */
-const buildPreviewCss = async (
-    parentStyles: string[],
-    settings: LogExportSettings,
-    scaleMode: string,
-    scaleFactor: number
-): Promise<{ fullCss: string; extraCss: string }> => {
-    let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
-
-    let extraCss = '';
-    if (settings.expandHover) {
-        extraCss += await generateForceHoverCss();
-    }
-    if (settings.disableAnimations) {
-        extraCss += `\n            *, *::before, *::after {\n                animation: none !important;\n                transition: none !important;\n            }\n        `;
-    }
-    if (scaleMode === 'font' && scaleFactor !== 1.0) {
-        extraCss += `\n            .prose, .chattext {\n                font-size: ${scaleFactor}em !important;\n            }\n        `;
-    }
+    // Scale CSS stylesheets for full scaling mode
     if (scaleMode === 'full' && scaleFactor !== 1.0) {
-        const scaleValue = createScaleValueFn(scaleFactor);
-        fullCss = scaleStylesheetCSSOM(fullCss, scaleValue);
-        extraCss = scaleStylesheetCSSOM(extraCss, scaleValue);
+        fullCss = scaleStylesheetCSSOM(fullCss);
+        extraCss = scaleStylesheetCSSOM(extraCss);
     }
 
-    return { fullCss, extraCss };
-};
-
-export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
-    // 1. parent styles 수집
-    const parentStyles = await getParentPageStyles();
-
-    // 2. 스케일 설정
-    const scaleMode = settings.htmlScaleMode || 'font';
-    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
-    const scaleValue = createScaleValueFn(scaleFactor);
-
-    // 3. 노드 복제 및 처리
-    const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
-        const clonedNode = cloneAndCleanNode(node);
-
-        forceNameFontColor(clonedNode);
-
-        const globalSettings = await loadGlobalSettings();
-        const name = getNameFromNode(clonedNode, globalSettings, '');
-        await replaceAvatarImages(clonedNode, name, avatarMap);
-
-        if (settings.embedImages !== false) {
-            await embedImagesInNode(clonedNode);
-        }
-
-        applyReplacementsToNode(clonedNode, settings.replacementRules);
-
-        if (scaleMode === 'full' && scaleFactor !== 1.0) {
-            scaleInlineStyles(clonedNode, scaleValue);
-        }
-
-        return clonedNode.outerHTML;
-    }));
-
-    // 4. CSS 조립
-    const { fullCss, extraCss } = await buildPreviewCss(parentStyles, settings, scaleMode, scaleFactor);
-
-    // 5. 최종 HTML 반환
     const wrapperClassAttr = settings.expandHover ? 'class="expand-hover-globally"' : '';
-    const wrapperStyle = `max-width: ${settings.previewWidth || 800}px;`;
+    const wrapperStyle = `
+    max-width: ${settings.previewWidth || 800}px;
+    `;
 
     return `
         <style>${fullCss}\n${extraCss}</style>

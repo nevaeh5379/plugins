@@ -71,13 +71,13 @@ interface BaseMessageProps extends MessageProps {
  */
 interface DeleteButtonProps {
   index: number;
-  isAvatarRight: boolean;
+  isUser: boolean;
   placement: 'beforeAvatar' | 'inAvatar' | 'afterContent';
   customStyle?: React.CSSProperties;
   opposite?: boolean;
 }
 
-const DeleteButton: React.FC<DeleteButtonProps> = ({ index, isAvatarRight, placement, customStyle, opposite }) => {
+const DeleteButton: React.FC<DeleteButtonProps> = ({ index, isUser, placement, customStyle, opposite }) => {
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
     top: '-2px',
@@ -99,11 +99,11 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({ index, isAvatarRight, place
   };
 
   const inAvatarStyle: React.CSSProperties = opposite
-    ? { ...baseStyle, right: isAvatarRight ? 'auto' : '-5px', left: isAvatarRight ? '-5px' : 'auto' }
+    ? { ...baseStyle, right: isUser ? 'auto' : '-5px', left: isUser ? '-5px' : 'auto' }
     : baseStyle;
 
   const afterContentStyle: React.CSSProperties = {
-    float: isAvatarRight ? 'left' : 'right',
+    float: isUser ? 'left' : 'right',
     opacity: 0.3,
   };
 
@@ -127,8 +127,6 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
   const {
     themeConfig, charInfoName,
     isForArca, showAvatar, isForExport, isEditable, index,
-    avatarPosition = 'opposite',
-    avatarShape = 'theme',
   } = props;
 
   const mc = useMessageCard(props);
@@ -136,192 +134,13 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
 
   const cardBgColor = isUser ? props.color.cardBgUser : props.color.cardBg;
 
-  // Determine if avatar is on the top-level row (name-adjacent)
-  const isAvatarTop = avatarPosition === 'opposite-top' || avatarPosition === 'top-left' || avatarPosition === 'top-right';
-
-  // Determine if the avatar should render on the right side
-  let isAvatarRight = isUser;
-  if (avatarPosition === 'left' || avatarPosition === 'top-left') {
-    isAvatarRight = false;
-  } else if (avatarPosition === 'right' || avatarPosition === 'top-right') {
-    isAvatarRight = true;
-  }
-
-  // Determine border radius according to avatarShape
-  let borderRadius = themeConfig.avatarRadius;
-  if (avatarShape === 'circle') {
-    borderRadius = '50%';
-  } else if (avatarShape === 'square') {
-    borderRadius = '0%';
-  } else if (avatarShape === 'rounded') {
-    borderRadius = isAvatarTop ? '6px' : '8px';
-  } else if (avatarShape === 'squircle') {
-    borderRadius = isAvatarTop ? '12%' : '20%';
-  }
-
-  // --- Avatar Top Mode (name-adjacent layout) ---
-  if (isAvatarTop) {
-    const topContainerStyle: React.CSSProperties = {
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: isAvatarRight ? 'flex-end' : 'flex-start',
-      marginBottom: `${themeConfig.marginBottom}px`,
-      width: '100%',
-    };
-    if (themeConfig.containerPaddingX != null) {
-      topContainerStyle.padding = `0 ${themeConfig.containerPaddingX}px`;
-    }
-
-    const headerRowStyle: React.CSSProperties = {
-      display: 'flex',
-      alignItems: 'center',
-      flexDirection: isAvatarRight ? 'row-reverse' : 'row',
-      marginBottom: '6px',
-    };
-
-    const topAvatarSize = Math.min(32, themeConfig.avatarSize);
-    const topAvatarBaseStyle: React.CSSProperties = {
-      width: topAvatarSize,
-      height: topAvatarSize,
-      minWidth: topAvatarSize,
-      borderRadius: borderRadius,
-      boxShadow: props.color.shadow || 'none',
-      border: themeConfig.avatarBorder
-        ? `1.5px solid ${props.color.avatarBorder}`
-        : 'none',
-    };
-
-    const topAvatarMarginStyle: React.CSSProperties = {
-      margin: isAvatarRight ? '0 0 0 8px' : '0 8px 0 0',
-    };
-
-    const nameColor = themeConfig.nameColorOverride
-      ? `${props.color.nameColor} !important`
-      : props.color.nameColor;
-
-    const nameStyle: React.CSSProperties = {
-      color: nameColor,
-      fontWeight: 600,
-      fontSize: `calc(${mc.baseSize} * ${themeConfig.nameFontSize})`,
-      opacity: themeConfig.nameOpacity,
-    };
-
-    // Card/Bubble rendering inside Top Mode
-    const renderCardOrBubble = () => {
-      if (themeConfig.renderMode === 'card') {
-        const cardStyle: React.CSSProperties = {
-          borderRadius: themeConfig.cardBorderRadius || '10px',
-          background: cardBgColor,
-          boxShadow: themeConfig.cardShadow || props.color.shadow,
-          border: themeConfig.cardBorder !== false ? `1px solid ${props.color.border}` : 'none',
-          overflow: 'hidden',
-        };
-        if (themeConfig.cardBackdropFilter) {
-          cardStyle.backdropFilter = 'blur(8px)';
-          (cardStyle as React.CSSProperties & { WebkitBackdropFilter?: string }).WebkitBackdropFilter = 'blur(8px)';
-        }
-        if (themeConfig.cardBorderRadiusUser != null) {
-          cardStyle.borderRadius = isUser ? themeConfig.cardBorderRadiusUser : themeConfig.cardBorderRadius || '10px';
-        }
-
-        const contentStyle: React.CSSProperties = {
-          padding: `${themeConfig.cardPaddingY || 12}px ${themeConfig.cardPaddingX || 14}px`,
-          color: props.color.text,
-          lineHeight: themeConfig.lineHeight,
-          wordWrap: 'break-word',
-          fontSize: mc.baseSize,
-        };
-
-        return (
-          <div style={cardStyle}>
-            <div ref={mc.contentRef} style={contentStyle}
-              contentEditable={isEditable}
-              onBlur={mc.handleBlur}
-              onClick={mc.handleContentClick}
-              suppressContentEditableWarning={true}
-            />
-          </div>
-        );
-      }
-
-      // Default bubble render mode inside Top Mode
-      return (
-        <MessageCard
-          themeConfig={{ ...themeConfig, showName: false }} // Hide name as we render it in the header row
-          color={props.color}
-          showBubble={props.showBubble}
-          isEditable={props.isEditable}
-          baseSize={mc.baseSize}
-          messageHtml={mc.messageHtml}
-          contentRef={mc.contentRef}
-          isUser={mc.isUser}
-          name={mc.name}
-          handleBlur={mc.handleBlur}
-          handleContentClick={mc.handleContentClick}
-        />
-      );
-    };
-
-    return (
-      <div style={topContainerStyle}>
-        {isEditable && themeConfig.deleteButtonPlacement === 'beforeAvatar' && (
-          <DeleteButton index={index} isAvatarRight={isAvatarRight} placement="beforeAvatar" customStyle={{ position: 'absolute', top: 0, left: isAvatarRight ? 'auto' : '-20px', right: isAvatarRight ? '-20px' : 'auto' }} />
-        )}
-
-        <div style={headerRowStyle}>
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <Avatar
-              avatarSrc={avatarSrc}
-              name={charInfoName}
-              isUser={isUser}
-              isForArca={isForArca}
-              showAvatar={showAvatar}
-              baseStyle={topAvatarBaseStyle}
-              marginStyle={topAvatarMarginStyle}
-              isForExport={isForExport}
-            />
-            {isEditable && themeConfig.deleteButtonPlacement === 'inAvatar' && (
-              <DeleteButton
-                index={index}
-                isAvatarRight={isAvatarRight}
-                placement="inAvatar"
-                customStyle={themeConfig.deleteButtonStyle}
-                opposite={themeConfig.deleteButtonOpposite}
-              />
-            )}
-          </div>
-          {themeConfig.showName && (
-            <span style={nameStyle}>{mc.name}</span>
-          )}
-        </div>
-
-        <div style={{ width: '100%', display: 'flex', justifyContent: isAvatarRight ? 'flex-end' : 'flex-start' }}>
-          <div style={{
-            width: (themeConfig.renderMode === 'card' && !themeConfig.nameInHeader) ? 'auto' : '100%',
-            maxWidth: (themeConfig.renderMode === 'card' && !themeConfig.nameInHeader) ? '85%' : '100%',
-            minWidth: 0
-          }}>
-            {renderCardOrBubble()}
-          </div>
-        </div>
-
-        {isEditable && themeConfig.deleteButtonPlacement === 'afterContent' && (
-          <DeleteButton index={index} isAvatarRight={isAvatarRight} placement="afterContent" customStyle={themeConfig.deleteButtonStyle} />
-        )}
-      </div>
-    );
-  }
-
-  // --- Default Side Mode (avatar on the side) ---
-
   // Container styles
   const containerStyle: React.CSSProperties = {
     position: 'relative',
     display: 'flex',
     alignItems: 'flex-start',
     marginBottom: `${themeConfig.marginBottom}px`,
-    flexDirection: isAvatarRight ? 'row-reverse' : (themeConfig.flexDirection || 'row'),
+    flexDirection: isUser ? 'row-reverse' : themeConfig.flexDirection,
   };
   if (themeConfig.gap != null) {
     containerStyle.gap = `${themeConfig.gap}px`;
@@ -335,7 +154,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
     width: themeConfig.avatarSize,
     height: themeConfig.avatarSize,
     minWidth: themeConfig.avatarSize,
-    borderRadius: borderRadius,
+    borderRadius: themeConfig.avatarRadius,
     boxShadow: props.color.shadow || 'none',
     border: themeConfig.avatarBorder
       ? `2px solid ${props.color.avatarBorder}`
@@ -343,7 +162,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
   };
 
   const avatarMarginStyle: React.CSSProperties = {
-    margin: isAvatarRight
+    margin: isUser
       ? `0 0 0 ${themeConfig.avatarMargin}px`
       : `0 ${themeConfig.avatarMargin}px 0 0`,
   };
@@ -386,7 +205,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
       fontSize: `calc(${mc.baseSize} * ${themeConfig.nameFontSize})`,
       padding: `${themeConfig.nameBarPaddingY || 8}px ${themeConfig.nameBarPaddingX || 14}px`,
       borderBottom: `1px solid ${props.color.border}`,
-      textAlign: isAvatarRight ? 'right' : 'left',
+      textAlign: isUser ? 'right' : 'left',
       opacity: themeConfig.nameOpacity,
     };
 
@@ -406,7 +225,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
       <div style={containerStyle}>
         {/* Delete button before Avatar */}
         {isEditable && themeConfig.deleteButtonPlacement === 'beforeAvatar' && (
-          <DeleteButton index={index} isAvatarRight={isAvatarRight} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
+          <DeleteButton index={index} isUser={isUser} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
         )}
 
         {/* Avatar section */}
@@ -424,7 +243,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
           {isEditable && themeConfig.deleteButtonPlacement === 'inAvatar' && (
             <DeleteButton
               index={index}
-              isAvatarRight={isAvatarRight}
+              isUser={isUser}
               placement="inAvatar"
               customStyle={themeConfig.deleteButtonStyle}
               opposite={themeConfig.deleteButtonOpposite}
@@ -451,7 +270,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            alignItems: isAvatarRight ? 'flex-end' : 'flex-start',
+            alignItems: isUser ? 'flex-end' : 'flex.start',
             maxWidth: '85%',
             minWidth: 0,
           }}>
@@ -477,7 +296,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
     <div style={containerStyle}>
       {/* Delete button before Avatar (BasicMessage, CustomMessage) */}
       {isEditable && themeConfig.deleteButtonPlacement === 'beforeAvatar' && (
-        <DeleteButton index={index} isAvatarRight={isAvatarRight} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
+        <DeleteButton index={index} isUser={isUser} placement="beforeAvatar" customStyle={themeConfig.deleteButtonStyle} />
       )}
 
       {/* Avatar section */}
@@ -496,7 +315,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
         {isEditable && themeConfig.deleteButtonPlacement === 'inAvatar' && (
           <DeleteButton
             index={index}
-            isAvatarRight={isAvatarRight}
+            isUser={isUser}
             placement="inAvatar"
             customStyle={themeConfig.deleteButtonStyle}
             opposite={themeConfig.deleteButtonOpposite}
@@ -521,7 +340,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
 
       {/* Delete button after content, floated (SimpleMessage) */}
       {isEditable && themeConfig.deleteButtonPlacement === 'afterContent' && (
-        <DeleteButton index={index} isAvatarRight={isAvatarRight} placement="afterContent" customStyle={themeConfig.deleteButtonStyle} />
+        <DeleteButton index={index} isUser={isUser} placement="afterContent" customStyle={themeConfig.deleteButtonStyle} />
       )}
     </div>
   );

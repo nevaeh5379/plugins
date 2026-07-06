@@ -19,8 +19,8 @@ export const collectCharacterAvatars = async (
       try {
         // Blob URLs are more efficient for client-side display
         return await imageUrlToBlob(url);
-      } catch {
-        console.error(`Failed to process image URL to blob: ${url}`);
+      } catch (e) {
+        console.error(`Failed to process image URL to blob: ${url}`, e);
         return '' // Return empty for failed conversions
       }
   }
@@ -44,7 +44,7 @@ export const collectCharacterAvatars = async (
                 break;
               }
             }
-          } catch { /* ignore invalid selectors */ }
+          } catch (e) { /* ignore invalid selectors */ }
           if (avatarElement) break;
         }
       }

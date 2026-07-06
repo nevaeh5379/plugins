@@ -23,7 +23,6 @@ interface ActionbarProps {
   charName: string;
   chatName: string;
   getPreviewContent: () => Promise<string>;
-  otherFormatContent: string
   messageNodes: HTMLElement[];
   settings: any;
   backgroundColor: string;
@@ -42,18 +41,17 @@ interface ActionbarProps {
   onInvertSelection?: () => void;
 }
  
-const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewContent, messageNodes, otherFormatContent, settings, backgroundColor, color, charAvatarUrl, onOpenArcaHelper, onProgressStart, onProgressUpdate, onProgressEnd, onSaveLogData, onLoadLogData, onDeleteSelected, hasSelection, onSelectAll, onDeselectAll, onInvertSelection }) => {
+const Actionbar: React.FC<ActionbarProps> = ({ charName, chatName, getPreviewContent, messageNodes, settings, backgroundColor, color, charAvatarUrl, onOpenArcaHelper, onProgressStart, onProgressUpdate, onProgressEnd, onSaveLogData, onLoadLogData, onDeleteSelected, hasSelection, onSelectAll, onDeselectAll, onInvertSelection }) => {
 
     const handleCopyHtml = async () => {
-        console.log(otherFormatContent)
         const content = await getPreviewContent();
         copyToClipboard(content);
     };
 
     const handleSaveHtml = async () => {
         const content = await getPreviewContent();
-        const safeCharName = charName.replace(/[/?%*:"<>]/g, '-');
-        const safeChatName = chatName.replace(/[/?%*:"<>]/g, '-');
+        const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
+        const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
         const filename = `Risu_Log_${safeCharName}_${safeChatName}.html`;
         saveAsFile(filename, content, 'text/html;charset=utf-8');
     };

@@ -1793,7 +1793,7 @@ interface RisuaiPluginAPI {
      */
     removeRisuReplacer(
         type: ReplacerType,
-        func: (type: string, content: string) => string | Promise<string>
+        func: Function
     ): Promise<void>;
 
     // ========== Body Interceptors ==========
@@ -1924,7 +1924,7 @@ interface RisuaiPluginAPI {
      * @param callback - Function to call when a message is received on this channel
      * @remarks This API is subject to change. API might be changed, deprecated, or removed in the future without prior notice.
      */
-    addPluginChannelListener(channelName: string, callback: (message: unknown) => void): Promise<void>;
+    addPluginChannelListener(channelName: string, callback: Function): Promise<void>;
 
     /**
      * Sends a message to another plugin's named channel (IPC between plugins).

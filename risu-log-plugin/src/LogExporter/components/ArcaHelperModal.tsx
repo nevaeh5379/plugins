@@ -4,7 +4,6 @@ import { createZipFromMediaList } from '../../services/zipService';
 import { copyToClipboard } from '../services/fileService';
 import type { CharInfo, ArcaImage } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
-import { getExportHtmlStyles } from '../services/logGenerator';
 import { Modal, Steps, Button, Alert, Input, Spin } from 'antd';
 import { DownloadOutlined, FileAddOutlined, CopyOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
@@ -70,16 +69,6 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         globalSettings,
         isForExport: true,
         isForArca: true,
-        allowHtmlRendering: !!settings.allowHtmlRendering,
-        disableAnimations: !!settings.disableAnimations,
-        imageCropActive: !!settings.imageCropActive,
-        imageCropAspectRatio: settings.imageCropAspectRatio || 'original',
-        imageCropVAlign: settings.imageCropVAlign !== undefined ? Number(settings.imageCropVAlign) : 50,
-        imageCropHAlign: settings.imageCropHAlign !== undefined ? Number(settings.imageCropHAlign) : 50,
-        imageCropHeight: settings.imageCropHeight !== undefined ? Number(settings.imageCropHeight) : 1,
-        imageScale: settings.imageScale !== undefined ? Number(settings.imageScale) : 100,
-        imageAlign: settings.imageAlign || 'left',
-        imageStyle: settings.imageStyle || 'none',
       });
 
       const tempDiv = document.createElement('div');
@@ -126,7 +115,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
           
           const urlLower = src.toLowerCase();
           const isWebM = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
-          const extension = isWebM && settings.convertWebM ? 'webp' : ((el as HTMLElement).dataset.extension || 'jpg');
+          let extension = isWebM && settings.convertWebM ? 'webp' : ((el as HTMLElement).dataset.extension || 'jpg');
           const filename = `${String(mediaCounter).padStart(3, '0')}.${extension}`;
 
           collectedImages.push({ url: src, filename, isWebM });
@@ -142,13 +131,12 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         }
       }
 
-      const cssStyles = await getExportHtmlStyles(settings);
-      setBaseHtml(`<style>${cssStyles}</style>\n${tempDiv.innerHTML}`);
+      setBaseHtml(tempDiv.innerHTML);
       setImages(collectedImages);
 
       if (collectedImages.length > 0) {
         const blob = await createZipFromMediaList(collectedImages, { convertWebM: settings.convertWebM });
-        const safeCharName = charInfo.name.replace(/[/?%*:"<>]/g, '-');
+        const safeCharName = charInfo.name.replace(/[\/\?%\*:|"<>]/g, '-');
         const zipFilename = `Arca_Images_${safeCharName}.zip`;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);

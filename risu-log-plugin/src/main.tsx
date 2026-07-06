@@ -1,3 +1,5 @@
+/// <reference path="./vite-env.d.ts" />
+
 import { setupMessageButtons, teardownMessageButtons, openExportModalForCurrentChat } from './injector/injector'
 
 // 플러그인 진입점 (RisuAI Plugin API v3.0)

@@ -1,31 +1,30 @@
+
 import React from 'react';
 import type { FooterProps } from '../../../types';
 
 const LogThemeFooter: React.FC<FooterProps> = ({ color, footerLeft, footerCenter, footerRight }) => {
   return (
     <footer style={{
-      marginTop: '24px',
-      padding: '16px 24px',
-      borderTop: `1px solid ${color.border}44`,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      fontSize: '0.85em',
+        marginTop: '2em',
+        padding: '1em',
+        backgroundColor: '#1e1e1e',
+        color: '#6a9955',
+        fontFamily: 'Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace',
+        fontSize: '0.85em',
+        borderLeft: `4px solid ${color.nameColor}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px'
     }}>
-
+      <div>
+        <span style={{ color: '#569cd6' }}>&gt; SYSTEM:</span> End of transmission.
+      </div>
       {(footerLeft || footerCenter || footerRight) && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          color: color.textSecondary,
-          opacity: 0.8, 
-          fontSize: '0.95em' 
-        }}>
-          <span>{footerLeft}</span>
-          <span style={{ fontWeight: 500 }}>{footerCenter}</span>
-          <span>{footerRight}</span>
-        </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.7, marginTop: '0.5em', fontSize: '0.9em' }}>
+             <span>{footerLeft}</span>
+             <span>{footerCenter}</span>
+             <span>{footerRight}</span>
+          </div>
       )}
     </footer>
   );

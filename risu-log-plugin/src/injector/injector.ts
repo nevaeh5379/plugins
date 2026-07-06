@@ -13,24 +13,44 @@ const INJECTOR_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  margin-right: 4px;
+  margin-right: 0;
   opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
   transition: opacity 0.15s ease;
 }
+.log-exporter-toolbar:hover .log-exporter-msg-btn-group,
+.log-exporter-toolbar:focus-within .log-exporter-msg-btn-group,
 .log-exporter-msg-btn-group:hover,
-.risu-chat:hover .log-exporter-msg-btn-group {
+.log-exporter-msg-btn-group:focus-within {
   opacity: 1;
+  max-width: 80px;
+  margin-right: 4px;
+  overflow: visible;
+  pointer-events: auto;
 }
 .log-exporter-msg-btn-group button {
   background: transparent;
   border: none;
   color: var(--textcolor2, #888);
   cursor: pointer;
-  padding: 2px;
+  width: 0;
+  padding: 0;
   border-radius: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+.log-exporter-toolbar:hover .log-exporter-msg-btn-group button,
+.log-exporter-toolbar:focus-within .log-exporter-msg-btn-group button,
+.log-exporter-msg-btn-group:hover button,
+.log-exporter-msg-btn-group:focus-within button {
+  width: auto;
+  padding: 2px;
+  overflow: visible;
 }
 .log-exporter-msg-btn-group button:hover {
   background: rgba(128,128,128,0.15);
@@ -43,7 +63,7 @@ const INJECTOR_CSS = `
 `
 
 // 모듈 상태
-const rangeSelection = {
+let rangeSelection = {
   active: false,
   startIndex: -1
 }
@@ -126,8 +146,8 @@ async function createMsgBtnGroup(
   )
   await fromHereBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(fromHereBtn, e))) return
-    ;(e as any).preventDefault?.()
-    ;(e as any).stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
 
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index })
@@ -141,8 +161,8 @@ async function createMsgBtnGroup(
   )
   await onlyThisBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(onlyThisBtn, e))) return
-    ;(e as any).preventDefault?.()
-    ;(e as any).stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
 
     await clearRange(rootDoc)
     await openExportModal({ startIndex: index, singleMessage: true })
@@ -156,8 +176,8 @@ async function createMsgBtnGroup(
   )
   await rangeBtn.addEventListener('click', async (e: unknown) => {
     if (!(await isClickInside(rangeBtn, e))) return
-    ;(e as any).preventDefault?.()
-    ;(e as any).stopPropagation?.()
+    (e as any).preventDefault?.()
+    (e as any).stopPropagation?.()
 
     if (!rangeSelection.active) {
       await clearRange(rootDoc)
@@ -191,6 +211,7 @@ async function injectMessageButtons(rootDoc: SafeDocument): Promise<void> {
     if (!target) continue
     if (await hasBtnGroup(target)) continue
 
+    await target.addClass('log-exporter-toolbar')
     const btnGroup = await createMsgBtnGroup(rootDoc, node, i)
     await target.prepend(btnGroup)
   }
@@ -235,7 +256,7 @@ export async function openExportModalForCurrentChat(): Promise<void> {
 // mutations 내용 검사 대신 단순 재주입 트리거(디바운스)로 회피합니다.
 let reinjectTimer: ReturnType<typeof setTimeout> | null = null
 
-async function onMutation(): Promise<void> {
+async function onMutation(_mutations: SafeClassArray<SafeMutationRecord>): Promise<void> {
   try {
     // 디바운스: 연속 DOM 변경 시 한 번만 재주입
     if (reinjectTimer) clearTimeout(reinjectTimer)

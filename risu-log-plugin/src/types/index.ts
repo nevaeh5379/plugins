@@ -69,10 +69,10 @@ export interface LogContainerProps extends ImageDisplayOptions {
   footerCenter?: string;
   footerRight?: string;
   showBubble?: boolean;
-  isForArca: boolean;
+  isForArca?: boolean;
   embedImagesAsBlob?: boolean;
   preCollectedAvatarMap?: Map<string, string>;
-  allowHtmlRendering: boolean;
+  allowHtmlRendering?: boolean;
   onReady?: () => void;
   globalSettings: GlobalSettings;
   fontSize?: number;
@@ -84,19 +84,7 @@ export interface LogContainerProps extends ImageDisplayOptions {
   isForImageExport?: boolean;
   isForExport?: boolean;
   replacementRules?: ReplacementRule[];
-  disableAnimations: boolean;
-
-  // Required crop/align options overriding base optional interface
-  imageCropActive: boolean;
-  imageCropAspectRatio: string;
-  imageCropVAlign: number;
-  imageCropHAlign: number;
-  imageCropHeight: number;
-  imageScale: number;
-  imageAlign: 'left' | 'center' | 'right';
-  imageStyle: ImageStyle;
-  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
-  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
+  disableAnimations?: boolean;
 }
 
 // 메시지 컴포넌트 Props
@@ -121,18 +109,6 @@ export interface MessageProps extends ImageDisplayOptions {
   onRendered?: () => void;
   replacementRules?: ReplacementRule[];
   fontSize?: number;
-
-  // Required crop/align options overriding base optional interface
-  imageCropActive: boolean;
-  imageCropAspectRatio: string;
-  imageCropVAlign: number;
-  imageCropHAlign: number;
-  imageCropHeight: number;
-  imageScale: number;
-  imageAlign: 'left' | 'center' | 'right';
-  imageStyle: ImageStyle;
-  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
-  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 export type LogNode = HTMLElement;
@@ -152,17 +128,17 @@ export interface GlobalSettings {
 }
 
 export interface ImageCropOptions {
-    imageCropActive: boolean;
-    imageCropAspectRatio: string;
-    imageCropVAlign: number;
-    imageCropHAlign: number;
-    imageCropHeight: number;
+    imageCropActive?: boolean;
+    imageCropAspectRatio?: string;
+    imageCropVAlign?: number;
+    imageCropHAlign?: number;
+    imageCropHeight?: number;
 }
 
 export interface ImageDisplayOptions extends ImageCropOptions {
-    imageScale: number;
-    imageAlign: 'left' | 'center' | 'right';
-    imageStyle: ImageStyle;
+    imageScale?: number;
+    imageAlign?: 'left' | 'center' | 'right';
+    imageStyle?: ImageStyle;
 }
 
 export interface ReplacementRule {
@@ -186,8 +162,8 @@ export interface LogExportSettings extends ImageDisplayOptions {
   headerTags?: string;
   headerLayout?: 'default' | 'compact' | 'banner';
   headerBannerUrl?: string;
-  headerBannerAlign?: number;
   headerBannerBlur?: boolean;
+  headerBannerAlign?: number;
   // Footer
   showFooter?: boolean;
   footerLeft?: string;
@@ -200,11 +176,9 @@ export interface LogExportSettings extends ImageDisplayOptions {
   embedImages?: boolean;
   replacementRules?: ReplacementRule[];
   expandHover?: boolean;
-  disableAnimations: boolean;
+  disableAnimations?: boolean;
   rawHtmlView?: boolean;
   isEditable?: boolean;
-  isForArca: boolean;
-  allowHtmlRendering: boolean;
   // HTML scaling
   htmlScaleMode?: 'font' | 'full';
   htmlScaleFactor?: number;
@@ -226,8 +200,6 @@ export interface LogExportSettings extends ImageDisplayOptions {
   onProgressEnd?: () => void;
   // External data
   charAvatarUrl?: string;
-  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
-  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 

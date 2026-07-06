@@ -149,14 +149,6 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
  *
  * @returns data URL 문자열. 실패 시 원본 URL 반환.
  */
-const promiseWithTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string = 'Timeout'): Promise<T> => {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
-};
-
 export const imageUrlToBlob = async (url: string): Promise<string> => {
   if (!url || url.startsWith('data:') || url.startsWith('blob:')) {
     return url
@@ -166,7 +158,7 @@ export const imageUrlToBlob = async (url: string): Promise<string> => {
   }
 
   try {
-    const blob = await promiseWithTimeout(fetchToBlobNative(url), 5000, `Timeout fetching image: ${url}`);
+    const blob = await fetchToBlobNative(url)
     const dataUrl = await blobToDataUrl(blob)
     dataUrlCache.set(url, dataUrl)
     return dataUrl

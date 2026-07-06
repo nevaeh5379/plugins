@@ -18,8 +18,8 @@ const DefaultHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesA
         <img src={avatarSrc} data-log-exporter-avatar="true" style={{
           width: '72px', height: '72px', borderRadius: '50%',
           objectFit: 'cover', margin: '0 auto 0.8em', display: 'block',
+          border: `2px solid ${color.avatarBorder}`,
           boxShadow: color.shadow,
-           objectPosition: 'top',
         }} />
       )}
       <h1 style={{

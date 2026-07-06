@@ -8,11 +8,13 @@ import type { Persona } from '../types'
 import { getAllMessageNodes } from './messageScanner'
 import { extractSwImageLocation, extractTauriAssetLocation, extractBackgroundImageUrl } from '../LogExporter/utils/imageUtils'
 
+
+
 export interface ChatLogData {
   charName: string
   chatName: string
   charAvatarUrl: string
-  messageNodes: SafeElement[]
+  messageNodes: SafeElement[] // SafeElement[] (메인 DOM, 외부에서 outerHTML로 변환)
   character: RisuCharacter | null
   chat: RisuChat | null
   avatarMap?: Record<string, string>
@@ -24,12 +26,10 @@ export interface ProcessOptions {
   singleMessage?: boolean
 }
 
-// ──────────────────────────────────────────────
-// 권한 관리
-// ──────────────────────────────────────────────
-
 /**
  * mainDom 권한을 보장하여 rootDoc을 반환합니다.
+ * getRootDocument()는 권한 거부 시 null을 반환하므로,
+ * 먼저 requestPluginPermission('mainDom')으로 권한을 요청합니다.
  */
 export async function ensureRootDoc(): Promise<SafeDocument | null> {
   try {
@@ -46,19 +46,18 @@ export async function ensureRootDoc(): Promise<SafeDocument | null> {
   }
 }
 
-// ──────────────────────────────────────────────
-// 아바타 추출
-// ──────────────────────────────────────────────
-
 /**
  * 캐릭터 아바타를 data URL로 추출합니다.
- * RisuAI의 character.image는 asset id이므로 Risuai.readImage로 원본 바이트를 가져옵니다.
+ * RisuAI의 character.image는 asset id(예: "assets/...")입니다.
+ * Risuai.readImage(assetId)로 원본 바이트를 가져와 data URL로 변환합니다.
+ * DOM 기반 추출(사이드바)은 폴더 아이콘 등과 혼동될 수 있어 사용하지 않습니다.
  */
 async function extractAvatarDataUrl(imageAssetId: string): Promise<string> {
   if (!imageAssetId) return ''
   try {
     const data = await Risuai.readImage(imageAssetId)
     if (!data) return ''
+    // readImage는 Uint8Array를 반환합니다.
     const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
     const blob = new Blob([bytes])
     return await new Promise<string>((resolve, reject) => {
@@ -74,19 +73,19 @@ async function extractAvatarDataUrl(imageAssetId: string): Promise<string> {
 }
 
 /**
- * 캐릭터 메타데이터 (이름, 아바타, 채팅 정보) 를 수집합니다.
+ * 현재 채팅의 로그 데이터를 수집합니다.
+ *
+ * @param chatIndex 내보낼 채팅 인덱스 (character.chatPage 기준). undefined 시 현재 채팅.
+ * @param options startIndex/endIndex/singleMessage로 메시지 범위 제한
  */
-async function fetchChatMetadata(
-  chatIndex?: number
-): Promise<{
-  charName: string
-  chatName: string
-  charAvatarUrl: string
-  character: RisuCharacter | null
-  chat: RisuChat | null
-}> {
+export async function processChatLog(
+  chatIndex?: number,
+  options: ProcessOptions = {}
+): Promise<ChatLogData> {
+  const rootDoc = await ensureRootDoc()
   const charIdx = await Risuai.getCurrentCharacterIndex()
   const character: RisuCharacter | null = (await Risuai.getCharacter()) as RisuCharacter | null
+
   const targetChatIndex = chatIndex ?? (await Risuai.getCurrentChatIndex())
 
   let chat: RisuChat | null = null
@@ -97,135 +96,123 @@ async function fetchChatMetadata(
   const charName = character?.name || 'Unknown'
   const chatName = chat?.name || `Chat ${targetChatIndex}`
 
+  // 아바타: Risuai.readImage(character.image)로 asset 데이터를 직접 가져와
+  // data URL로 변환합니다. DOM 추출(사이드바)은 폴더 아이콘 혼동 위험이 있어 사용하지 않습니다.
   let charAvatarUrl = ''
   if (character?.image) {
     charAvatarUrl = await extractAvatarDataUrl(String(character.image))
   }
 
-  return { charName, chatName, charAvatarUrl, character, chat }
-}
-
-// ──────────────────────────────────────────────
-// 노드 수집
-// ──────────────────────────────────────────────
-
-/**
- * 메인 DOM에서 메시지 노드를 수집합니다.
- */
-async function collectMessageNodes(rootDoc: SafeDocument | null): Promise<SafeElement[]> {
-  if (!rootDoc) {
+  // 메시지 DOM 노드 수집 (문서 순서)
+  let allNodes: SafeElement[] = []
+  if (rootDoc) {
+    allNodes = await getAllMessageNodes(rootDoc)
+  } else {
     console.warn('[log plugin] rootDoc is null — no message nodes collected')
-    return []
   }
-  return await getAllMessageNodes(rootDoc)
-}
 
-/**
- * 메시지 노드를 범위 옵션에 따라 슬라이스합니다.
- */
-function sliceMessageNodes(
-  allNodes: SafeElement[],
-  options: ProcessOptions
-): SafeElement[] {
+  // 범위 슬라이싱
+  let messageNodes = allNodes
   const { startIndex, endIndex, singleMessage } = options
   if (singleMessage && typeof startIndex === 'number') {
-    return allNodes.slice(startIndex, startIndex + 1)
+    messageNodes = allNodes.slice(startIndex, startIndex + 1)
+  } else if (typeof startIndex === 'number' && typeof endIndex === 'number') {
+    messageNodes = allNodes.slice(startIndex, endIndex + 1)
+  } else if (typeof startIndex === 'number') {
+    messageNodes = allNodes.slice(startIndex)
   }
-  if (typeof startIndex === 'number' && typeof endIndex === 'number') {
-    return allNodes.slice(startIndex, endIndex + 1)
+
+  const avatarMap = await collectAvatarsMain(messageNodes, charName)
+
+  return {
+    charName,
+    chatName,
+    charAvatarUrl,
+    messageNodes,
+    character,
+    chat,
+    avatarMap
   }
-  if (typeof startIndex === 'number') {
-    return allNodes.slice(startIndex)
-  }
-  return allNodes
 }
 
-// ──────────────────────────────────────────────
-// 아바타 맵 수집
-// ──────────────────────────────────────────────
-
 /**
- * 캐릭터 기본 아바타를 수집합니다.
+ * 메인 DOM에서 캐릭터 및 유저(페르소나) 등의 아바타 이미지를 수집하여
+ * 이름 -> Base64 data URL 형태의 맵을 생성합니다.
  */
-async function fetchCharacterAvatar(
-  character: RisuCharacter | null,
+
+
+
+
+
+
+
+
+async function collectAvatarsMain(
+  nodes: SafeElement[],
   charName: string
 ): Promise<Record<string, string>> {
   const avatarMap: Record<string, string> = {}
+  
+  // 1. 현재 캐릭터의 기본 아바타 (미리 캐싱)
+  const character: RisuCharacter | null = (await Risuai.getCharacter()) as RisuCharacter | null
   if (character?.image) {
     const dataUrl = await extractAvatarDataUrl(String(character.image))
     if (dataUrl) {
       avatarMap[charName] = dataUrl
     }
   }
-  return avatarMap
-}
 
-/**
- * 바인딩된 페르소나 아바타를 수집합니다.
- */
-async function fetchPersonaAvatar(
-  charIdx: number,
-  chatIdx: number
-): Promise<Record<string, string>> {
-  const avatarMap: Record<string, string> = {}
+  // 2. 현재 대화에 바인딩된 페르소나 아바타 (미리 캐싱)
   try {
     const db = await Risuai.getDatabase(['personas', 'selectedPersona'])
-    if (!db) return avatarMap
-
-    let userIcon = ''
-    let username = 'User'
-
-    const chat = await Risuai.getChatFromIndex(charIdx, chatIdx) as RisuChat | null
-    let bindedPersona: Persona | null = null
-    if (chat && chat.bindedPersona && db.personas) {
-      bindedPersona = db.personas?.find((v) => v.id === chat.bindedPersona) as Persona | undefined ?? null
-    }
-
-    if (bindedPersona) {
-      userIcon = bindedPersona.icon
-      username = bindedPersona.name
-    } else {
-      userIcon = (db as Record<string, unknown>)['userIcon'] as string || ''
-      username = (db as Record<string, unknown>)['username'] as string || 'User'
-    }
-
-    if (userIcon) {
-      const dataUrl = await extractAvatarDataUrl(userIcon)
-      if (dataUrl) {
-        avatarMap[username] = dataUrl
+    if (db) {
+      let userIcon = ''
+      let username = 'User'
+      // 바인딩된 페르소나 체크
+      const charIdx = await Risuai.getCurrentCharacterIndex()
+      const chatIdx = await Risuai.getCurrentChatIndex()
+      const chat = await Risuai.getChatFromIndex(charIdx, chatIdx) as RisuChat | null
+      
+      let bindedPersona: Persona | null = null
+      if (chat && chat.bindedPersona && db.personas) {
+        bindedPersona = db.personas?.find((v) => v.id === chat.bindedPersona) as Persona | undefined ?? null
+      }
+      
+      if (bindedPersona) {
+        userIcon = bindedPersona.icon
+        username = bindedPersona.name
+      } else {
+        userIcon = (db as Record<string, unknown>)['userIcon'] as string || ''
+        username = (db as Record<string, unknown>)['username'] as string || 'User'
+      }
+      
+      if (userIcon) {
+        const dataUrl = await extractAvatarDataUrl(userIcon)
+        if (dataUrl) {
+          avatarMap[username] = dataUrl
+        }
       }
     }
   } catch (e) {
     console.warn('[log plugin] Failed to pre-fetch user persona avatar:', e)
   }
-  return avatarMap
-}
 
-/**
- * DOM 노드에서 background-image 스타일을 통해 추가 아바타를 수집합니다.
- */
-async function collectAvatarsFromDOM(
-  nodes: SafeElement[],
-  existingMap: Record<string, string>
-): Promise<Record<string, string>> {
-  const avatarMap = { ...existingMap }
-
+  // 3. 각 대화 노드를 돌며 background style 로부터 추가적인 아바타(그룹 챗 등)를 수집
   for (const node of nodes) {
     try {
       const nameEl = await node.querySelector('.text-textcolor')
       if (!nameEl) continue
-
+      
       const nameHtml = await nameEl.getOuterHTML()
       const cleanText = nameHtml.replace(/<[^>]+>/g, '').trim()
       if (!cleanText) continue
       const name = cleanText
-
-      if (avatarMap[name]) continue
+      
+      if (avatarMap[name]) continue // 이미 수집된 이름이면 패스
 
       const styleDivs = await node.querySelectorAll('[style*="background"]')
       const arr = await Risuai.unwarpSafeArray(styleDivs)
-
+      
       let avatarUrl = ''
       for (const div of arr) {
         const styleAttr = await div.getAttribute('style')
@@ -237,9 +224,48 @@ async function collectAvatarsFromDOM(
           }
         }
       }
-
+      
       if (avatarUrl) {
-        const finalDataUrl = await convertUrlToDataUrl(avatarUrl)
+        let finalDataUrl = ''
+
+        // 서비스 워커 주소인 경우
+        const swLoc = extractSwImageLocation(avatarUrl)
+        if (swLoc) {
+          try {
+            finalDataUrl = await extractAvatarDataUrl(swLoc)
+          } catch {
+            // ignore - 이미 수집된 아바타일 수 있음
+          }
+        }
+
+        // Tauri 로컬 프로토콜 주소인 경우
+        if (!finalDataUrl && (avatarUrl.startsWith('asset://') || avatarUrl.includes('asset.localhost'))) {
+          try {
+            const loc = extractTauriAssetLocation(avatarUrl)
+            if (loc) {
+              finalDataUrl = await extractAvatarDataUrl(loc)
+            }
+          } catch {
+            // ignore - Tauri asset 로드 실패
+          }
+        }
+
+        // 일반 URL인 경우 fetch 시도
+        if (!finalDataUrl && !avatarUrl.startsWith('data:') && !avatarUrl.startsWith('blob:')) {
+          try {
+            const res = await fetch(avatarUrl)
+            const blob = await res.blob()
+            finalDataUrl = await new Promise<string>((resVal, rejVal) => {
+              const reader = new FileReader()
+              reader.onload = () => resVal(reader.result as string)
+              reader.onerror = () => rejVal(new Error('FileReader failed'))
+              reader.readAsDataURL(blob)
+            })
+          } catch {
+            // ignore - 외부 URL fetch 실패
+          }
+        }
+
         if (finalDataUrl) {
           avatarMap[name] = finalDataUrl
         }
@@ -248,84 +274,13 @@ async function collectAvatarsFromDOM(
       console.warn('[log plugin] Error collecting avatar for a node:', e)
     }
   }
-
+  
   return avatarMap
 }
 
 /**
- * URL을 종류에 따라 data URL로 변환합니다.
- */
-async function convertUrlToDataUrl(avatarUrl: string): Promise<string> {
-  // SW 이미지 주소인 경우
-  const swLoc = extractSwImageLocation(avatarUrl)
-  if (swLoc) {
-    try {
-      return await extractAvatarDataUrl(swLoc)
-    } catch {
-      // ignore
-    }
-  }
-
-  // Tauri 로컬 프로토콜 주소인 경우
-  if (!avatarUrl.startsWith('data:') && !avatarUrl.startsWith('blob:')) {
-    if (avatarUrl.startsWith('asset://') || avatarUrl.includes('asset.localhost')) {
-      try {
-        const loc = extractTauriAssetLocation(avatarUrl)
-        if (loc) {
-          return await extractAvatarDataUrl(loc)
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  // 일반 URL — fetch 시도
-  if (!avatarUrl.startsWith('data:') && !avatarUrl.startsWith('blob:')) {
-    try {
-      const res = await fetch(avatarUrl)
-      const blob = await res.blob()
-      return await new Promise<string>((resVal, rejVal) => {
-        const reader = new FileReader()
-        reader.onload = () => resVal(reader.result as string)
-        reader.onerror = () => rejVal(new Error('FileReader failed'))
-        reader.readAsDataURL(blob)
-      })
-    } catch {
-      // ignore
-    }
-  }
-
-  return ''
-}
-
-/**
- * 모든 아바타를 수집합니다 (캐릭터 + 페르소나 + DOM).
- */
-async function collectAllAvatars(
-  nodes: SafeElement[],
-  charName: string,
-  character: RisuCharacter | null,
-  chatIdx: number
-): Promise<Record<string, string>> {
-  // 1. 캐릭터 아바타
-  const avatarMap = await fetchCharacterAvatar(character, charName)
-
-  // 2. 페르소나 아바타
-  const charIdx = await Risuai.getCurrentCharacterIndex()
-  const personaMap = await fetchPersonaAvatar(charIdx, chatIdx)
-  Object.assign(avatarMap, personaMap)
-
-  // 3. DOM 노드에서 추가 아바타
-  return await collectAvatarsFromDOM(nodes, avatarMap)
-}
-
-// ──────────────────────────────────────────────
-// Serialize
-// ──────────────────────────────────────────────
-
-/**
- * SafeElement[]의 outerHTML을 문자열 배열로 반환합니다.
+ * SafeElement[]의 outerHTML을 수집하여 문자열 배열로 반환합니다.
+ * iframe 내부에서 HTMLElement로 재구성할 때 사용합니다.
  */
 export async function serializeNodes(nodes: SafeElement[]): Promise<string[]> {
   const out: string[] = []
@@ -337,43 +292,4 @@ export async function serializeNodes(nodes: SafeElement[]): Promise<string[]> {
     }
   }
   return out
-}
-
-// ──────────────────────────────────────────────
-// 메인 진입점
-// ──────────────────────────────────────────────
-
-/**
- * 현재 채팅의 로그 데이터를 수집합니다.
- */
-export async function processChatLog(
-  chatIndex?: number,
-  options: ProcessOptions = {}
-): Promise<ChatLogData> {
-  // 1. 메타데이터 수집
-  const { charName, chatName, charAvatarUrl, character, chat } =
-    await fetchChatMetadata(chatIndex)
-
-  // 2. 노드 수집
-  const rootDoc = await ensureRootDoc()
-  const allNodes = await collectMessageNodes(rootDoc)
-
-  // 3. 범위 슬라이싱
-  const messageNodes = sliceMessageNodes(allNodes, options)
-
-  // 4. 아바타 수집
-  const targetChatIndex = chatIndex ?? (await Risuai.getCurrentChatIndex())
-  const avatarMap = await collectAllAvatars(
-    messageNodes, charName, character, targetChatIndex
-  )
-
-  return {
-    charName,
-    chatName,
-    charAvatarUrl,
-    messageNodes,
-    character,
-    chat,
-    avatarMap,
-  }
 }
