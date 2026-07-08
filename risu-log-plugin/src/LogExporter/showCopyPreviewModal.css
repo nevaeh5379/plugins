@@ -336,23 +336,20 @@
     }
 
     .log-exporter-modal-content {
-        display: grid !important;
-        grid-template-columns: 450px 1fr !important;
-        grid-template-rows: 1fr !important;
+        display: flex !important;
+        flex-direction: row !important;
         gap: 0 !important;
         padding: 0 !important;
         overflow: hidden !important;
     }
 
     .desktop-settings-panel {
-        grid-column: 1;
-        grid-row: 1;
         display: flex !important;
         flex-direction: column !important;
         height: 100%;
         background: var(--bg-secondary);
         border-right: 1px solid var(--border-color);
-        overflow: hidden;
+        overflow: visible !important;
     }
 
     /* antd Tabs fill height */
@@ -372,13 +369,12 @@
     }
 
     .desktop-preview-panel {
-        grid-column: 2;
-        grid-row: 1;
+        flex: 1 !important;
         display: flex !important;
         flex-direction: column;
         height: 100%;
         background: var(--bg-primary);
-        overflow: hidden;
+        overflow: hidden !important;
         position: relative;
     }
 
@@ -408,11 +404,31 @@
     justify-content: space-between;
     align-items: center;
     z-index: 10;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.desktop-preview-toolbar > * {
+    flex-shrink: 0 !important;
+}
+
+.desktop-preview-toolbar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.desktop-preview-toolbar::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 2px;
 }
 
 .desktop-preview-content {
     flex: 1;
-    padding: 20px;
+    padding-right: 20px;
+    padding-left: 20px;
     overflow-y: auto;
 }
 
@@ -960,4 +976,155 @@
     background: transparent !important;
     color: var(--text-primary) !important;
     border-top: 1px solid var(--border-color-light) !important;
+}
+
+/* ============================================
+   Export settings popover styling
+   ============================================ */
+.export-settings-popover .ant-popover-inner {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    padding: 12px 16px !important;
+}
+
+.export-settings-popover .ant-popover-title {
+    color: var(--text-white) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding-bottom: 8px !important;
+    font-weight: 600 !important;
+}
+
+.export-settings-popover-content .tab-content {
+    padding: 8px 0px !important;
+}
+
+.export-settings-popover-content .setting-field {
+    margin-bottom: 12px;
+}
+
+.export-settings-popover-content .ant-segmented {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.export-settings-popover-content .ant-segmented-item-selected {
+    background: var(--btn-secondary-bg) !important;
+    color: var(--accent-primary) !important;
+}
+
+.export-settings-popover-content .ant-select-selector {
+    background-color: var(--bg-primary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.export-settings-popover-content textarea {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.export-settings-popover-content textarea::placeholder {
+    color: var(--text-secondary) !important;
+    opacity: 0.5;
+}
+
+.export-settings-popover-content .ant-slider-rail {
+    background-color: var(--border-color) !important;
+}
+
+.export-settings-popover-content .ant-input-number {
+    background-color: var(--bg-primary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.export-settings-popover-content .ant-input-number-input {
+    color: var(--text-primary) !important;
+}
+
+.export-settings-popover-content .ant-input {
+    background-color: var(--bg-primary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.export-settings-popover-content .ant-divider {
+    border-top-color: var(--border-color) !important;
+}
+
+/* ============================================
+   Settings Collapse Accordion Styling
+   ============================================ */
+.settings-collapse-container .ant-collapse-item {
+    border-bottom: 1px solid var(--border-color-light) !important;
+    margin-bottom: 8px;
+}
+
+.settings-collapse-container .ant-collapse-item:last-child {
+    border-bottom: none !important;
+}
+
+.settings-collapse-container .ant-collapse-header {
+    padding: 12px 8px !important;
+    font-size: 1.05em;
+    background-color: var(--bg-primary) !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s ease;
+}
+
+.settings-collapse-container .ant-collapse-header:hover {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.settings-collapse-container .ant-collapse-content-box {
+    padding: 16px 8px !important;
+    background-color: transparent !important;
+}
+
+/* Popover Content layout spacing */
+.export-style-settings-content .setting-field,
+.export-option-settings-content .setting-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.export-style-settings-content .setting-field:last-child,
+.export-option-settings-content .setting-field:last-child {
+    margin-bottom: 0;
+}
+
+.export-style-settings-content textarea,
+.export-option-settings-content textarea {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 0.9em;
+}
+
+.export-style-settings-content textarea:focus,
+.export-option-settings-content textarea:focus {
+    border-color: var(--accent-primary) !important;
+    outline: none;
+}
+
+/* ============================================
+   Sidebar Toggle Handle Styling
+   ============================================ */
+.sidebar-toggle-handle {
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.sidebar-toggle-handle:hover {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+    transform: translateY(-50%) !important;
+    cursor: pointer;
 }

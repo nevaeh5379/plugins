@@ -353,6 +353,7 @@ export const saveAsImage = async (
         }
 
         const { container, remove } = createOffscreenContainer();
+        let root: any = null;
 
         try {
             const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
@@ -394,10 +395,22 @@ export const saveAsImage = async (
                         fontSize: htmlOptions.htmlScaleFactor !== undefined ? 16 * Number(htmlOptions.htmlScaleFactor) : Number(htmlOptions.previewFontSize || 16),
                         containerWidth: htmlOptions.previewWidth,
                         imageScale: Number(htmlOptions.imageScale),
+                        imageAlign: htmlOptions.imageAlign,
+                        imageStyle: htmlOptions.imageStyle,
+                        imageCropActive: htmlOptions.imageCropActive,
+                        imageCropAspectRatio: htmlOptions.imageCropAspectRatio,
+                        imageCropVAlign: htmlOptions.imageCropVAlign,
+                        imageCropHAlign: htmlOptions.imageCropHAlign,
+                        imageCropHeight: htmlOptions.imageCropHeight,
+                        disableAnimations: htmlOptions.disableAnimations,
+                        isForArca: htmlOptions.isForArca,
+                        allowHtmlRendering: htmlOptions.allowHtmlRendering,
+                        avatarPosition: htmlOptions.avatarPosition,
+                        avatarShape: htmlOptions.avatarShape,
                         isForImageExport: true,
                         replacementRules: htmlOptions.replacementRules,
                     };
-                    const root = createRoot(container);
+                    root = createRoot(container);
                     root.render(<LogContainer {...props} />);
                 });
 
@@ -421,12 +434,23 @@ export const saveAsImage = async (
 
                 await waitForMedia(elementToRender);
                 await renderImage(elementToRender, finalResolution, i, chunks.length);
+                if (root) {
+                    root.unmount();
+                    root = null;
+                }
                 container.innerHTML = '';
             }
         } catch (error) {
             console.error('Error preparing images:', error);
             message.error('이미지 준비 중 오류가 발생했습니다.');
         } finally {
+            if (root) {
+                try {
+                    root.unmount();
+                } catch (e) {
+                    console.error('Failed to unmount root in finally:', e);
+                }
+            }
             onProgressEnd();
             remove();
         }

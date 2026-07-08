@@ -156,9 +156,6 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
     minWidth: themeConfig.avatarSize,
     borderRadius: themeConfig.avatarRadius,
     boxShadow: props.color.shadow || 'none',
-    border: themeConfig.avatarBorder
-      ? `2px solid ${props.color.avatarBorder}`
-      : 'none',
   };
 
   const avatarMarginStyle: React.CSSProperties = {

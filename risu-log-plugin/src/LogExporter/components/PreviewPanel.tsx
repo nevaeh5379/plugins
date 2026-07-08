@@ -1,9 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState } from 'react';
-import { Button, Space, Spin } from 'antd';
+import { Button, Space, Spin, Popover, Segmented, Select, Input, Slider } from 'antd';
+import { 
+  FileTextOutlined, 
+  CodeOutlined, 
+  FileMarkdownOutlined, 
+  AlignLeftOutlined, 
+  BgColorsOutlined, 
+  EyeOutlined,
+  SkinOutlined,
+  LayoutOutlined,
+  PictureOutlined
+} from '@ant-design/icons';
 import LogContainer from './LogContainer';
-import type { LogContainerProps } from '../../types';
+import type { LogContainerProps, ThemeInfo, ColorPalette } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
+import SettingToggle from './SettingToggle';
 
 interface PreviewPanelProps {
   settings: any;
@@ -18,6 +30,9 @@ interface PreviewPanelProps {
   onInvertSelection?: () => void;
   onDimensionsChange: (dims: { width: number, height: number, maxMessageHeight: number }) => void;
   isConverting: boolean;
+  onSettingChange: (key: string, value: any) => void;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ 
@@ -33,6 +48,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   onInvertSelection,
   onDimensionsChange,
   isConverting,
+  onSettingChange,
+  themes,
+  colors,
 }) => {
   const shadowHostRef = useRef<HTMLDivElement>(null);
   const previewContentRef = useRef<HTMLDivElement>(null);
@@ -123,17 +141,400 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   const showSpinner = !isBasicFormat && isConverting;
 
+  // 1. 커스텀 CSS 편집 Popover 내용
+  const customCssPopoverContent = (
+    <div style={{ width: '280px' }} className="export-style-settings-content">
+      <div className="setting-field">
+        <span className="setting-field-label" style={{ fontWeight: 500, fontSize: '0.9em', color: 'var(--text-primary)' }}>커스텀 CSS</span>
+        <Input.TextArea
+          value={settings.customCss || ''}
+          onChange={(e) => onSettingChange('customCss', e.target.value)}
+          placeholder="여기에 CSS 코드를 입력하세요..."
+          autoSize={{ minRows: 4, maxRows: 10 }}
+        />
+      </div>
+    </div>
+  );
+
+  const displayOptionsContent = (
+    <div style={{ width: '320px', maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }} className="export-option-settings-content">
+      {isBasicFormat && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <SettingToggle
+            label="아바타"
+            description="프로필 이미지 표시"
+            checked={settings.showAvatar}
+            onChange={(v) => onSettingChange('showAvatar', v)}
+          />
+          {settings.showAvatar !== false && (
+            <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>아바타 위치</span>
+                <Select
+                  size="small"
+                  value={settings.avatarPosition || 'opposite'}
+                  onChange={(val) => onSettingChange('avatarPosition', val)}
+                  style={{ width: '100%' }}
+                  options={[
+                    { value: 'opposite', label: '말풍선 옆 - 기본' },
+                    { value: 'left', label: '말풍선 옆 - 항상 좌측' },
+                    { value: 'right', label: '말풍선 옆 - 항상 우측' },
+                    { value: 'opposite-top', label: '이름 옆 - 기본' },
+                    { value: 'top-left', label: '이름 옆 - 항상 좌측' },
+                    { value: 'top-right', label: '이름 옆 - 항상 우측' },
+                  ]}
+                />
+              </div>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>아바타 모양</span>
+                <Select
+                  size="small"
+                  value={settings.avatarShape || 'theme'}
+                  onChange={(val) => onSettingChange('avatarShape', val)}
+                  style={{ width: '100%' }}
+                  options={[
+                    { value: 'theme', label: '테마 기본값' },
+                    { value: 'circle', label: '동그라미' },
+                    { value: 'square', label: '네모' },
+                    { value: 'rounded', label: '둥근 네모' },
+                    { value: 'squircle', label: '애매한 네모' },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
+          <SettingToggle
+            label="말풍선"
+            description="메시지 말풍선 스타일"
+            checked={settings.showBubble}
+            onChange={(v) => onSettingChange('showBubble', v)}
+          />
+
+          <SettingToggle
+            label="헤더"
+            description="상단 정보 표시"
+            checked={settings.showHeader}
+            onChange={(v) => onSettingChange('showHeader', v)}
+          />
+          {settings.showHeader !== false && (
+            <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
+              <SettingToggle
+                label="헤더 아이콘"
+                description="헤더 프로필 이미지 표시"
+                checked={settings.showHeaderIcon}
+                onChange={(v) => onSettingChange('showHeaderIcon', v)}
+              />
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>헤더 태그</span>
+                <Input
+                  size="small"
+                  value={settings.headerTags || ''}
+                  onChange={(e) => onSettingChange('headerTags', e.target.value)}
+                  placeholder="쉼표로 태그 구분"
+                />
+              </div>
+              {settings.headerLayout === 'banner' && (
+                <>
+                  <div className="setting-field">
+                    <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>배너 이미지 URL</span>
+                    <Input
+                      size="small"
+                      value={settings.headerBannerUrl || ''}
+                      onChange={(e) => onSettingChange('headerBannerUrl', e.target.value)}
+                    />
+                  </div>
+                  <SettingToggle
+                    label="블러 효과"
+                    checked={settings.headerBannerBlur}
+                    onChange={(v) => onSettingChange('headerBannerBlur', v)}
+                  />
+                  <div className="setting-field">
+                    <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>이미지 정렬 ({settings.headerBannerAlign || 50}%)</span>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={settings.headerBannerAlign || 50}
+                      onChange={(val) => onSettingChange('headerBannerAlign', val)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <SettingToggle
+            label="푸터"
+            description="하단 정보 표시"
+            checked={settings.showFooter}
+            onChange={(v) => onSettingChange('showFooter', v)}
+          />
+          {settings.showFooter !== false && (
+            <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>푸터 (왼쪽)</span>
+                <Input size="small" value={settings.footerLeft || ''} onChange={(e) => onSettingChange('footerLeft', e.target.value)} />
+              </div>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>푸터 (중앙)</span>
+                <Input size="small" value={settings.footerCenter || ''} onChange={(e) => onSettingChange('footerCenter', e.target.value)} />
+              </div>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>푸터 (오른쪽)</span>
+                <Input size="small" value={settings.footerRight || ''} onChange={(e) => onSettingChange('footerRight', e.target.value)} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {settings.format === 'html' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <SettingToggle
+            label="이미지 내장"
+            description="이미지를 Base64로 포함"
+            checked={settings.embedImages}
+            onChange={(v) => onSettingChange('embedImages', v)}
+          />
+          <SettingToggle
+            label="호버 요소 펼치기"
+            checked={settings.expandHover}
+            onChange={(v) => onSettingChange('expandHover', v)}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  // 3. 이미지 설정 Popover 내용
+  const imageSettingsContent = (
+    <div style={{ width: '320px', maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }} className="export-option-settings-content">
+      {isBasicFormat && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="setting-field">
+            <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>이미지 크기 ({settings.imageScale || 100}%)</span>
+            <Slider
+              min={1}
+              max={100}
+              value={settings.imageScale || 100}
+              onChange={(val) => onSettingChange('imageScale', val)}
+            />
+          </div>
+          <div className="setting-field">
+            <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>이미지 정렬</span>
+            <Segmented
+              size="small"
+              value={settings.imageAlign || 'left'}
+              onChange={(val) => onSettingChange('imageAlign', val)}
+              options={[
+                { label: '왼쪽', value: 'left' },
+                { label: '중앙', value: 'center' },
+                { label: '오른쪽', value: 'right' },
+              ]}
+              block
+            />
+          </div>
+          <div className="setting-field">
+            <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>이미지 스타일</span>
+            <Select
+              size="small"
+              value={settings.imageStyle || 'none'}
+              onChange={(val) => onSettingChange('imageStyle', val)}
+              options={[
+                { value: 'none', label: '없음' },
+                { value: 'gallery', label: '갤러리' },
+                { value: 'modern', label: '모던' },
+                { value: 'tape', label: '테이프' },
+              ]}
+            />
+          </div>
+          <div className="setting-field" style={{ marginTop: '4px' }}>
+            <SettingToggle
+              label="이미지 크롭 활성화"
+              checked={settings.imageCropActive || false}
+              onChange={(v) => onSettingChange('imageCropActive', v)}
+            />
+          </div>
+          {settings.imageCropActive && (
+            <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
+              <div className="setting-field">
+                <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>크롭 비율</span>
+                <Select
+                  size="small"
+                  value={settings.imageCropAspectRatio || 'original'}
+                  onChange={(val) => onSettingChange('imageCropAspectRatio', val)}
+                  options={[
+                    { value: 'original', label: '원본 비율' },
+                    { value: '1:1', label: '1:1 (정사각형)' },
+                    { value: '3:4', label: '3:4 (인물)' },
+                    { value: '4:3', label: '4:3 (가로)' },
+                    { value: '9:16', label: '9:16 (세로)' },
+                    { value: '16:9', label: '16:9 (시네마)' },
+                    { value: 'custom', label: '사용자 지정' },
+                  ]}
+                />
+              </div>
+              {settings.imageCropAspectRatio === 'custom' && (
+                <div className="setting-field">
+                  <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>사용자 지정 세로 비율 ({settings.imageCropHeight || 1.0})</span>
+                  <Slider
+                    min={0.1}
+                    max={3.0}
+                    step={0.01}
+                    value={settings.imageCropHeight || 1.0}
+                    onChange={(val) => onSettingChange('imageCropHeight', val)}
+                  />
+                </div>
+              )}
+              {settings.imageCropAspectRatio !== 'original' && (
+                <>
+                  <div className="setting-field">
+                    <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>세로 초점 위치 ({settings.imageCropVAlign || 50}%)</span>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={settings.imageCropVAlign !== undefined ? settings.imageCropVAlign : 50}
+                      onChange={(val) => onSettingChange('imageCropVAlign', val)}
+                    />
+                  </div>
+                  <div className="setting-field">
+                    <span className="setting-field-label" style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>가로 초점 위치 ({settings.imageCropHAlign || 50}%)</span>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={settings.imageCropHAlign !== undefined ? settings.imageCropHAlign : 50}
+                      onChange={(val) => onSettingChange('imageCropHAlign', val)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
-        {settings.isEditable && (
-            <div className="desktop-preview-toolbar">
-                <Space className="desktop-selection-controls" size={6}>
-                    <Button size="small" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</Button>
-                    <Button size="small" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</Button>
-                    <Button size="small" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</Button>
-                </Space>
-            </div>
-        )}
+        <div className="desktop-preview-toolbar">
+            <Space className="desktop-selection-controls" size={6}>
+                {settings.isEditable && (
+                    <>
+                        <Button size="small" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</Button>
+                        <Button size="small" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</Button>
+                        <Button size="small" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</Button>
+                    </>
+                )}
+            </Space>
+            <Space size={6} className="desktop-export-controls">
+                {/* 2. 테마 설정 (출력 형식이 기본(basic)일 때만 표시) */}
+                {isBasicFormat && (
+                  <Space size={4} align="center">
+                    <SkinOutlined style={{ color: 'var(--text-secondary)' }} title="테마 선택" />
+                    <Select
+                      size="small"
+                      value={settings.theme || 'basic'}
+                      onChange={(val) => onSettingChange('theme', val)}
+                      style={{ width: '100px' }}
+                      popupMatchSelectWidth={false}
+                    >
+                      {Object.entries(themes).map(([key, theme]: [string, any]) =>
+                        <Select.Option value={key} key={key}>{theme.name}</Select.Option>
+                      )}
+                    </Select>
+                    {settings.theme === 'custom' && (
+                      <Popover
+                        content={customCssPopoverContent}
+                        title="커스텀 CSS 편집"
+                        trigger="click"
+                        placement="bottomRight"
+                        overlayClassName="export-settings-popover"
+                      >
+                        <Button size="small" icon={<CodeOutlined />} title="커스텀 CSS 편집">CSS</Button>
+                      </Popover>
+                    )}
+                  </Space>
+                )}
+
+                {/* 3. 색상 설정 */}
+                {isBasicFormat && (
+                  <Space size={4} align="center">
+                    <BgColorsOutlined style={{ color: 'var(--text-secondary)' }} title="색상 선택" />
+                    <Select
+                      size="small"
+                      value={settings.color || 'dark'}
+                      onChange={(val) => onSettingChange('color', val)}
+                      style={{ width: '90px' }}
+                      popupMatchSelectWidth={false}
+                    >
+                      {Object.entries(colors).map(([key, color]: [string, any]) =>
+                        <Select.Option value={key} key={key}>{color.name}</Select.Option>
+                      )}
+                    </Select>
+                  </Space>
+                )}
+
+                {/* 4. 헤더 레이아웃 설정 */}
+                {isBasicFormat && (
+                  <Space size={4} align="center">
+                    <LayoutOutlined style={{ color: 'var(--text-secondary)' }} title="헤더 레이아웃 선택" />
+                    <Select
+                      size="small"
+                      value={settings.headerLayout || 'default'}
+                      onChange={(val) => onSettingChange('headerLayout', val)}
+                      style={{ width: '100px' }}
+                      popupMatchSelectWidth={false}
+                      options={[
+                        { value: 'default', label: '기본' },
+                        { value: 'compact', label: '컴팩트' },
+                        { value: 'banner', label: '배너' },
+                        { value: 'smart', label: '스마트' },
+                        { value: 'cover', label: '커버' },
+                      ]}
+                    />
+                  </Space>
+                )}
+
+                {/* 5. 표시 옵션 Popover (기본 형식 및 HTML 형식 대응) */}
+                {(isBasicFormat || settings.format === 'html') && (
+                  <Popover
+                      content={displayOptionsContent}
+                      title="표시 옵션"
+                      trigger="click"
+                      placement="bottomRight"
+                      overlayClassName="export-settings-popover"
+                  >
+                      <Button 
+                          size="small" 
+                          icon={<EyeOutlined />} 
+                          title="상세 표시 옵션 변경"
+                      >
+                          옵션
+                      </Button>
+                  </Popover>
+                )}
+
+                {/* 6. 이미지 설정 Popover (기본 형식 대응) */}
+                {isBasicFormat && (
+                  <Popover
+                      content={imageSettingsContent}
+                      title="이미지 설정"
+                      trigger="click"
+                      placement="bottomRight"
+                      overlayClassName="export-settings-popover"
+                  >
+                      <Button 
+                          size="small" 
+                          icon={<PictureOutlined />} 
+                          title="상세 이미지 설정 변경"
+                      >
+                          이미지
+                      </Button>
+                  </Popover>
+                )}
+            </Space>
+        </div>
         <div className="desktop-preview-content" ref={previewContentRef} style={{ position: 'relative' }}>
             {showSpinner && (
                 <div style={{
@@ -153,8 +554,34 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                     <span style={{ color: '#c0caf5', fontSize: '14px', fontWeight: 500 }}>로딩 및 변환 중...</span>
                 </div>
             )}
-            <div className="log-exporter-modal-preview">
-                {renderContent()}
+            <div className="log-exporter-modal-preview" style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
+                {/* 출력 형식 토글 버튼을 absolute 플로팅으로 겹치게 배치 */}
+                <div className="preview-format-toggle-container" style={{
+                    position: 'absolute',
+                    top: '12px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 10,
+                    background: 'transparent',
+                    display: 'flex',
+                    justifyContent: 'center',
+                }}>
+                    <Segmented
+                        size="small"
+                        value={settings.format || 'basic'}
+                        onChange={(val) => onSettingChange('format', val)}
+                        options={[
+                          { label: '기본', value: 'basic', icon: <FileTextOutlined /> },
+                          { label: 'HTML', value: 'html', icon: <CodeOutlined /> },
+                          { label: '마크다운', value: 'markdown', icon: <FileMarkdownOutlined /> },
+                          { label: '텍스트', value: 'text', icon: <AlignLeftOutlined /> },
+                        ]}
+                    />
+                </div>
+                {/* 로그 본문 영역은 100% 채우되 상단 패딩을 주어 겹치게 설계 */}
+                <div className="preview-content-render-area" style={{ height: '100%', overflowY: 'auto', paddingTop: '52px', boxSizing: 'border-box' }}>
+                    {renderContent()}
+                </div>
             </div>
         </div>
     </>

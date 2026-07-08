@@ -20,7 +20,7 @@ const CompactHeader: React.FC<LogHeaderProps> = ({ charInfo, color, embedImagesA
         {showHeaderIcon !== false && (
           <img src={avatarSrc} data-log-exporter-avatar="true" style={{
             width: '44px', height: '44px', borderRadius: '50%',
-            objectFit: 'cover', border: `2px solid ${color.avatarBorder}`,
+            objectFit: 'cover',
             boxShadow: color.shadow,
           }} />
         )}

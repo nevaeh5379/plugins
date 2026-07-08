@@ -83,8 +83,10 @@ export interface LogContainerProps extends ImageDisplayOptions {
   onMessageSelect?: (index: number, e: React.MouseEvent) => void;
   isForImageExport?: boolean;
   isForExport?: boolean;
-  replacementRules?: ReplacementRule[];
   disableAnimations?: boolean;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
+  replacementRules?: ReplacementRule[];
 }
 
 // 메시지 컴포넌트 Props
@@ -179,6 +181,8 @@ export interface LogExportSettings extends ImageDisplayOptions {
   disableAnimations?: boolean;
   rawHtmlView?: boolean;
   isEditable?: boolean;
+  isForArca?: boolean;
+  allowHtmlRendering?: boolean;
   // HTML scaling
   htmlScaleMode?: 'font' | 'full';
   htmlScaleFactor?: number;
@@ -200,6 +204,8 @@ export interface LogExportSettings extends ImageDisplayOptions {
   onProgressEnd?: () => void;
   // External data
   charAvatarUrl?: string;
+  avatarPosition?: 'left' | 'right' | 'opposite' | 'top-left' | 'top-right' | 'opposite-top';
+  avatarShape?: 'theme' | 'circle' | 'square' | 'rounded' | 'squircle';
 }
 
 

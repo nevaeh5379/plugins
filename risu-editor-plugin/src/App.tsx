@@ -332,7 +332,7 @@ const AppContent: React.FC = () => {
       const targetPath = pendingFilePathRef.current
       pendingFileFieldRef.current = null
       pendingFilePathRef.current = null
-      
+
       let node = null
       if (targetField) {
         node = findNodeByField(vfsRoot, targetField)
@@ -340,7 +340,7 @@ const AppContent: React.FC = () => {
       if (!node && targetPath) {
         node = findNode(vfsRoot, targetPath)
       }
-      
+
       if (node) {
         handleFileSelect(node)
       }

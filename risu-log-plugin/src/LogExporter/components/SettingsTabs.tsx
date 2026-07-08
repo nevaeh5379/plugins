@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Tabs } from 'antd';
-import { ExportOutlined, FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined } from '@ant-design/icons';
+import { FilterOutlined, TranslationOutlined, SlidersOutlined, SettingOutlined, BgColorsOutlined } from '@ant-design/icons';
 import type { UIClassInfo } from '../utils/domUtils';
-import type { ThemeInfo, ColorPalette } from '../../types';
-import type { ReplacementRule } from '../../types';
+import type { ReplacementRule, ThemeInfo, ColorPalette } from '../../types';
 
-import ExportTab from './ExportTab';
 import FilterTab from './FilterTab';
 import ReplacementTab from './ReplacementTab';
+import StyleTab from './StyleTab';
 import AdvancedTab from './AdvancedTab';
 import PluginGlobalSettings from './PluginGlobalSettings';
 
@@ -17,13 +16,13 @@ export interface SettingsTabsProps {
   onTabChange: (key: string) => void;
   settings: any;
   onSettingChange: (key: string, value: any) => void;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
   participants: Set<string>;
   globalSettings: any;
   onGlobalSettingChange: (key: string, value: any) => void;
   uiClasses: UIClassInfo[];
   imageSizeWarning?: string;
+  themes: Record<string, ThemeInfo>;
+  colors: Record<string, ColorPalette>;
 }
 
 const SettingsTabs: React.FC<SettingsTabsProps> = ({
@@ -31,32 +30,15 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
   onTabChange,
   settings,
   onSettingChange,
-  themes,
-  colors,
   participants,
   globalSettings,
   onGlobalSettingChange,
   uiClasses,
   imageSizeWarning,
+  themes,
+  colors,
 }) => {
   const items = [
-    {
-      key: 'export',
-      label: (
-        <span>
-          <ExportOutlined />
-          내보내기
-        </span>
-      ),
-      children: (
-        <ExportTab
-          settings={settings}
-          onSettingChange={onSettingChange}
-          themes={themes}
-          colors={colors}
-        />
-      ),
-    },
     {
       key: 'filter',
       label: (
@@ -88,6 +70,23 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
         <ReplacementTab
           rules={(settings.replacementRules as ReplacementRule[]) || []}
           onRulesChange={(rules) => onSettingChange('replacementRules', rules)}
+        />
+      ),
+    },
+    {
+      key: 'style',
+      label: (
+        <span>
+          <BgColorsOutlined />
+          스타일
+        </span>
+      ),
+      children: (
+        <StyleTab
+          settings={settings}
+          onSettingChange={onSettingChange}
+          themes={themes}
+          colors={colors}
         />
       ),
     },

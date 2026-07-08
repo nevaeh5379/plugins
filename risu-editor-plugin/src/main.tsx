@@ -19,6 +19,7 @@ import './lib/monacoSetup'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { FloatingEditorHost } from './components/FloatingEditor'
 
 /**
  * Risu Editor Plugin - Entry Point
@@ -71,22 +72,6 @@ function getFieldFromLabel(labelText: string): string | null {
   return null;
 }
 
-function getVfsPathFromField(field: string): string {
-  switch (field) {
-    case 'desc': return '/character/description.md';
-    case 'firstMessage': return '/character/first_message.md';
-    case 'systemPrompt': return '/character/system_prompt.md';
-    case 'personality': return '/character/personality.md';
-    case 'scenario': return '/character/scenario.md';
-    case 'exampleMessage': return '/character/example_messages.md';
-    case 'creatorNotes': return '/character/creator_notes.md';
-    case 'additionalText': return '/character/additional_text.md';
-    case 'replaceGlobalNote': return '/character/global_note.md';
-    case 'translatorNote': return '/character/translator_note.md';
-    default: return '';
-  }
-}
-
 async function isClickInside(element: any, e: any): Promise<boolean> {
   if (!e || typeof e.clientX !== 'number' || typeof e.clientY !== 'number') {
     return false;
@@ -105,7 +90,7 @@ async function isClickInside(element: any, e: any): Promise<boolean> {
   }
 }
 
-async function injectQuickEditButtons(api: any) {
+async function injectQuickEditButtons(api: any, floatingEditor: FloatingEditorHost | null) {
   try {
     const rootDoc = await api.getRootDocument()
     // 1. 캐릭터 설정 사이드바(.setting-area) 내부에 있는 .text-textcolor 요소를 찾습니다. (로어북 등 다른 Svelte 돔 크래시 예방)
@@ -184,18 +169,13 @@ async function injectQuickEditButtons(api: any) {
         try {
           if (e && e.stopPropagation) e.stopPropagation();
         } catch {}
-        
+
         // RisuAI API v3.0 addEventListener 버그 우회 검증 (버튼 영역 밖에서의 엉뚱한 전역 클릭 무시)
         if (!(await isClickInside(btn, e))) return;
-        
-        const path = getVfsPathFromField(field)
-        
-        // 플러그인 열기
-        await api.showContainer('fullscreen')
-        
-        // 동일한 플러그인 iframe 윈도우로 이벤트 전송 (CORS 우회, field/path 동시 전달)
-        const ev = new window.CustomEvent('risu-editor:open-file', { detail: { path, field } })
-        window.dispatchEvent(ev)
+
+        // 플로팅 에디터 열기 — 호스트 DOM에 직접 패널 주입
+        if (!floatingEditor) return
+        await floatingEditor.open(field)
       })
       
       await textareaContainer.appendChild(btn)
@@ -244,22 +224,25 @@ if (isPlugin) {
       )
  
       // DOM 감시 및 주입 시작
+      const floatingEditor = new FloatingEditorHost(api)
+
       try {
         const rootDoc = await api.getRootDocument()
         const body = await rootDoc.querySelector('body')
         if (body) {
           const observer = await api.createMutationObserver(async () => {
-            await injectQuickEditButtons(api)
+            await injectQuickEditButtons(api, floatingEditor)
           })
           await observer.observe(body, { childList: true, subtree: true })
           // 최초 주입 1회 실행
-          await injectQuickEditButtons(api)
+          await injectQuickEditButtons(api, floatingEditor)
         }
       } catch (domErr) {
         console.error('[Risu Editor] DOM observer initialization failed:', domErr)
       }
- 
+
       await api.onUnload(async () => {
+        floatingEditor.destroy()
         if (appRoot) {
           appRoot.unmount()
           appRoot = null

@@ -76,6 +76,34 @@ const DEFAULT_CONFIG: PluginConfig = {
 
 const api = typeof Risuai !== 'undefined' ? Risuai : (typeof risuai !== 'undefined' ? risuai : null);
 
+const normalizeApiKey = (apiKey: string) => apiKey.trim().replace(/^Bearer\s+/i, '')
+
+const applyAuthHeader = async (headers: Record<string, any>, apiKey: string) => {
+  const normalizedKey = normalizeApiKey(apiKey)
+  if (!api || !normalizedKey) return
+
+  await api.saveSecretHeader('Authorization', 'Bearer ', normalizedKey)
+  headers['Authorization'] = { secretHeader: 'Authorization' }
+}
+
+const parseApiErrorMessage = async (res: Response) => {
+  const errText = await res.text()
+  let detail = errText || res.statusText
+
+  try {
+    const json = JSON.parse(errText)
+    detail = json?.error?.message || json?.detail || detail
+  } catch {
+    // Keep the plain response text when the API does not return JSON.
+  }
+
+  const authHint = res.status === 401 || res.status === 403
+    ? ' API Key와 Base URL이 현재 선택한 제공자와 맞는지 확인해주세요.'
+    : ''
+
+  return `API 오류 (${res.status}): ${detail}${authHint}`
+}
+
 const isLorebookTriggered = (entry: any, messages: any[], depth: number, isFullWord: boolean) => {
   if (entry.alwaysActive) return true;
   const keys = (entry.key || '').split(',').map((k: string) => k.trim()).filter(Boolean);
@@ -596,11 +624,10 @@ export const App: React.FC = () => {
     }
     setFetchingModels(prev => ({ ...prev, [endpoint.id]: true }))
     try {
-      const headers: Record<string, any> = { 'Content-Type': 'application/json' }
-      if (endpoint.apiKey) {
-        const secretKey = `btw_custom_auth_${endpoint.id}`
-        await api.saveSecretHeader(secretKey, 'Bearer ', endpoint.apiKey)
-        headers['Authorization'] = { secretHeader: secretKey }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const normalizedKey = normalizeApiKey(endpoint.apiKey)
+      if (normalizedKey) {
+        headers['Authorization'] = `Bearer ${normalizedKey}`
       }
       const fetchUrl = `${endpoint.apiUrl.replace(/\/$/, '')}/models`
       const res = await api.nativeFetch(fetchUrl, { method: 'GET', headers })
@@ -1761,14 +1788,15 @@ export const App: React.FC = () => {
           throw new Error('외부 API Base URL이 구성되지 않았습니다.')
         }
 
-        const headers: Record<string, any> = {
+        const headers: Record<string, string> = {
           'Content-Type': 'application/json'
         }
 
         if (activeEp.apiKey) {
-          const secretKey = `btw_custom_auth_${activeEp.id}`
-          await api.saveSecretHeader(secretKey, 'Bearer ', activeEp.apiKey)
-          headers['Authorization'] = { secretHeader: secretKey }
+          const normalizedKey = normalizeApiKey(activeEp.apiKey)
+          if (normalizedKey) {
+            headers['Authorization'] = `Bearer ${normalizedKey}`
+          }
         }
 
         const fetchUrl = `${activeEp.apiUrl.replace(/\/$/, '')}/chat/completions`
@@ -1787,8 +1815,7 @@ export const App: React.FC = () => {
         })
 
         if (!res.ok) {
-          const errText = await res.text()
-          throw new Error(`API 오류 (${res.status}): ${errText || res.statusText}`)
+          throw new Error(await parseApiErrorMessage(res))
         }
 
         if (streamEnabled) {
