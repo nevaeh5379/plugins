@@ -545,6 +545,25 @@
         display: none !important;
     }
 
+    /* Let every settings tab, including the lower image-export controls in
+       Advanced, scroll inside the full-screen mobile drawer. */
+    .mobile-settings-drawer .ant-drawer-body {
+        min-height: 0;
+        overflow: hidden;
+    }
+    .mobile-settings-drawer .ant-tabs {
+        height: 100%;
+        min-height: 0;
+    }
+    .mobile-settings-drawer .ant-tabs-nav {
+        flex-shrink: 0;
+    }
+    .mobile-settings-drawer .ant-tabs-content-holder {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     /* Bottom dock action bar */
     .mobile-action-bar {
         position: fixed;

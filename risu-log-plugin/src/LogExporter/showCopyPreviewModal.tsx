@@ -383,7 +383,11 @@ interface ShowCopyPreviewModalProps {
 const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {}, onClose }) => {
   // ── Hooks ──
   const width = useWindowWidth();
-  const isMobile = width <= 768;
+  // Keep this breakpoint in sync with the mobile layout CSS. Some mobile
+  // WebViews report a layout viewport wider than 768px; treating 769-1024px as
+  // desktop hid the desktop toolbar via CSS without rendering the mobile
+  // settings button.
+  const isMobile = width <= 1024;
 
   const { progress, startProgress, updateProgress, endProgress } = useProgress();
 
@@ -905,6 +909,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
 
       {/* Mobile Settings Drawer */}
       <Drawer
+        className="mobile-settings-drawer"
         title="설정"
         placement="right"
         open={isSettingsDrawerOpen}
