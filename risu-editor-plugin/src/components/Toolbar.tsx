@@ -129,6 +129,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       )}
 
       <div className="re-toolbar-right">
+        {onOpenSettings && (
+          <button
+            className="re-btn re-btn-icon"
+            onClick={onOpenSettings}
+            title="Settings"
+          >
+            <LuSettings size={16} />
+          </button>
+        )}
         {onToggleLayoutMode && (
           <button
             className="re-btn re-btn-icon"

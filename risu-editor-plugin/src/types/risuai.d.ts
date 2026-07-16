@@ -230,4 +230,13 @@ export interface RisuaiPluginAPI {
 declare global {
   const Risuai: RisuaiPluginAPI
   const risuai: RisuaiPluginAPI
+  const unsafeWindow: Window & {
+    __pluginApis__?: {
+      getChar(): any
+      setChar(character: any): void
+    }
+    RisuMods?: {
+      register(definition: unknown): Promise<void>
+    }
+  }
 }

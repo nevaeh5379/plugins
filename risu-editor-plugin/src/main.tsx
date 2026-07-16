@@ -1,260 +1,314 @@
-/**
- * risup-editor-plugin, a RisuAI plugin for editing character lorebooks, prompts, and settings
- * Copyright (C) 2026 nevaeh5379
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
+/** Adds VSCode textarea windows and an optional character explorer UI. */
 import './lib/monacoSetup'
 import React from 'react'
-import { createRoot } from 'react-dom/client'
-import { App } from './App'
-import { FloatingEditorHost } from './components/FloatingEditor'
+import { createRoot, type Root } from 'react-dom/client'
+import { App, type EditorRequest } from './App'
+import { CharacterExplorer } from './components/CharacterExplorer'
+import {
+  characterToVFS, findNode, rebuildGlobalLoreFromVFS, rebuildGreetingsFromVFS,
+  updateFileContent, vfsToCharacter, type VFSNode,
+} from './lib/virtualFS'
+import type { RisuCharacter } from './types/risuai.d.ts'
 
-/**
- * Risu Editor Plugin - Entry Point
- *
- * This plugin provides a Monaco Editor-based IDE interface for editing
- * character lorebooks, prompts, and settings within RisuAI.
- */
+const MOD_ID = 'risu.textarea-editor'
+const HOST_ID = 'risu-textarea-editor-host'
+const EXPLORER_HOST_ID = 'risu-vscode-character-ui'
+const MODE_BAR_ID = 'risu-editor-mode-bar'
+const DECORATED = 'risuEditorDecorated'
+const MODE_KEY = 'risu-editor:character-ui'
 
-// Check if we're running inside the RisuAI plugin iframe
-const isPlugin = typeof Risuai !== 'undefined' || typeof risuai !== 'undefined'
-
-function mountApp() {
-  let rootEl = document.getElementById('root')
-  if (!rootEl) {
-    rootEl = document.createElement('div')
-    rootEl.id = 'root'
-    document.body.appendChild(rootEl)
+interface RuntimeApi {
+  character: {
+    getCurrent<T = unknown>(): T | null
+    updateCurrent<T = unknown>(character: T): Promise<void>
   }
-
-  // Reset body styles for fullscreen
-  document.body.style.margin = '0'
-  document.body.style.padding = '0'
-  document.body.style.overflow = 'hidden'
-  document.body.style.width = '100%'
-  document.body.style.height = '100%'
-  document.documentElement.style.width = '100%'
-  document.documentElement.style.height = '100%'
-
-  const root = createRoot(rootEl)
-  root.render(React.createElement(App))
-  return root
+  context: { onCharacterChange(callback: () => void): () => void }
+  ui: { toast(message: string, options?: { type?: 'info' | 'success' | 'warning' | 'error' }): void }
 }
 
-// ─── Helper functions for DOM Injection ──────────────────────────────────────
-
-function getFieldFromLabel(labelText: string): string | null {
-  const text = labelText.trim().toLowerCase();
-  
-  if (text.includes('설명') || text.includes('description')) return 'desc';
-  if (text.includes('첫 메시지') || text.includes('first message') || text.includes('첫 대사')) return 'firstMessage';
-  if (text.includes('시스템 프롬프트') || text.includes('system prompt')) return 'systemPrompt';
-  if (text.includes('성격') || text.includes('personality')) return 'personality';
-  if (text.includes('시나리오') || text.includes('scenario')) return 'scenario';
-  if (text.includes('예시 메시지') || text.includes('example message')) return 'exampleMessage';
-  if (text.includes('작가의 노트') || text.includes('creator notes') || text.includes('creator\'s notes') || text.includes('제작자 코멘트')) return 'creatorNotes';
-  if (text.includes('번역가의 노트') || text.includes('translator note')) return 'translatorNote';
-  if (text.includes('추가 텍스트') || text.includes('additional text')) return 'additionalText';
-  if (text.includes('글로벌 노트') || text.includes('global note')) return 'replaceGlobalNote';
-  
-  return null;
+interface RisuModsApi {
+  register(definition: {
+    id: string; name: string; version: string; permissions: string[]
+    activate(api: RuntimeApi): void | (() => void)
+  }): Promise<void>
 }
 
-async function isClickInside(element: any, e: any): Promise<boolean> {
-  if (!e || typeof e.clientX !== 'number' || typeof e.clientY !== 'number') {
-    return false;
-  }
-  try {
-    const rect = await element.getBoundingClientRect();
-    return (
-      e.clientX >= rect.left &&
-      e.clientX <= rect.right &&
-      e.clientY >= rect.top &&
-      e.clientY <= rect.bottom
-    );
-  } catch (err) {
-    console.error('[Risu Editor] isClickInside check failed:', err);
-    return false;
+function getLoader(): RisuModsApi | null {
+  try { return typeof unsafeWindow !== 'undefined' ? unsafeWindow.RisuMods as RisuModsApi | undefined ?? null : null }
+  catch { return null }
+}
+
+function copyStyles(shadow: ShadowRoot) {
+  for (const style of Array.from(document.head.querySelectorAll('style'))) {
+    if (style.textContent?.includes('.re-vscode-window')) shadow.appendChild(style.cloneNode(true))
   }
 }
 
-async function injectQuickEditButtons(api: any, floatingEditor: FloatingEditorHost | null) {
-  try {
-    const rootDoc = await api.getRootDocument()
-    // 1. 캐릭터 설정 사이드바(.setting-area) 내부에 있는 .text-textcolor 요소를 찾습니다. (로어북 등 다른 Svelte 돔 크래시 예방)
-    const labels = await rootDoc.querySelectorAll('.setting-area .text-textcolor')
-    const labelsArray = await api.unwarpSafeArray(labels)
-    
-    for (const label of labelsArray) {
-      const text = await label.textContent()
-      if (!text) continue
-      
-      const field = getFieldFromLabel(text)
-      if (!field) continue
-      
-      // 2. 부모 요소를 찾아 그 아래의 자식들 중에서 이 라벨 바로 뒤에 오는 TextAreaInput 컨테이너를 1대1 매핑하여 찾습니다.
-      const parentNode = await label.getParent()
-      if (!parentNode) continue
-      
-      const children = await parentNode.getChildren()
-      const childrenArray = await api.unwarpSafeArray(children)
-      
-      let labelIdx = -1
-      for (let i = 0; i < childrenArray.length; i++) {
-        const childText = await childrenArray[i].textContent()
-        if (childText === text) {
-          labelIdx = i
-          break
-        }
-      }
-      if (labelIdx === -1) continue
-      
-      let textareaContainer = null
-      for (let i = labelIdx + 1; i < childrenArray.length; i++) {
-        const child = childrenArray[i]
-        const className = await child.getClassName()
-        
-        // 텍스트 영역 래퍼 div 가 직접 자식인 경우 (예: .border.border-darkborderc 클래스를 갖고 있음)
-        if (className && className.includes('border') && className.includes('border-darkborderc')) {
-          textareaContainer = child
-          break
-        }
-        
-        // 혹시 자식 노드의 내부에 들어있는 경우 (예: TextAreaInput 래퍼 div 하위에 있을 때)
-        const innerContainer = await child.querySelector('.border.border-darkborderc')
-        if (innerContainer) {
-          textareaContainer = innerContainer
-          break
-        }
-        
-        // 만약 도중에 다른 라벨(.text-textcolor)을 만나면 이 라벨에 매치되는 입력 상자가 누락된 것이므로 중단
-        if (className && className.includes('text-textcolor') && !className.includes('text-textcolor2')) {
-          break
-        }
-      }
-      if (!textareaContainer) continue
-      
-      // 3. 이미 버튼이 주입되어 있는지 확인합니다.
-      const alreadyInjected = await textareaContainer.querySelector('.re-injected-quick-edit-btn')
-      if (alreadyInjected) continue
-      
-      // 4. 버튼 생성
-      const btn = await rootDoc.createElement('button')
-      await btn.setClassName('re-injected-quick-edit-btn')
-      await btn.setAttribute('x-field', field)
-      await btn.setAttribute('x-injected', 'true')
-      
-      // Lucide Edit3 SVG 아이콘
-      await btn.setInnerHTML('<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>')
-      
-      // 인라인 스타일 (CSS 파일에서도 보완 가능)
-      await btn.setStyle('position', 'absolute')
-      await btn.setStyle('top', '4px')
-      await btn.setStyle('right', '4px')
-      await btn.setStyle('zIndex', '60')
-      
-      await btn.addEventListener('click', async (e: any) => {
-        try {
-          if (e && e.stopPropagation) e.stopPropagation();
-        } catch {}
+type Editable = HTMLTextAreaElement | HTMLElement
+const readEditable = (editable: Editable) => editable instanceof HTMLTextAreaElement ? editable.value : editable.textContent ?? ''
 
-        // RisuAI API v3.0 addEventListener 버그 우회 검증 (버튼 영역 밖에서의 엉뚱한 전역 클릭 무시)
-        if (!(await isClickInside(btn, e))) return;
+function writeEditable(editable: Editable, value: string) {
+  if (!editable.isConnected) throw new Error('원본 입력란이 더 이상 존재하지 않습니다.')
+  if (editable instanceof HTMLTextAreaElement) {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(editable, value)
+  } else editable.textContent = value
+  editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: null }))
+  editable.dispatchEvent(new Event('change', { bubbles: true }))
+}
 
-        // 플로팅 에디터 열기 — 호스트 DOM에 직접 패널 주입
-        if (!floatingEditor) return
-        await floatingEditor.open(field)
-      })
-      
-      await textareaContainer.appendChild(btn)
+function titleFor(editable: Editable): string {
+  let node = editable.parentElement?.previousElementSibling
+  for (let index = 0; node && index < 5; index += 1, node = node.previousElementSibling) {
+    const text = node.textContent?.replace(/\s+/g, ' ').trim()
+    if (text && text.length < 100 && !node.querySelector('textarea,[contenteditable="true"]')) return text
+  }
+  return editable.getAttribute('placeholder') || '텍스트 편집'
+}
+
+function languageFor(title: string): string {
+  const value = title.toLowerCase()
+  if (value.includes('css')) return 'css'
+  if (value.includes('html')) return 'html'
+  if (value.includes('json')) return 'json'
+  if (value.includes('lua')) return 'lua'
+  if (value.includes('javascript') || value.includes('스크립트') || value.includes('script')) return 'javascript'
+  return 'markdown'
+}
+
+function findCharacterConfig(): { area: HTMLElement; tabRow: HTMLElement } | null {
+  for (const area of document.querySelectorAll<HTMLElement>('.setting-area')) {
+    for (const candidate of area.querySelectorAll<HTMLElement>('div')) {
+      const directButtons = Array.from(candidate.children).filter((child) => child.tagName === 'BUTTON')
+      if (directButtons.length >= 5) return { area, tabRow: candidate }
     }
-  } catch (err) {
-    console.error('[Risu Editor] Button injection error:', err)
+  }
+  return null
+}
+
+function createIntegration(api: RuntimeApi): () => void {
+  const overlayHost = document.createElement('div')
+  overlayHost.id = HOST_ID
+  overlayHost.style.cssText = 'position:fixed;inset:0;z-index:2147483645;pointer-events:none;width:100vw;height:100vh'
+  document.documentElement.appendChild(overlayHost)
+  const overlayShadow = overlayHost.attachShadow({ mode: 'open' })
+  copyStyles(overlayShadow)
+  const overlayContainer = document.createElement('div')
+  overlayShadow.appendChild(overlayContainer)
+  const overlayRoot = createRoot(overlayContainer)
+
+  let requestId = 0
+  let requests: EditorRequest[] = []
+  let mode: 'native' | 'vscode' = localStorage.getItem(MODE_KEY) === 'vscode' ? 'vscode' : 'native'
+  let currentArea: HTMLElement | null = null
+  let modeBar: HTMLDivElement | null = null
+  let explorerHost: HTMLDivElement | null = null
+  let explorerRoot: Root | null = null
+  let explorerVfs: VFSNode | null = null
+  let explorerLoading = false
+  const hidden = new Map<HTMLElement, string>()
+  const buttons = new Set<HTMLButtonElement>()
+  const decorated = new Set<Editable>()
+
+  const renderOverlay = () => overlayRoot.render(React.createElement(App, {
+    requests,
+    onClose: (id: number) => { requests = requests.filter((request) => request.id !== id); renderOverlay() },
+  }))
+  const openRequest = (request: Omit<EditorRequest, 'id'>) => {
+    requests = [...requests, { ...request, id: ++requestId }]
+    renderOverlay()
+  }
+  renderOverlay()
+
+  const restoreNative = () => {
+    for (const [element, display] of hidden) element.style.display = display
+    hidden.clear()
+  }
+
+  const syncModeButtons = () => {
+    if (!modeBar) return
+    for (const button of modeBar.querySelectorAll<HTMLButtonElement>('button')) {
+      const active = button.dataset.mode === mode
+      button.style.background = active ? 'var(--risu-theme-selected)' : 'transparent'
+      button.style.color = active ? 'var(--risu-theme-textcolor)' : 'var(--risu-theme-textcolor2)'
+    }
+  }
+
+  const renderExplorer = () => {
+    if (!explorerRoot) return
+    explorerRoot.render(React.createElement(CharacterExplorer, {
+      root: explorerVfs,
+      loading: explorerLoading,
+      onRefresh: loadExplorer,
+      onNative: () => setMode('native'),
+      onOpen: openVfsNode,
+    }))
+  }
+
+  async function loadExplorer() {
+    explorerLoading = true
+    renderExplorer()
+    const character = api.character.getCurrent<RisuCharacter>()
+    explorerVfs = character ? characterToVFS(character) : null
+    explorerLoading = false
+    renderExplorer()
+  }
+
+  function openVfsNode(node: VFSNode) {
+    if (node.type !== 'file') return
+    openRequest({
+      title: node.name,
+      value: node.content ?? '',
+      language: node.language ?? 'markdown',
+      save: async (value) => {
+        const character = api.character.getCurrent<RisuCharacter>()
+        if (!character) throw new Error('선택된 캐릭터가 없습니다.')
+        const vfs = characterToVFS(character)
+        let target = findNode(vfs, node.path)
+        // Character name changes alter the virtual root path. Fall back to mapping identity.
+        if (!target?.mapping && node.mapping) {
+          const visit = (candidate: VFSNode): VFSNode | null => {
+            if (candidate.mapping?.field === node.mapping?.field && candidate.mapping?.index === node.mapping?.index && candidate.mapping?.subfield === node.mapping?.subfield) return candidate
+            for (const child of candidate.children ?? []) { const found = visit(child); if (found) return found }
+            return null
+          }
+          target = visit(vfs)
+        }
+        if (!target || !updateFileContent(vfs, target.path, value)) throw new Error('가상 파일을 찾지 못했습니다.')
+        const updated = vfsToCharacter(vfs, character)
+        updated.globalLore = rebuildGlobalLoreFromVFS(vfs)
+        updated.alternateGreetings = rebuildGreetingsFromVFS(vfs)
+        await api.character.updateCurrent(updated)
+        explorerVfs = characterToVFS(updated)
+        renderExplorer()
+        api.ui.toast(`${node.name} 저장됨`, { type: 'success' })
+      },
+    })
+  }
+
+  function applyMode() {
+    restoreNative()
+    syncModeButtons()
+    if (!explorerHost || !modeBar) return
+    explorerHost.style.display = mode === 'vscode' ? 'block' : 'none'
+    if (mode === 'native') return
+    let sibling = explorerHost.nextElementSibling as HTMLElement | null
+    while (sibling) {
+      hidden.set(sibling, sibling.style.display)
+      sibling.style.display = 'none'
+      sibling = sibling.nextElementSibling as HTMLElement | null
+    }
+    void loadExplorer()
+  }
+
+  function setMode(next: 'native' | 'vscode') {
+    mode = next
+    localStorage.setItem(MODE_KEY, next)
+    applyMode()
+  }
+
+  const removeCharacterUi = () => {
+    restoreNative()
+    explorerRoot?.unmount()
+    explorerRoot = null
+    explorerHost?.remove()
+    modeBar?.remove()
+    explorerHost = null
+    modeBar = null
+    currentArea = null
+  }
+
+  const installCharacterUi = () => {
+    const found = findCharacterConfig()
+    if (!found) {
+      if (modeBar || explorerHost) removeCharacterUi()
+      return
+    }
+    if (currentArea === found.area && modeBar?.isConnected && explorerHost?.isConnected) return
+    removeCharacterUi()
+    currentArea = found.area
+
+    modeBar = document.createElement('div')
+    modeBar.id = MODE_BAR_ID
+    modeBar.style.cssText = 'display:flex;align-items:center;gap:3px;margin-bottom:8px;padding:3px;border:1px solid var(--risu-theme-darkborderc);border-radius:8px;background:var(--risu-theme-darkbg);font:11px system-ui'
+    const label = document.createElement('span')
+    label.textContent = 'Character UI'
+    label.style.cssText = 'flex:1;padding-left:6px;color:var(--risu-theme-textcolor2)'
+    modeBar.appendChild(label)
+    for (const [value, text] of [['native', '기본 UI'], ['vscode', 'VSCode UI']] as const) {
+      const button = document.createElement('button')
+      button.type = 'button'; button.dataset.mode = value; button.textContent = text
+      button.style.cssText = 'border:0;border-radius:6px;padding:5px 8px;cursor:pointer'
+      button.addEventListener('click', () => setMode(value))
+      modeBar.appendChild(button)
+    }
+    found.tabRow.insertAdjacentElement('beforebegin', modeBar)
+
+    explorerHost = document.createElement('div')
+    explorerHost.id = EXPLORER_HOST_ID
+    explorerHost.style.cssText = 'display:none;width:100%;height:calc(100vh - 190px);min-height:420px'
+    modeBar.insertAdjacentElement('afterend', explorerHost)
+    const shadow = explorerHost.attachShadow({ mode: 'open' })
+    copyStyles(shadow)
+    const container = document.createElement('div')
+    container.style.height = '100%'
+    shadow.appendChild(container)
+    explorerRoot = createRoot(container)
+    applyMode()
+  }
+
+  const decorateTextareas = () => {
+    if (mode !== 'native') return
+    for (const area of document.querySelectorAll<HTMLElement>('.setting-area')) {
+      for (const editable of area.querySelectorAll<Editable>('textarea, [contenteditable="true"][role="textbox"]')) {
+        if (editable.dataset[DECORATED]) continue
+        const wrapper = editable.parentElement
+        if (!wrapper) continue
+        editable.dataset[DECORATED] = 'true'; decorated.add(editable)
+        if (getComputedStyle(wrapper).position === 'static') wrapper.style.position = 'relative'
+        const button = document.createElement('button')
+        button.type = 'button'; button.title = 'VSCode 편집기로 열기'; button.setAttribute('aria-label', 'VSCode 편집기로 열기')
+        button.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/><path d="m14.5 4-5 16"/></svg>'
+        button.style.cssText = 'position:absolute;top:6px;right:6px;z-index:70;display:flex;width:27px;height:27px;align-items:center;justify-content:center;border:1px solid var(--risu-theme-darkborderc);border-radius:6px;background:var(--risu-theme-darkbg);color:var(--risu-theme-textcolor2);box-shadow:0 2px 7px #0004;cursor:pointer'
+        button.addEventListener('click', (event) => {
+          event.preventDefault(); event.stopPropagation()
+          const title = titleFor(editable)
+          openRequest({ title, value: readEditable(editable), language: languageFor(title), save: (value) => writeEditable(editable, value) })
+        })
+        wrapper.appendChild(button); buttons.add(button)
+      }
+    }
+    for (const button of buttons) if (!button.isConnected) buttons.delete(button)
+  }
+
+  const sync = () => { installCharacterUi(); decorateTextareas() }
+  const observer = new MutationObserver(sync)
+  observer.observe(document.body, { childList: true, subtree: true })
+  const unsubscribe = api.context.onCharacterChange(() => { if (mode === 'vscode') void loadExplorer() })
+  sync()
+
+  return () => {
+    observer.disconnect(); unsubscribe(); removeCharacterUi()
+    for (const button of buttons) button.remove()
+    for (const editable of decorated) delete editable.dataset[DECORATED]
+    overlayRoot.unmount(); overlayHost.remove()
   }
 }
 
-// ─── Initialize Plugin ──────────────────────────────────────────────────────
-
-if (isPlugin) {
-  // ── Plugin Mode ──
-  ;(async () => {
-    try {
-      const api = typeof Risuai !== 'undefined' ? Risuai : risuai
- 
-      // Pre-mount React into the (hidden) iframe so body has content before
-      // the host transitions display:none → display:block.
-      let appRoot: ReturnType<typeof createRoot> | null = mountApp()
- 
-      const openEditor = async () => {
-        if (!appRoot) appRoot = mountApp()
-        // Tell App.tsx to refresh — user may have switched characters.
-        window.dispatchEvent(new CustomEvent('risu-editor:reload'))
-        await api.showContainer('fullscreen')
-      }
- 
-      await api.registerSetting(
-        'Risu Editor',
-        openEditor,
-        '📝',
-        'html',
-        'risu-editor-settings'
-      )
- 
-      await api.registerButton(
-        {
-          name: 'Open Editor',
-          icon: '📝',
-          iconType: 'html',
-          location: 'action',
-          id: 'risu-editor-action',
-        },
-        openEditor
-      )
- 
-      // DOM 감시 및 주입 시작
-      const floatingEditor = new FloatingEditorHost(api)
-
-      try {
-        const rootDoc = await api.getRootDocument()
-        const body = await rootDoc.querySelector('body')
-        if (body) {
-          const observer = await api.createMutationObserver(async () => {
-            await injectQuickEditButtons(api, floatingEditor)
-          })
-          await observer.observe(body, { childList: true, subtree: true })
-          // 최초 주입 1회 실행
-          await injectQuickEditButtons(api, floatingEditor)
-        }
-      } catch (domErr) {
-        console.error('[Risu Editor] DOM observer initialization failed:', domErr)
-      }
-
-      await api.onUnload(async () => {
-        floatingEditor.destroy()
-        if (appRoot) {
-          appRoot.unmount()
-          appRoot = null
-        }
+async function register() {
+  const started = Date.now()
+  while (Date.now() - started < 30_000) {
+    const loader = getLoader()
+    if (loader) {
+      await loader.register({
+        id: MOD_ID, name: 'Risu Textarea Editor', version: '2.3.0',
+        permissions: ['character.read', 'character.write', 'context.read', 'ui.inject'], activate: createIntegration,
       })
- 
-      console.log('[Risu Editor] initialized')
-    } catch (error) {
-      console.error('[Risu Editor] init error:', error)
+      console.log('[Risu Editor] 기본/VSCode 캐릭터 UI 전환이 활성화되었습니다.')
+      return
     }
-  })()
-} else {
-  // ── Development Mode (standalone) ──
-  mountApp()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+  throw new Error('Risu Userscript Loader를 찾지 못했습니다.')
 }
+
+register().catch((error) => console.error('[Risu Editor]', error))

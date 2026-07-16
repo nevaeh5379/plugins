@@ -7,16 +7,25 @@ import { resolve } from 'path'
 const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'))
 const version = pkg.version || '1.0.0'
 
-const PLUGIN_HEADER = `//@name risu_editor
-//@display-name Risu Editor
-//@api 3.0
-//@version ${version}
-//@link https://github.com/kwaroran/RisuAI RisuAI
+const PLUGIN_HEADER = `// ==UserScript==
+// @name         Risu Editor
+// @namespace    https://risuai.xyz/
+// @version      ${version}
+// @description  Add VSCode textarea windows and an optional VSCode character explorer to RisuAI.
+// @match        https://risuai.xyz/*
+// @match        https://stable.risuai.xyz/*
+// @match        https://nightly.risuai.xyz/*
+// @match        http://localhost/*
+// @match        http://127.0.0.1/*
+// @grant        unsafeWindow
+// @run-at       document-start
+// @license      GPL-3.0-or-later
+// ==/UserScript==
 
 `
 
 /**
- * Plugin that prepends the RisuAI plugin metadata header AFTER all other
+ * Prepends the Tampermonkey metadata header AFTER all other
  * transformations (including CSS injection) are complete.
  */
 function prependPluginHeader(): Plugin {
@@ -24,11 +33,11 @@ function prependPluginHeader(): Plugin {
     name: 'prepend-plugin-header',
     enforce: 'post',
     closeBundle() {
-      const outPath = resolve(__dirname, 'dist/plugin.js')
+      const outPath = resolve(__dirname, 'dist/risu-editor.user.js')
       try {
         const content = readFileSync(outPath, 'utf-8')
         writeFileSync(outPath, PLUGIN_HEADER + content, 'utf-8')
-        console.log('✓ Plugin header prepended to plugin.js')
+        console.log('✓ Userscript header prepended to risu-editor.user.js')
       } catch (e) {
         console.error('Failed to prepend plugin header:', e)
       }
@@ -43,13 +52,16 @@ export default defineConfig({
     prependPluginHeader(),
   ],
   build: {
+    // Keep codicon fonts inside the userscript. Worker files may still be
+    // emitted by Monaco's build, but monacoSetup disables them at runtime.
+    assetsInlineLimit: 200_000,
     rollupOptions: {
       input: 'src/main.tsx',
       output: {
         format: 'iife',
         name: 'RisuEditorPlugin',
         inlineDynamicImports: true,
-        entryFileNames: 'plugin.js',
+        entryFileNames: 'risu-editor.user.js',
         assetFileNames: 'assets/[name].[ext]',
       },
     },
