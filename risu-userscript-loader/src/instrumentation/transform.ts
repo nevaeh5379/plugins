@@ -108,6 +108,7 @@ globalThis.__RISU_LOADER_HOOK__ = Object.freeze({
   },
   getActiveModules: () => __rlClone(__rlGetModules()),
   getCurrentCharacterIndex: () => { const character = __rlGetCharacter(); return __rlGetDatabase().characters?.findIndex((item) => item?.chaId === character?.chaId) ?? -1; },
+  getContextKey: (kind) => { const character = __rlGetCharacter(); if (!character) return 'none'; const characterKey = character.chaId ?? 'unknown-character'; if (kind === 'character') return String(characterKey); const chatIndex = character.chatPage ?? -1; return characterKey + ':' + chatIndex + ':' + (character.chats?.[chatIndex]?.id ?? ''); },
   getCurrentChat: () => __rlClone(__rlChat()),
   readAsset: async (path) => __rlClone(await __rlReadAsset(String(path))),
   saveAsset: async (data, customId = '', fileName = '') => __rlSaveAsset(new Uint8Array(data), customId, fileName),

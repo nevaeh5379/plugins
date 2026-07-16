@@ -3,11 +3,8 @@
 // @namespace    https://risuai.xyz/mods/test
 // @version      0.3.0
 // @description  Diagnostics for context, chat, parser, assets, and UI APIs in Risu Userscript Loader.
-// @match        https://risuai.xyz/*
-// @match        https://stable.risuai.xyz/*
-// @match        https://nightly.risuai.xyz/*
-// @match        http://localhost/*
-// @match        http://127.0.0.1/*
+// @match        http://*/*
+// @match        https://*/*
 // @grant        unsafeWindow
 // @run-at       document-start
 // @license      MIT

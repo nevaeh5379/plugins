@@ -28,7 +28,7 @@ interface ActiveMod {
 }
 
 export class ModRegistry implements PublicLoaderApi {
-  readonly version = '0.3.0'
+  readonly version = '0.5.2'
   status: LoaderStatus = { phase: 'booting' }
   private hook: RisuRuntimeHook | null = null
   private mods = new Map<string, ActiveMod>()
@@ -402,6 +402,7 @@ function validateDefinition(definition: RisuModDefinition) {
 }
 
 function contextKey(kind: 'character' | 'chat', hook: RisuRuntimeHook) {
+  if (hook.getContextKey) return hook.getContextKey(kind)
   const character = hook.getCurrentCharacter() as {
     chaId?: string
     chatPage?: number

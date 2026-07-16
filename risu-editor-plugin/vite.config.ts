@@ -12,11 +12,8 @@ const PLUGIN_HEADER = `// ==UserScript==
 // @namespace    https://risuai.xyz/
 // @version      ${version}
 // @description  Add VSCode textarea windows and an optional VSCode character explorer to RisuAI.
-// @match        https://risuai.xyz/*
-// @match        https://stable.risuai.xyz/*
-// @match        https://nightly.risuai.xyz/*
-// @match        http://localhost/*
-// @match        http://127.0.0.1/*
+// @match        http://*/*
+// @match        https://*/*
 // @grant        unsafeWindow
 // @run-at       document-start
 // @license      GPL-3.0-or-later

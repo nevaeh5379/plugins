@@ -7,7 +7,8 @@ const page = (() => {
   try { return unsafeWindow } catch { return window as typeof unsafeWindow }
 })()
 
-if (!page.RisuMods) {
+function startLoader() {
+  if (page.RisuMods) return
   const registry = new ModRegistry()
   page.RisuMods = registry
 
@@ -19,12 +20,6 @@ if (!page.RisuMods) {
         console.info(`[Risu Loader] upgraded to ${hook.source}/${hook.version ?? 'unknown'}`)
       }).catch((error) => console.error('[Risu Loader] hook upgrade failed', error))
     }
-  })
-
-  // Capture the parser-inserted module entry. Unsupported production builds
-  // are restored unchanged; this makes a failed signature scan non-destructive.
-  interceptRisuEntry((report) => {
-    console.info('[Risu Loader] entry interception', report)
   })
 
   const queued = page.__RISU_MOD_QUEUE__?.splice(0) ?? []
@@ -46,5 +41,21 @@ if (!page.RisuMods) {
   }).catch((error) => {
     registry.setStatus({ phase: 'failed', message: String(error) })
     console.error('[Risu Loader] initialization failed', error)
+  })
+}
+
+// The userscript intentionally matches every HTTP(S) origin so self-hosted
+// installations work without editing metadata. Do not expose anything on an
+// unrelated site until its entry module has passed the Risu source-map scan.
+if (page.__RISU_LOADER_HOOK__) {
+  startLoader()
+} else {
+  interceptRisuEntry((report) => {
+    if (!report.intercepted) {
+      console.warn('[Risu Loader] compatible entry was found but instrumentation failed', report)
+      return
+    }
+    console.info('[Risu Loader] entry interception', report)
+    startLoader()
   })
 }

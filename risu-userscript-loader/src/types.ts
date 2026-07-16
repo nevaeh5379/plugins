@@ -34,6 +34,7 @@ export interface RisuRuntimeHook {
   listEffectiveVariables?(): Record<string, string>
   getActiveModules?(): unknown[]
   getCurrentCharacterIndex?(): number
+  getContextKey?(kind: 'character' | 'chat'): string
   getCurrentChat?(): unknown | null
   readAsset?(path: string): Promise<Uint8Array | null>
   saveAsset?(data: Uint8Array, customId?: string, fileName?: string): Promise<string>

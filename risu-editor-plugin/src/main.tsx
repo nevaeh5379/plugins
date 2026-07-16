@@ -281,34 +281,48 @@ function createIntegration(api: RuntimeApi): () => void {
   }
 
   const sync = () => { installCharacterUi(); decorateTextareas() }
-  const observer = new MutationObserver(sync)
+  let syncFrame = 0
+  const scheduleSync = () => {
+    if (syncFrame) return
+    syncFrame = requestAnimationFrame(() => {
+      syncFrame = 0
+      sync()
+    })
+  }
+  const isInsideSettings = (node: Node) => node instanceof Element
+    && (node.matches('.setting-area') || !!node.closest('.setting-area'))
+  const containsSettings = (node: Node) => node instanceof Element
+    && (node.matches('.setting-area') || (node.matches('[class*="rs-setting-cont"]') && !!node.querySelector('.setting-area')))
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (isInsideSettings(record.target)) { scheduleSync(); return }
+      for (const node of record.addedNodes) if (containsSettings(node)) { scheduleSync(); return }
+      for (const node of record.removedNodes) if (containsSettings(node)) { scheduleSync(); return }
+    }
+  })
   observer.observe(document.body, { childList: true, subtree: true })
   const unsubscribe = api.context.onCharacterChange(() => { if (mode === 'vscode') void loadExplorer() })
   sync()
 
   return () => {
-    observer.disconnect(); unsubscribe(); removeCharacterUi()
+    observer.disconnect(); if (syncFrame) cancelAnimationFrame(syncFrame); unsubscribe(); removeCharacterUi()
     for (const button of buttons) button.remove()
     for (const editable of decorated) delete editable.dataset[DECORATED]
     overlayRoot.unmount(); overlayHost.remove()
   }
 }
 
-async function register() {
-  const started = Date.now()
-  while (Date.now() - started < 30_000) {
-    const loader = getLoader()
-    if (loader) {
-      await loader.register({
-        id: MOD_ID, name: 'Risu Textarea Editor', version: '2.3.0',
-        permissions: ['character.read', 'character.write', 'context.read', 'ui.inject'], activate: createIntegration,
-      })
-      console.log('[Risu Editor] 기본/VSCode 캐릭터 UI 전환이 활성화되었습니다.')
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200))
-  }
-  throw new Error('Risu Userscript Loader를 찾지 못했습니다.')
+const definition = {
+  id: MOD_ID, name: 'Risu Textarea Editor', version: '2.3.2',
+  permissions: ['character.read', 'character.write', 'context.read', 'ui.inject'], activate: createIntegration,
 }
 
-register().catch((error) => console.error('[Risu Editor]', error))
+const loader = getLoader()
+if (loader) {
+  loader.register(definition).catch((error) => console.error('[Risu Editor]', error))
+} else {
+  const page = (() => {
+    try { return unsafeWindow } catch { return window as typeof unsafeWindow }
+  })() as Window & { __RISU_MOD_QUEUE__?: unknown[] }
+  ;(page.__RISU_MOD_QUEUE__ ??= []).push(definition)
+}

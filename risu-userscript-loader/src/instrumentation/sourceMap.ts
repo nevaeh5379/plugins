@@ -198,6 +198,14 @@ globalThis.__RISU_LOADER_HOOK__ = Object.freeze({
     const character = __risuGetCharacter();
     return __risuGetDatabase().characters?.findIndex((item) => item?.chaId === character?.chaId) ?? -1;
   },
+  getContextKey: (kind) => {
+    const character = __risuGetCharacter();
+    if (!character) return 'none';
+    const characterKey = character.chaId ?? 'unknown-character';
+    if (kind === 'character') return String(characterKey);
+    const chatIndex = character.chatPage ?? -1;
+    return characterKey + ':' + chatIndex + ':' + (character.chats?.[chatIndex]?.id ?? '');
+  },
   getCurrentChat: () => __risuClone(__risuCurrentChat()),
   readAsset: async (path) => __risuClone(await __risuReadAsset(String(path))),
   saveAsset: async (data, customId = '', fileName = '') => __risuSaveAsset(new Uint8Array(data), customId, fileName),
