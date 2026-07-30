@@ -8,6 +8,7 @@ import {
 } from './ui'
 import { cloneForTransport } from './clone'
 import type {
+  ChatSendOptions,
   LoaderStatus,
   CbsParseOptions,
   MarkdownParseOptions,
@@ -28,7 +29,7 @@ interface ActiveMod {
 }
 
 export class ModRegistry implements PublicLoaderApi {
-  readonly version = '0.5.2'
+  readonly version = '0.6.0'
   status: LoaderStatus = { phase: 'booting' }
   private hook: RisuRuntimeHook | null = null
   private mods = new Map<string, ActiveMod>()
@@ -317,6 +318,16 @@ export class ModRegistry implements PublicLoaderApi {
           if (message.role !== 'user' && message.role !== 'char') throw new Error('Message role must be user or char.')
           if (typeof message.data !== 'string') throw new Error('Message data must be a string.')
           await updateCurrentChat((chat) => chat.message.push(cloneForTransport(message)))
+        },
+        send: async (text: string, options: ChatSendOptions = {}) => {
+          check('chat.send')
+          if (!hook.sendMessage) throw new Error('Native chat sending is unavailable.')
+          if (typeof text !== 'string') throw new TypeError('Chat text must be a string.')
+          const timeoutMs = options.timeoutMs ?? 10 * 60 * 1000
+          if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60 * 60 * 1000) {
+            throw new RangeError('timeoutMs must be between 1 second and 1 hour.')
+          }
+          return hook.sendMessage(text, { wait: options.wait ?? true, timeoutMs })
         },
         reload: async () => {
           check('chat.write')

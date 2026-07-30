@@ -60,6 +60,7 @@ else (unsafeWindow.__RISU_MOD_QUEUE__ ??= []).push(mod)
 - 현재 컨텍스트의 활성 모듈 조회
 - 현재 캐릭터/채팅 인덱스 및 전환 이벤트
 - 채팅 메시지 조회와 명시적인 no-op 수정
+- Risu 네이티브 입력·트리거·생성 흐름을 사용하는 실제 메시지 전송
 - Risu Markdown 및 safe Markdown 파싱
 - 에셋 읽기와 사용자가 확인한 테스트 에셋 저장
 - 로더 전용 툴바/채팅 버튼, Mods 메뉴, 모달, 토스트
@@ -75,7 +76,7 @@ else (unsafeWindow.__RISU_MOD_QUEUE__ ??= []).push(mod)
 - `character`: 현재 캐릭터 복제본 조회/교체와 변경 구독
 - `database`: 전체 DB 스냅샷 조회/교체
 - `context`: 현재 캐릭터·채팅·인덱스 조회와 변경 이벤트
-- `chat`: 메시지 목록/마지막 메시지 조회, 추가/수정/삭제, 새로고침
+- `chat`: 메시지 목록/마지막 메시지 조회, 추가/수정/삭제, 네이티브 전송, 새로고침
 - `parser`: CBS, Markdown, safe Markdown, CBS 예약문자 escape/unescape
 - `variables`: 채팅/글로벌/유효 변수 조회와 수정
 - `modules`: 활성 모듈, namespace, lorebook, assets 조회
@@ -84,11 +85,12 @@ else (unsafeWindow.__RISU_MOD_QUEUE__ ??= []).push(mod)
 - `lifecycle`: 모드 unload 정리 함수 등록
 
 ```js
-permissions: ['context.read', 'chat.read', 'parser.cbs', 'ui.inject'],
+permissions: ['context.read', 'chat.read', 'chat.send', 'parser.cbs', 'ui.inject'],
 async activate(api) {
   console.log(api.context.getCurrentChatIndex())
   console.log(api.chat.getLastMessage())
   console.log(await api.parser.markdown('**hello**'))
+  await api.chat.send('Hello from a userscript mod')
 
   api.context.onChatChange((chat) => console.log('chat changed', chat))
   api.ui.addChatButton({
@@ -108,7 +110,7 @@ UI 슬롯은 Risu의 내부 Svelte 컴포넌트나 Plugin v3 API가 아니라 �
 - `character.read`, `character.write`
 - `database.read`, `database.write`
 - `context.read`
-- `chat.read`, `chat.write`
+- `chat.read`, `chat.write`, `chat.send`
 - `parser.cbs`, `parser.cbs.mutate`
 - `variables.read`, `variables.write`
 - `modules.read`

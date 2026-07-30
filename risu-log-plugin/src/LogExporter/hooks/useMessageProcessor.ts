@@ -88,13 +88,6 @@ export const useMessageProcessor = (
     }
 
     const process = async () => {
-      console.log('[log plugin] useMessageProcessor hook process():', {
-        imageCropActive,
-        imageCropAspectRatio,
-        imageCropVAlign,
-        imageCropHAlign,
-        imageCropHeight
-      });
       let result = '';
       if (allowHtmlRendering) {
         result = await processRawHtmlContent(originalMessageEl, embedImagesAsBlob, replacementRules);

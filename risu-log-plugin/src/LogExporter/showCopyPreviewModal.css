@@ -429,7 +429,66 @@
     flex: 1;
     padding-right: 20px;
     padding-left: 20px;
-    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.preview-viewport {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+}
+
+.preview-scaled-stage {
+    position: relative;
+    min-width: 100%;
+    margin: 0 auto;
+}
+
+.preview-export-document {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform-origin: top center;
+}
+
+.preview-export-document > div {
+    margin: 0 !important;
+}
+
+.preview-zoom-controls {
+    position: sticky;
+    top: 8px;
+    width: max-content;
+    margin: 8px 8px -38px auto;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--bg-primary);
+    background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+}
+
+.preview-zoom-value {
+    min-width: 48px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 12px;
+    line-height: 24px;
+}
+
+.preview-zoom-value:hover {
+    color: var(--accent-primary);
 }
 
 /* ============================================
@@ -533,16 +592,18 @@
 
     .mobile-preview-tab {
         padding: 0;
-        padding-bottom: 110px;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden !important;
     }
     .mobile-preview-tab .desktop-preview-content {
-        overflow: visible !important;
-        padding: 20px;
+        height: 100%;
+        overflow: hidden !important;
+        padding: 0;
     }
     .mobile-preview-tab .desktop-preview-toolbar {
         display: none !important;
+    }
+    .mobile-preview-tab .preview-scaled-stage {
+        margin-bottom: 110px;
     }
 
     /* Let every settings tab, including the lower image-export controls in
@@ -593,8 +654,7 @@
         flex-shrink: 0;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
         border-radius: 16px;
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: var(--bg-primary);
     }
     .mobile-action-bar .export-group button {
         margin: 0 !important;

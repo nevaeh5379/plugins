@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Risu Loader Test Mod
 // @namespace    https://risuai.xyz/mods/test
-// @version      0.3.0
+// @version      0.4.0
 // @description  Diagnostics for context, chat, parser, assets, and UI APIs in Risu Userscript Loader.
 // @match        http://*/*
 // @match        https://*/*
@@ -16,10 +16,10 @@
   const definition = {
     id: 'loader.test-mod',
     name: 'Loader Test Mod',
-    version: '0.3.0',
+    version: '0.4.0',
     permissions: [
       'character.read', 'character.write', 'database.read', 'parser.cbs',
-      'variables.read', 'modules.read', 'context.read', 'chat.read', 'chat.write',
+      'variables.read', 'modules.read', 'context.read', 'chat.read', 'chat.write', 'chat.send',
       'assets.read', 'assets.write', 'ui.inject',
     ],
 
@@ -85,6 +85,7 @@
               <button type="button" data-action="modules">모듈 조회</button>
               <button type="button" data-action="context">컨텍스트</button>
               <button type="button" data-action="chat">채팅 조회</button>
+              <button class="danger" type="button" data-action="chat-send">실제 전송</button>
               <button type="button" data-action="asset-read">에셋 읽기</button>
               <button class="danger" type="button" data-action="asset-save">에셋 저장</button>
               <button class="danger" type="button" data-action="chat-write">채팅 no-op</button>
@@ -249,6 +250,19 @@
         }
       }
       mounted.container.querySelector('[data-action="chat"]').addEventListener('click', readChat)
+
+      mounted.container.querySelector('[data-action="chat-send"]').addEventListener('click', async () => {
+        const text = window.prompt('Risu의 실제 전송 파이프라인으로 보낼 메시지', 'Loader API 전송 테스트')
+        if (text === null || !window.confirm(`실제로 전송하고 응답 완료까지 기다릴까요?\n\n${text}`)) return
+        try {
+          appendLog('메시지 전송 시작…')
+          const sent = await api.chat.send(text)
+          appendLog(sent ? '메시지 전송 및 생성 완료' : 'Risu가 이미 생성 중이어서 전송하지 않음', sent ? 'ok' : 'error')
+          readChat()
+        } catch (error) {
+          appendLog(`메시지 전송 실패: ${String(error)}`, 'error')
+        }
+      })
 
       mounted.container.querySelector('[data-action="chat-write"]').addEventListener('click', async () => {
         const messages = api.chat.getMessages()

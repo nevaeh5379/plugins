@@ -91,10 +91,11 @@ const arePropsEqual = (prevProps: MessageProps, nextProps: MessageProps) => {
   if (prevProps.charInfoName !== nextProps.charInfoName) return false;
   if (prevProps.node !== nextProps.node) return false;
 
-  // Safe checks for objects via JSON stringification to handle reference changes
-  if (JSON.stringify(prevProps.color) !== JSON.stringify(nextProps.color)) return false;
-  if (JSON.stringify(prevProps.globalSettings) !== JSON.stringify(nextProps.globalSettings)) return false;
-  if (JSON.stringify(prevProps.replacementRules) !== JSON.stringify(nextProps.replacementRules)) return false;
+  // These values are memoized by the parent. Reference checks avoid repeatedly
+  // serializing the same settings once for every visible message.
+  if (prevProps.color !== nextProps.color) return false;
+  if (prevProps.globalSettings !== nextProps.globalSettings) return false;
+  if (prevProps.replacementRules !== nextProps.replacementRules) return false;
 
   // Custom Map comparison for avatar mappings
   if (prevProps.avatarMap !== nextProps.avatarMap) {

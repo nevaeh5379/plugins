@@ -56,25 +56,40 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
 
   // Incremental rendering for long logs in preview mode.
   // When exporting images or files, render everything immediately.
-  const [visibleCount, setVisibleCount] = useState(isForImageExport || isForExport ? nodes.length : 50);
+  const isMobilePreview = !isForImageExport
+    && !isForExport
+    && typeof window !== 'undefined'
+    && window.matchMedia('(max-width: 1024px)').matches;
+  const initialBatchSize = isMobilePreview ? 24 : 50;
+  const renderBatchSize = isMobilePreview ? 16 : 50;
+  const [visibleCount, setVisibleCount] = useState(
+    isForImageExport || isForExport ? nodes.length : Math.min(initialBatchSize, nodes.length),
+  );
 
   useEffect(() => {
     if (isForImageExport || isForExport) {
       setVisibleCount(nodes.length);
     } else {
-      setVisibleCount(Math.min(50, nodes.length));
+      setVisibleCount(Math.min(initialBatchSize, nodes.length));
     }
-  }, [nodes, isForImageExport, isForExport]);
+  }, [nodes, isForImageExport, isForExport, initialBatchSize]);
 
   useEffect(() => {
     if (isForImageExport || isForExport) return;
     if (visibleCount >= nodes.length) return;
 
-    const timer = setTimeout(() => {
-      setVisibleCount(prev => Math.min(prev + 50, nodes.length));
-    }, 80); // Load chunks of 50 messages every 80ms
-    return () => clearTimeout(timer);
-  }, [visibleCount, nodes.length, isForImageExport, isForExport]);
+    const renderNextBatch = () => {
+      setVisibleCount(prev => Math.min(prev + renderBatchSize, nodes.length));
+    };
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(renderNextBatch, { timeout: 250 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = globalThis.setTimeout(renderNextBatch, isMobilePreview ? 120 : 60);
+    return () => globalThis.clearTimeout(timer);
+  }, [visibleCount, nodes.length, isForImageExport, isForExport, isMobilePreview, renderBatchSize]);
 
   const renderedIndicesRef = useRef<Set<number>>(new Set());
   const [allMessagesReady, setAllMessagesReady] = useState(false);
@@ -125,7 +140,9 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
 
   const containerStyle: React.CSSProperties = {
       margin: isForImageExport ? '0' : '16px auto',
-      maxWidth: containerWidth ? `${containerWidth}px` : '900px',
+      width: containerWidth ? `${containerWidth}px` : '900px',
+      maxWidth: 'none',
+      boxSizing: 'border-box',
       fontSize: fontSize ? `${fontSize}px` : '16px',
       backgroundColor: color.background,
       borderRadius: selectedThemeKey === 'log' ? '8px' : '12px',

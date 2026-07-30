@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { Button, Space, Spin, Popover, Segmented, Select, Input, Slider } from 'antd';
 import { 
   FileTextOutlined, 
@@ -10,7 +10,10 @@ import {
   EyeOutlined,
   SkinOutlined,
   LayoutOutlined,
-  PictureOutlined
+  PictureOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  CompressOutlined,
 } from '@ant-design/icons';
 import LogContainer from './LogContainer';
 import type { LogContainerProps, ThemeInfo, ColorPalette } from '../../types';
@@ -34,6 +37,207 @@ interface PreviewPanelProps {
   themes: Record<string, ThemeInfo>;
   colors: Record<string, ColorPalette>;
 }
+
+const MIN_PREVIEW_SCALE = 0.15;
+const MAX_PREVIEW_SCALE = 2;
+
+interface ScaledPreviewProps {
+  width: number;
+  children: React.ReactNode;
+}
+
+interface PinchState {
+  distance: number;
+  scale: number;
+  contentX: number;
+  contentY: number;
+}
+
+/**
+ * Renders the export document at its real output width and scales only the
+ * viewport. This keeps line wrapping and image layout identical to the saved
+ * image while still allowing a small screen to inspect and pan the document.
+ */
+const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children }) => {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<PinchState | null>(null);
+  const [documentHeight, setDocumentHeight] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [fitMode, setFitMode] = useState(true);
+
+  const fitToViewport = React.useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const availableWidth = Math.max(1, viewport.clientWidth - 24);
+    setScale(Math.min(1, Math.max(MIN_PREVIEW_SCALE, availableWidth / width)));
+  }, [width]);
+
+  useLayoutEffect(() => {
+    const documentElement = documentRef.current;
+    const viewport = viewportRef.current;
+    if (!documentElement || !viewport) return;
+
+    const updateDocumentHeight = () => {
+      setDocumentHeight(documentElement.offsetHeight);
+    };
+    const updateViewport = () => {
+      if (fitMode) fitToViewport();
+    };
+
+    updateDocumentHeight();
+    updateViewport();
+
+    const documentObserver = new ResizeObserver(updateDocumentHeight);
+    const viewportObserver = new ResizeObserver(updateViewport);
+    documentObserver.observe(documentElement);
+    viewportObserver.observe(viewport);
+
+    return () => {
+      documentObserver.disconnect();
+      viewportObserver.disconnect();
+    };
+  }, [fitMode, fitToViewport]);
+
+  const changeScale = (nextScale: number) => {
+    const viewport = viewportRef.current;
+    const clampedScale = Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, nextScale));
+
+    setFitMode(false);
+    if (viewport) {
+      const contentX = (viewport.scrollLeft + viewport.clientWidth / 2) / scale;
+      const contentY = (viewport.scrollTop + viewport.clientHeight / 2) / scale;
+      setScale(clampedScale);
+      requestAnimationFrame(() => {
+        viewport.scrollTo({
+          left: contentX * clampedScale - viewport.clientWidth / 2,
+          top: contentY * clampedScale - viewport.clientHeight / 2,
+        });
+      });
+      return;
+    }
+    setScale(clampedScale);
+  };
+
+  const handleFit = () => {
+    setFitMode(true);
+    fitToViewport();
+    viewportRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length !== 2 || !viewportRef.current) return;
+    const [first, second] = Array.from(event.touches);
+    const viewport = viewportRef.current;
+    const rect = viewport.getBoundingClientRect();
+    const midpointX = (first.clientX + second.clientX) / 2 - rect.left;
+    const midpointY = (first.clientY + second.clientY) / 2 - rect.top;
+
+    pinchRef.current = {
+      distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+      scale,
+      contentX: (viewport.scrollLeft + midpointX) / scale,
+      contentY: (viewport.scrollTop + midpointY) / scale,
+    };
+    setFitMode(false);
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const pinch = pinchRef.current;
+    const viewport = viewportRef.current;
+    if (!pinch || !viewport || event.touches.length !== 2) return;
+    event.preventDefault();
+
+    const [first, second] = Array.from(event.touches);
+    const rect = viewport.getBoundingClientRect();
+    const midpointX = (first.clientX + second.clientX) / 2 - rect.left;
+    const midpointY = (first.clientY + second.clientY) / 2 - rect.top;
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    const nextScale = Math.min(
+      MAX_PREVIEW_SCALE,
+      Math.max(MIN_PREVIEW_SCALE, pinch.scale * (distance / pinch.distance)),
+    );
+
+    setScale(nextScale);
+    requestAnimationFrame(() => {
+      viewport.scrollTo({
+        left: pinch.contentX * nextScale - midpointX,
+        top: pinch.contentY * nextScale - midpointY,
+      });
+    });
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length < 2) pinchRef.current = null;
+  };
+
+  return (
+    <div
+      className="preview-viewport"
+      ref={viewportRef}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
+      <div className="preview-zoom-controls" role="group" aria-label="미리보기 확대/축소">
+        <Button
+          size="small"
+          type="text"
+          icon={<ZoomOutOutlined />}
+          aria-label="축소"
+          title="축소"
+          onClick={() => changeScale(scale - 0.1)}
+          disabled={scale <= MIN_PREVIEW_SCALE}
+        />
+        <button
+          type="button"
+          className="preview-zoom-value"
+          title="화면에 맞추기"
+          onClick={handleFit}
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <Button
+          size="small"
+          type="text"
+          icon={<ZoomInOutlined />}
+          aria-label="확대"
+          title="확대"
+          onClick={() => changeScale(scale + 0.1)}
+          disabled={scale >= MAX_PREVIEW_SCALE}
+        />
+        <Button
+          size="small"
+          type="text"
+          icon={<CompressOutlined />}
+          aria-label="화면에 맞추기"
+          title="화면에 맞추기"
+          onClick={handleFit}
+        />
+      </div>
+      <div
+        className="preview-scaled-stage"
+        style={{
+          width: `${width * scale}px`,
+          height: `${documentHeight * scale}px`,
+        }}
+      >
+        <div
+          ref={documentRef}
+          className="preview-export-document"
+          data-log-export-document
+          style={{
+            width: `${width}px`,
+            transform: `translateX(-50%) scale(${scale})`,
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ 
   settings, 
@@ -60,7 +264,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   const onReady = React.useCallback(() => {
     if (previewContentRef.current) {
-      const element = previewContentRef.current;
+      const element = previewContentRef.current.querySelector<HTMLElement>('[data-log-export-document] > div')
+        || previewContentRef.current;
       let maxMessageHeight = 0;
       const messageElements = element.querySelectorAll('.chat-message-container');
       messageElements.forEach(msg => {
@@ -134,7 +339,16 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
       return <textarea readOnly style={{width: '100%', height: '100%', whiteSpace: 'pre-wrap', wordWrap: 'break-word', backgroundColor: '#1a1b26', color: '#c0caf5', border: 'none'}} value={rawHtmlContent}></textarea>;
     }
     if (isBasicFormat) {
-      return <LogContainer {...logContainerProps} onReady={onReady} selectedIndices={selectedIndices} onMessageSelect={handleMessageSelect} />;
+      return (
+        <ScaledPreview width={Number(logContainerProps.containerWidth) || 900}>
+          <LogContainer
+            {...logContainerProps}
+            onReady={onReady}
+            selectedIndices={selectedIndices}
+            onMessageSelect={handleMessageSelect}
+          />
+        </ScaledPreview>
+      );
     }
     return <div ref={shadowHostRef}></div>;
   };

@@ -419,7 +419,12 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
 
   // ── Selection ──
   const selection = useSelection(finalNodes);
-  const nodesForExport = selection.getFilteredItems();
+  const nodesForExport = useMemo(
+    () => selection.selectedIndices.size === 0
+      ? finalNodes
+      : finalNodes.filter((_, index) => selection.selectedIndices.has(index)),
+    [finalNodes, selection.selectedIndices],
+  );
 
   // ── Image Size ──
   const [estimatedImageSize, setEstimatedImageSize] = useState<EstimatedImageSize | null>(null);

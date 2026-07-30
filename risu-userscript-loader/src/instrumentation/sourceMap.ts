@@ -214,6 +214,33 @@ globalThis.__RISU_LOADER_HOOK__ = Object.freeze({
     options.chatID ?? -1, options.cbsConditions ?? {}
   ),
   parseMarkdownSafe: (text, forbidTags = []) => __risuParseMarkdownSafe(String(text), { forbidTags })
+  ,sendMessage: async (text, options = {}) => {
+    const input = Array.from(document.querySelectorAll('.default-chat-screen textarea.text-input-area'))
+      .find((element) => element.isConnected);
+    if (!input) throw new Error('Risu chat composer was not found.');
+    const row = input.parentElement;
+    const sendButton = row?.querySelector('button.button-icon-send');
+    if (!sendButton) return false;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    if (setter) setter.call(input, String(text)); else input.value = String(text);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const readyButton = row?.querySelector('button.button-icon-send');
+    if (!readyButton) return false;
+    readyButton.click();
+    if (options.wait === false) return true;
+    const timeoutMs = options.timeoutMs ?? 600000;
+    const startedAt = Date.now();
+    let observedBusy = false;
+    while (Date.now() - startedAt < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const ready = !!row?.querySelector('button.button-icon-send');
+      if (!ready) observedBusy = true;
+      if (observedBusy && ready) return true;
+      if (!observedBusy && Date.now() - startedAt >= 1500) return true;
+    }
+    throw new Error('Timed out while waiting for Risu chat generation.');
+  }
 });
 globalThis.dispatchEvent(new CustomEvent('risu-loader:hook-ready'));
 `

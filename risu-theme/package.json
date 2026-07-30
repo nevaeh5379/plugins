@@ -1,17 +1,12 @@
 {
-  "name": "risu-userscript-loader",
-  "version": "0.6.0",
+  "name": "risu-theme",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@jridgewell/trace-mapping": "^0.3.31",
-    "acorn": "^8.15.0",
-    "acorn-walk": "^8.3.4"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
