@@ -4,7 +4,7 @@ import './showCopyPreviewModal.css';
 import type { RisuCharacter } from '../types/risuai';
 import type { ColorPalette, GlobalSettings, LogContainerProps, ThemeInfo } from '../types';
 import { ConfigProvider, Spin, Button, Drawer, message } from 'antd';
-import { SettingOutlined, CloseOutlined, EditOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { Settings as SettingIcon, X, Pencil, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
 import SettingsTabs from './components/SettingsTabs';
 import PreviewPanel from './components/PreviewPanel';
@@ -170,40 +170,106 @@ interface HeaderBarProps {
 
 function HeaderBar({ isMobile, isEditable, onClose, onToggleEditable, onOpenSettingsDrawer }: HeaderBarProps) {
   return (
-    <div className="log-exporter-modal-header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
-      <Button
-        id="log-exporter-close"
-        className="log-exporter-modal-close-btn"
-        type="text"
-        icon={<CloseOutlined />}
-        title="닫기 (Esc)"
-        aria-label="모달 닫기"
-        onClick={onClose}
-        style={{ color: 'var(--text-white)' }}
-      />
-      <span className="header-title" style={{ flex: 1, fontSize: '1.2em', fontWeight: 'bold' }}>로그 플러그인</span>
-      <Button
-        type="text"
-        icon={<EditOutlined />}
+    <div className="log-exporter-modal-header-bar" style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '12px 16px',
+      borderBottom: '1px solid var(--border)',
+      background: 'var(--card)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '6px',
+          backgroundColor: 'var(--muted)',
+          border: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--foreground)',
+        }}>
+          <FileText size={15} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+          <span className="header-title" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.2 }}>로그 플러그인</span>
+        </div>
+      </div>
+
+      <div style={{ flex: 1 }}></div>
+
+      <button
+        type="button"
         onClick={onToggleEditable}
-        style={{ color: isEditable ? 'var(--accent-primary)' : 'var(--text-white)' }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '5px 10px',
+          fontSize: '12px',
+          fontWeight: 500,
+          borderRadius: 'var(--radius)',
+          border: isEditable ? '1px solid var(--primary)' : '1px solid var(--border)',
+          backgroundColor: isEditable ? 'var(--secondary)' : 'transparent',
+          color: isEditable ? 'var(--foreground)' : 'var(--muted-foreground)',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+        }}
         title="로그 편집 활성화 토글"
       >
-        {!isMobile ? '로그 편집' : null}
-      </Button>
+        <Pencil size={13} style={{ opacity: isEditable ? 1 : 0.7 }} />
+      </button>
+
       {isMobile && (
-        <Button
-          type="text"
-          icon={<SettingOutlined />}
+        <button
+          type="button"
           onClick={onOpenSettingsDrawer}
-          style={{ color: 'var(--text-white)' }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '5px 10px',
+            fontSize: '12px',
+            fontWeight: 500,
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            backgroundColor: 'transparent',
+            color: 'var(--foreground)',
+            cursor: 'pointer',
+          }}
         >
-          설정
-        </Button>
+          <SettingIcon size={14} />
+          <span>설정</span>
+        </button>
       )}
+
+      <button
+        type="button"
+        id="log-exporter-close"
+        onClick={onClose}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '28px',
+          height: '28px',
+          borderRadius: '6px',
+          border: '1px solid var(--border)',
+          backgroundColor: 'transparent',
+          color: 'var(--muted-foreground)',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+        }}
+        title="닫기 (Esc)"
+        aria-label="모달 닫기"
+      >
+        <X size={15} />
+      </button>
     </div>
   );
 }
+
 
 interface PreviewContentProps {
   logContainerProps: Omit<LogContainerProps, 'onReady'>;
@@ -517,8 +583,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
         }
 
         if (settings.format === 'markdown' || settings.format === 'text') {
-          const style = `font-size: ${settings.previewFontSize || 16}px; max-width: ${settings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: #1a1b26; color: #c0caf5; border-radius: 8px;`;
-          setConversionContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word;">${content}</pre></div>`);
+          const style = `font-size: ${settings.previewFontSize || 16}px; max-width: ${settings.previewWidth || 800}px; margin: 20px auto; padding: 20px; background-color: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 8px;`;
+          setConversionContent(`<div style="${style}"><pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0; font-family: monospace;">${content}</pre></div>`);
         } else {
           setConversionContent(content);
         }
@@ -666,7 +732,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
   // ── Error View ──
   if (modalState.error) {
     return (
-      <ConfigProvider theme={antdTheme}>
+      <ConfigProvider 
+        theme={antdTheme}
+        getPopupContainer={(node) => (node?.parentElement ? node.parentElement : (document.getElementById('log-exporter-react-modal-root') || document.body))}
+      >
         <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
           <div
             className="log-exporter-modal"
@@ -697,7 +766,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
 
   // ── Render ──
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider 
+      theme={antdTheme}
+      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
+    >
       <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
         {!isArcaHelperOpen && (
           <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
@@ -775,17 +847,18 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                 display: 'flex',
                 height: 'calc(100% - 71px)',
                 overflow: 'hidden',
+                position: 'relative',
               }}>
                 <div className="desktop-settings-panel" style={{
                   display: 'flex',
                   flexDirection: 'column',
                   height: '100%',
                   width: isSettingsOpen ? '450px' : '0px',
-                  borderRight: isSettingsOpen ? '1px solid var(--border-color)' : '0px solid transparent',
-                  background: 'var(--bg-secondary)',
-                  overflow: 'visible',
+                  borderRight: isSettingsOpen ? '1px solid var(--border)' : '0px solid transparent',
+                  background: 'var(--card)',
+                  overflow: 'hidden',
                   flexShrink: 0,
-                  position: 'relative',
+                  transition: 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                 }}>
                   <div style={{ width: '450px', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
                     <SettingsDrawerContent
@@ -802,13 +875,24 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                       colors={COLORS}
                     />
                   </div>
+                </div>
+                <div className="desktop-preview-panel" style={{
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
+                  position: 'relative',
+                  flex: 1,
+                }}>
+                  {/* Sidebar Toggle Handle Button */}
                   <Button
                     className="sidebar-toggle-handle"
-                    icon={isSettingsOpen ? <LeftOutlined /> : <RightOutlined />}
+                    icon={isSettingsOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                     onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                    title={isSettingsOpen ? '설정 접기' : '설정 펼치기'}
                     style={{
                       position: 'absolute',
-                      right: isSettingsOpen ? '-10px' : '-18px',
+                      left: 0,
                       top: '50%',
                       transform: 'translateY(-50%)',
                       zIndex: 100,
@@ -820,21 +904,13 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderLeft: 'none',
-                      backgroundColor: 'var(--bg-secondary)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-secondary)',
+                      backgroundColor: 'var(--card)',
+                      borderColor: 'var(--border)',
+                      color: 'var(--muted-foreground)',
                       boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
+                      cursor: 'pointer',
                     }}
                   />
-                </div>
-                <div className="desktop-preview-panel" style={{
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: '100%',
-                  position: 'relative',
-                  flex: 1,
-                }}>
                   <PreviewContent
                     logContainerProps={logContainerProps}
                     settings={settings}
@@ -885,6 +961,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
         {progress.active && (
           <div className="progress-overlay">
             <div className="progress-card">
+              <Spin size="large" />
               <p className="progress-message">{progress.message}</p>
               {progress.total > 0 && (
                 <span className="progress-count">{progress.current} / {progress.total}</span>

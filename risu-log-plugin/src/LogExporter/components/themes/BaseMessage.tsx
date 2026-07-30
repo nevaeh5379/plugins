@@ -267,7 +267,7 @@ const BaseMessage: React.FC<BaseMessageProps> = (props) => {
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            alignItems: isUser ? 'flex-end' : 'flex.start',
+            alignItems: isUser ? 'flex-end' : 'flex-start',
             maxWidth: '85%',
             minWidth: 0,
           }}>

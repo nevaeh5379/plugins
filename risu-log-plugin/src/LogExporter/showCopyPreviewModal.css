@@ -1,1209 +1,431 @@
 /* ============================================
-   Theme variables
+   shadcn / UI Design System Tokens
    ============================================ */
 
-/* 클래식 다크 테마 */
-[data-theme="classic"], .log-exporter-modal[data-theme="classic"] {
-    --bg-primary: #1a1b26;
-    --bg-secondary: #1f2335;
-    --bg-tertiary: #24283b;
-    --border-color: #414868;
-    --border-color-light: rgba(65, 72, 104, 0.3);
-    --text-primary: #c0caf5;
-    --text-secondary: #a9b1d6;
-    --text-title: #7aa2f7;
-    --text-white: #ffffff;
-    --accent-primary: #7aa2f7;
-    --accent-secondary: #bb9af7;
-    --btn-primary-bg: #7aa2f7;
-    --btn-primary-text: #1a1b26;
-    --btn-secondary-bg: #414868;
-    --btn-secondary-text: #c0caf5;
-    --btn-success-bg: #9ece6a;
-    --btn-success-text: #1a1b26;
-    --text-warning: #e0af68;
+/* Dark Mode (Default Zinc/Slate) */
+[data-theme="dark"],
+[data-theme="classic"],
+.log-exporter-modal {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #27272a;
+  --border-light: rgba(255, 255, 255, 0.07);
+  --input: #27272a;
+  --ring: #3f3f46;
+  --radius: 8px;
+
+  /* Backward compatibility variables */
+  --bg-primary: var(--background);
+  --bg-secondary: var(--card);
+  --bg-tertiary: var(--muted);
+  --border-color: var(--border);
+  --border-color-light: var(--border-light);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-title: var(--foreground);
+  --text-white: #ffffff;
+  --accent-primary: var(--primary);
+  --accent-secondary: #818cf8;
 }
 
-/* 모던 다크 테마 */
-[data-theme="dark"], .log-exporter-modal[data-theme="dark"] {
-    --bg-primary: #0f1117;
-    --bg-secondary: #16181f;
-    --bg-tertiary: #1c1e26;
-    --border-color: #2e3240;
-    --border-color-light: rgba(46, 50, 64, 0.4);
-    --text-primary: #e4e6eb;
-    --text-secondary: #b8bcc8;
-    --text-title: #61afef;
-    --text-white: #ffffff;
-    --accent-primary: #61afef;
-    --accent-secondary: #c678dd;
-    --btn-primary-bg: #61afef;
-    --btn-primary-text: #0f1117;
-    --btn-secondary-bg: #2e3240;
-    --btn-secondary-text: #e4e6eb;
-    --btn-success-bg: #98c379;
-    --btn-success-text: #0f1117;
-    --text-warning: #e0af68;
+/* Light Mode */
+[data-theme="light"],
+.log-exporter-modal[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #f8f9fa;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #09090b;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e4e4e7;
+  --border-light: rgba(0, 0, 0, 0.08);
+  --input: #e4e4e7;
+  --ring: #18181b;
+  --radius: 8px;
+
+  /* Backward compatibility variables */
+  --bg-primary: var(--background);
+  --bg-secondary: var(--card);
+  --bg-tertiary: var(--muted);
+  --border-color: var(--border);
+  --border-color-light: var(--border-light);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-title: var(--foreground);
+  --text-white: #09090b;
+  --accent-primary: var(--primary);
+  --accent-secondary: #4f46e5;
 }
 
-/* 라이트 테마 */
-[data-theme="light"], .log-exporter-modal[data-theme="light"] {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8f9fa;
-    --bg-tertiary: #e9ecef;
-    --border-color: #dee2e6;
-    --border-color-light: rgba(108, 117, 125, 0.3);
-    --text-primary: #212529;
-    --text-secondary: #6c757d;
-    --text-title: #0066cc;
-    --text-white: #000000;
-    --accent-primary: #007bff;
-    --accent-secondary: #5856d6;
-    --btn-primary-bg: #007bff;
-    --btn-primary-text: #ffffff;
-    --btn-secondary-bg: #6c757d;
-    --btn-secondary-text: #ffffff;
-    --btn-success-bg: #28a745;
-    --btn-success-text: #ffffff;
-    --text-warning: #b95000;
-}
-
-/* ============================================
-   Modal backdrop & container
-   ============================================ */
-
+/* Base Modal Reset & Keyframes */
 .log-exporter-modal-backdrop {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    -webkit-overflow-scrolling: touch;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    animation: leFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: leFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes leFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .log-exporter-modal {
-    background-color: var(--bg-tertiary);
-    color: var(--text-primary);
-    border-radius: 10px;
-    width: 90%;
-    max-width: 1200px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    overflow: hidden;
-    user-select: text;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, color 0.3s, box-shadow 0.3s;
-    position: relative;
-    animation: leSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--background);
+  color: var(--foreground);
+  border-radius: 12px;
+  width: 90vw;
+  max-width: 1500px;
+  height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border);
+  overflow: hidden;
+  position: relative;
+  z-index: 1001;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  animation: leScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes leSlideUp {
-    from { opacity: 0; transform: translateY(40px) scale(0.95); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes leScaleUp {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ============================================
-   Header bar
-   ============================================ */
-
+/* Header bar */
 .log-exporter-modal-header-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
-.log-exporter-modal-header-bar .header-title {
-    flex: 1;
-    font-size: 1.2em;
-    font-weight: bold;
-    color: var(--text-white);
-}
-
-.log-exporter-modal-close-btn {
-    color: var(--text-white) !important;
-    flex-shrink: 0;
-}
-
-/* ============================================
-   Content layout
-   ============================================ */
-
-.log-exporter-modal-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.desktop-modal-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    gap: 16px;
-    color: var(--text-secondary);
-}
-
-/* ============================================
-   Tab content (ExportTab / FilterTab / AdvancedTab / ReplacementTab / PluginGlobalSettings)
-   ============================================ */
-
-.tab-content {
-    padding: 16px 16px 24px;
-}
-
-.tab-section {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.tab-section-title {
-    margin: 0;
-    font-size: 1.05em;
-    font-weight: 600;
-    color: var(--text-title);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* 단일 라벨 + 컨트롤 (Select/Input/Slider 등) 세로 배치 */
-.setting-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.setting-field-label {
-    font-weight: 500;
-    color: var(--text-primary);
-    font-size: 0.92em;
-}
-
-/* 라벨 + Switch 가로 배치 (토글 행) */
-.setting-toggle-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 0;
-}
-
-.setting-toggle-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-}
-
-.setting-toggle-label {
-    font-weight: 500;
-    color: var(--text-primary);
-    font-size: 0.92em;
-}
-
-.setting-toggle-desc {
-    font-size: 0.82em;
-    color: var(--text-secondary);
-}
-
-/* 들여쓰기된 하위 옵션 그룹 */
-.setting-subgroup {
-    margin-left: 12px;
-    padding-left: 12px;
-    border-left: 2px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-/* Slider + InputNumber 가로 배치 */
-.setting-slider-row {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    width: 100%;
-}
-
-/* ReplacementTab — 규칙 추가 카드 */
-.replacement-add-card {
-    background: var(--bg-tertiary);
-    padding: 16px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-/* ReplacementTab — 패턴/치환 토큰 */
-.replacement-token {
-    font-family: monospace;
-    background: var(--bg-tertiary);
-    padding: 2px 8px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color-light);
-    max-width: 40%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-primary);
-    font-size: 0.88em;
-}
-
-/* ============================================
-   Dark scrollbar tuning (for tab content & preview panes)
-   ============================================ */
-
-.log-exporter-modal ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.log-exporter-modal ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
-
-.log-exporter-modal ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 4px;
-    border: 1px solid var(--bg-secondary);
-}
-
-.log-exporter-modal ::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-primary);
-}
-
-.log-exporter-modal * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-color) var(--bg-secondary);
-}
-
-/* antd Tabs content holder scroll */
-.desktop-settings-panel .ant-tabs-content-holder {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-color) var(--bg-secondary);
-}
-
-.desktop-settings-panel .ant-tabs-content-holder::-webkit-scrollbar {
-    width: 8px;
-}
-
-.desktop-settings-panel .ant-tabs-content-holder::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-}
-
-.desktop-settings-panel .ant-tabs-content-holder::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 4px;
-}
-
-.desktop-settings-panel .ant-tabs-content-holder::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-primary);
-}
-
-/* ============================================
-   Desktop (≥ 1025px): side-by-side grid
-   ============================================ */
-
-@media (min-width: 1025px) {
-    .log-exporter-modal {
-        width: 90vw !important;
-        max-width: 1800px !important;
-        height: 90vh !important;
-        padding: 0 !important;
-    }
-
-    .log-exporter-modal-content {
-        display: flex !important;
-        flex-direction: row !important;
-        gap: 0 !important;
-        padding: 0 !important;
-        overflow: hidden !important;
-    }
-
-    .desktop-settings-panel {
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100%;
-        background: var(--bg-secondary);
-        border-right: 1px solid var(--border-color);
-        overflow: visible !important;
-    }
-
-    /* antd Tabs fill height */
-    .desktop-settings-panel .ant-tabs {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .desktop-settings-panel .ant-tabs-content-holder {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-    }
-    .desktop-settings-panel .ant-tabs-content,
-    .desktop-settings-panel .ant-tabs-tabpane {
-        height: 100%;
-    }
-
-    .desktop-preview-panel {
-        flex: 1 !important;
-        display: flex !important;
-        flex-direction: column;
-        height: 100%;
-        background: var(--bg-primary);
-        overflow: hidden !important;
-        position: relative;
-    }
-
-    .desktop-floating-action-bar {
-        position: absolute;
-        bottom: 24px;
-        right: 24px;
-        z-index: 100;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        flex-wrap: nowrap;
-    }
-}
-
-/* ============================================
-   Preview panel (shared)
-   ============================================ */
-
-.desktop-preview-toolbar {
-    position: sticky;
-    top: 0;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    z-index: 10;
-    overflow-x: auto !important;
-    white-space: nowrap !important;
-    flex-wrap: nowrap !important;
-    gap: 12px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.desktop-preview-toolbar > * {
-    flex-shrink: 0 !important;
-}
-
-.desktop-preview-toolbar::-webkit-scrollbar {
-    height: 4px;
-}
-
-.desktop-preview-toolbar::-webkit-scrollbar-thumb {
-    background-color: var(--border-color);
-    border-radius: 2px;
-}
-
-.desktop-preview-content {
-    flex: 1;
-    padding-right: 20px;
-    padding-left: 20px;
-    min-height: 0;
-    overflow: hidden;
-}
-
+/* Scaled Preview Document Engine Styles */
 .preview-viewport {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x pan-y;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  padding-top: 52px;
+  box-sizing: border-box;
 }
 
 .preview-scaled-stage {
-    position: relative;
-    min-width: 100%;
-    margin: 0 auto;
+  position: relative;
+  min-width: 100%;
+  margin: 0 auto;
 }
 
 .preview-export-document {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform-origin: top center;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform-origin: top center;
 }
 
 .preview-export-document > div {
-    margin: 0 !important;
+  margin: 0 !important;
 }
 
+/* Zoom controls */
 .preview-zoom-controls {
-    position: sticky;
-    top: 8px;
-    width: max-content;
-    margin: 8px 8px -38px auto;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    padding: 2px;
-    border: 1px solid var(--border-color);
-    border-radius: 9px;
-    background: var(--bg-primary);
-    background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+  position: sticky;
+  top: 12px;
+  width: max-content;
+  margin: 12px 12px -42px auto;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  gap: 2px;
 }
 
 .preview-zoom-value {
-    min-width: 48px;
-    padding: 0 4px;
-    border: 0;
-    background: transparent;
-    color: var(--text-primary);
-    font: inherit;
-    font-size: 12px;
-    line-height: 24px;
+  min-width: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
 }
 
 .preview-zoom-value:hover {
-    color: var(--accent-primary);
+  color: var(--primary);
 }
 
-/* ============================================
-   Action bar buttons (antd Button overrides)
-   ============================================ */
-
-.action-bar-content {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.action-bar-group {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-}
-
-.action-bar-group.export-group {
-    gap: 0;
-}
-
-/* Desktop floating action bar button styling */
-.desktop-floating-action-bar .action-bar-btn {
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    height: 34px !important;
-    padding: 4px 14px !important;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25) !important;
-}
-
-.desktop-floating-action-bar .action-bar-btn:not(:disabled):hover {
-    transform: translateY(-1.5px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
-}
-
-/* Image-save + more split button (green) */
-.desktop-floating-action-bar .btn-save-img.desktop-btn-primary {
-    background-color: #98c379 !important;
-    border-color: #98c379 !important;
-    color: var(--bg-primary) !important;
-    border-top-right-radius: 0px !important;
-    border-bottom-right-radius: 0px !important;
-    border-right: none !important;
-}
-.desktop-floating-action-bar .btn-save-img.desktop-btn-primary:hover {
-    background-color: #a3cc85 !important;
-    border-color: #a3cc85 !important;
-}
-
-.desktop-floating-action-bar .btn-more.desktop-btn-secondary {
-    background-color: #98c379 !important;
-    border-color: #98c379 !important;
-    color: var(--bg-primary) !important;
-    border-top-left-radius: 0px !important;
-    border-bottom-left-radius: 0px !important;
-    border-left: 1px solid rgba(0, 0, 0, 0.15) !important;
-    width: 32px !important;
-    padding: 0 !important;
-}
-.desktop-floating-action-bar .btn-more.desktop-btn-secondary:hover {
-    background-color: #a3cc85 !important;
-    border-color: #a3cc85 !important;
-    color: var(--bg-primary) !important;
-}
-
-/* ============================================
-   Mobile / Tablet (≤ 1024px): full screen + dock
-   ============================================ */
-
-@media (max-width: 1024px) {
-    .log-exporter-modal-backdrop {
-        padding: 0 !important;
-    }
-    .log-exporter-modal {
-        width: 100vw !important;
-        height: 100dvh !important;
-        max-width: 100vw !important;
-        max-height: 100dvh !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-    }
-
-    .log-exporter-modal-header-bar {
-        padding: 14px 18px !important;
-        position: sticky;
-        top: 0;
-        z-index: 100;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .log-exporter-modal-header-bar .header-title {
-        font-size: 1.15em !important;
-        letter-spacing: -0.02em;
-    }
-
-    .mobile-preview-tab {
-        padding: 0;
-        overflow: hidden !important;
-    }
-    .mobile-preview-tab .desktop-preview-content {
-        height: 100%;
-        overflow: hidden !important;
-        padding: 0;
-    }
-    .mobile-preview-tab .desktop-preview-toolbar {
-        display: none !important;
-    }
-    .mobile-preview-tab .preview-scaled-stage {
-        margin-bottom: 110px;
-    }
-
-    /* Let every settings tab, including the lower image-export controls in
-       Advanced, scroll inside the full-screen mobile drawer. */
-    .mobile-settings-drawer .ant-drawer-body {
-        min-height: 0;
-        overflow: hidden;
-    }
-    .mobile-settings-drawer .ant-tabs {
-        height: 100%;
-        min-height: 0;
-    }
-    .mobile-settings-drawer .ant-tabs-nav {
-        flex-shrink: 0;
-    }
-    .mobile-settings-drawer .ant-tabs-content-holder {
-        min-height: 0;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Bottom dock action bar */
-    .mobile-action-bar {
-        position: fixed;
-        bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
-        max-width: calc(100vw - 32px);
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-        flex-shrink: 0;
-        z-index: 100;
-    }
-    .mobile-action-bar::-webkit-scrollbar {
-        display: none;
-    }
-    .mobile-action-bar .action-bar-content {
-        flex-wrap: nowrap;
-        width: max-content;
-        gap: 8px;
-    }
-    .mobile-action-bar .action-bar-group {
-        flex-shrink: 0;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
-        border-radius: 16px;
-        background: var(--bg-primary);
-    }
-    .mobile-action-bar .export-group button {
-        margin: 0 !important;
-    }
-    .mobile-action-bar .btn-save-img.desktop-btn-primary {
-        border-top-right-radius: 0 !important;
-        border-bottom-right-radius: 0 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
-        background: rgba(97, 175, 239, 0.15) !important;
-        color: #61afef !important;
-    }
-    .mobile-action-bar .btn-more.desktop-btn-secondary {
-        border-top-left-radius: 0 !important;
-        border-bottom-left-radius: 0 !important;
-        border-left: none !important;
-        min-width: 44px !important;
-        width: 44px !important;
-        background: rgba(97, 175, 239, 0.15) !important;
-        color: #61afef !important;
-    }
-    .mobile-action-bar .btn-save-img.desktop-btn-primary:hover,
-    .mobile-action-bar .btn-more.desktop-btn-secondary:hover {
-        background: rgba(97, 175, 239, 0.25) !important;
-    }
-    .mobile-action-bar .action-spacer {
-        display: none;
-    }
-    .mobile-action-bar button {
-        min-height: 64px;
-        min-width: 64px;
-        padding: 10px 14px;
-        border-radius: 16px;
-        font-size: 0.75em;
-        font-weight: 600;
-        border: none !important;
-        box-shadow: none !important;
-        flex-shrink: 0;
-        background: rgba(97, 175, 239, 0.1) !important;
-        flex-direction: column;
-        gap: 4px;
-        white-space: nowrap;
-    }
-    .mobile-action-bar .btn-icon {
-        font-size: 1.8em;
-        display: block;
-        line-height: 1;
-        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-    }
-    .mobile-action-bar .btn-text {
-        display: block;
-        font-size: 0.95em;
-        line-height: 1.2;
-        text-align: center;
-        color: var(--text-primary);
-    }
-
-    /* iOS auto-zoom prevention */
-    .log-exporter-modal input,
-    .log-exporter-modal select,
-    .log-exporter-modal textarea {
-        font-size: 16px !important;
-    }
-}
-
-/* Hide desktop floating bar on mobile/tablet */
-@media (max-width: 1024px) {
-    .desktop-floating-action-bar {
-        display: none !important;
-    }
-}
-
-/* ============================================
-   Progress overlay
-   ============================================ */
-
-.progress-overlay {
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.45);
-    z-index: 10002;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.progress-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 24px 32px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
-    min-width: 280px;
-    text-align: center;
-    animation: leZoomIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes leZoomIn {
-    from { opacity: 0; transform: scale(0.9); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.progress-card .progress-message {
-    font-size: 1.05em;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-}
-
-.progress-card .progress-count {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: var(--accent-primary);
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* GPU acceleration so spinners keep animating during heavy export */
-.progress-overlay .anticon-spin,
-.progress-overlay .anticon-loading,
-.progress-overlay .ant-spin,
-.progress-overlay .ant-spin-dot {
-    will-change: transform !important;
-    transform: translate3d(0, 0, 0) !important;
-    backface-visibility: hidden !important;
-}
-
-/* ============================================
-   Arca Helper Modal mobile
-   ============================================ */
-
-@media (max-width: 768px) {
-    .arca-helper-modal {
-        width: 100vw !important;
-        max-width: 100vw !important;
-        height: 100dvh !important;
-        max-height: 100dvh !important;
-        border-radius: 0 !important;
-    }
-}
-
-.arca-content-body {
-    flex: 1;
-    padding: 16px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.arca-helper-step {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.arca-instruction-card {
-    background: var(--bg-secondary);
-    padding: 16px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-}
-
-.arca-paste-area {
-    width: 100%;
-    font-family: monospace;
-}
-
-/* ============================================
-   Ant Design dark theme tuning
-   ============================================ */
-
-[data-theme="dark"] .ant-select,
-[data-theme="classic"] .ant-select {
-    text-align: left !important;
-}
-
-[data-theme="dark"] .ant-select-selector,
-[data-theme="classic"] .ant-select-selector {
-    background-color: var(--bg-secondary) !important;
-    border-color: var(--border-color) !important;
-    border-radius: 8px !important;
-    color: var(--text-primary) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-[data-theme="dark"] .ant-select-focused .ant-select-selector,
-[data-theme="classic"] .ant-select-focused .ant-select-selector {
-    border-color: var(--accent-primary) !important;
-    box-shadow: 0 0 0 2px rgba(97, 175, 239, 0.2) !important;
-}
-
-[data-theme="dark"] .ant-select-dropdown,
-[data-theme="classic"] .ant-select-dropdown {
-    background-color: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
-}
-
-[data-theme="dark"] .ant-select-item,
-[data-theme="classic"] .ant-select-item {
-    color: var(--text-secondary) !important;
-    transition: background-color 0.15s !important;
-    border-radius: 4px !important;
-    margin: 2px 4px !important;
-}
-
-[data-theme="dark"] .ant-select-item-option-selected,
-[data-theme="classic"] .ant-select-item-option-selected {
-    background-color: rgba(97, 175, 239, 0.15) !important;
-    color: var(--accent-primary) !important;
-    font-weight: 500 !important;
-}
-
-[data-theme="dark"] .ant-select-item-option-active,
-[data-theme="classic"] .ant-select-item-option-active {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-segmented,
-[data-theme="classic"] .ant-segmented {
-    background-color: var(--bg-secondary) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    padding: 2px !important;
-}
-
-[data-theme="dark"] .ant-segmented-item,
-[data-theme="classic"] .ant-segmented-item {
-    color: var(--text-secondary) !important;
-    transition: color 0.2s !important;
-}
-
-[data-theme="dark"] .ant-segmented-item-selected,
-[data-theme="classic"] .ant-segmented-item-selected {
-    background-color: var(--bg-tertiary) !important;
-    color: var(--accent-primary) !important;
-    border-radius: 6px !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
-}
-
-[data-theme="dark"] .ant-switch,
-[data-theme="classic"] .ant-switch {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-[data-theme="dark"] .ant-switch-checked,
-[data-theme="classic"] .ant-switch-checked {
-    background-color: var(--accent-primary) !important;
-}
-
-[data-theme="dark"] .ant-input-number,
-[data-theme="dark"] .ant-input,
-[data-theme="classic"] .ant-input-number,
-[data-theme="classic"] .ant-input {
-    background-color: var(--bg-secondary) !important;
-    border-color: var(--border-color) !important;
-    border-radius: 8px !important;
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-input-number-handler-wrap,
-[data-theme="classic"] .ant-input-number-handler-wrap {
-    background-color: var(--bg-tertiary) !important;
-    border-left: 1px solid var(--border-color) !important;
-}
-
-[data-theme="dark"] .ant-input-number-group-addon,
-[data-theme="classic"] .ant-input-number-group-addon {
-    background-color: var(--bg-tertiary) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-secondary) !important;
-    border-radius: 0 8px 8px 0 !important;
-}
-
-/* Dropdown menu */
-[data-theme="dark"] .ant-dropdown-menu,
-[data-theme="classic"] .ant-dropdown-menu {
-    background-color: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-    padding: 4px !important;
-}
-
-[data-theme="dark"] .ant-dropdown-menu-item,
-[data-theme="classic"] .ant-dropdown-menu-item {
-    color: var(--text-secondary) !important;
-    border-radius: 4px !important;
-    padding: 6px 12px !important;
-    margin: 2px 0 !important;
-    transition: all 0.15s !important;
-}
-
-[data-theme="dark"] .ant-dropdown-menu-item:hover,
-[data-theme="classic"] .ant-dropdown-menu-item:hover {
-    background-color: rgba(255, 255, 255, 0.05) !important;
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-dropdown-menu-item .anticon,
-[data-theme="classic"] .ant-dropdown-menu-item .anticon {
-    color: var(--accent-primary) !important;
-    margin-right: 8px !important;
-}
-
-/* Tabs */
-[data-theme="dark"] .ant-tabs,
-[data-theme="classic"] .ant-tabs {
-    color: var(--text-primary);
-}
-
-[data-theme="dark"] .ant-tabs-tab,
-[data-theme="classic"] .ant-tabs-tab {
-    color: var(--text-secondary) !important;
-}
-
-[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn,
-[data-theme="classic"] .ant-tabs-tab-active .ant-tabs-tab-btn {
-    color: var(--accent-primary) !important;
-}
-
-[data-theme="dark"] .ant-tabs-ink-bar,
-[data-theme="classic"] .ant-tabs-ink-bar {
-    background: var(--accent-primary) !important;
-}
-
-[data-theme="dark"] .ant-tabs-tab:hover,
-[data-theme="classic"] .ant-tabs-tab:hover {
-    color: var(--text-primary) !important;
-}
-
-/* Drawer */
-[data-theme="dark"] .ant-drawer-content,
-[data-theme="classic"] .ant-drawer-content {
-    background-color: var(--bg-secondary) !important;
-}
-
-[data-theme="dark"] .ant-drawer-header,
-[data-theme="classic"] .ant-drawer-header {
-    background-color: var(--bg-secondary) !important;
-    border-bottom: 1px solid var(--border-color) !important;
-}
-
-[data-theme="dark"] .ant-drawer-title,
-[data-theme="classic"] .ant-drawer-title {
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-drawer-close,
-[data-theme="classic"] .ant-drawer-close {
-    color: var(--text-secondary) !important;
-}
-
-/* Modal */
-[data-theme="dark"] .ant-modal-content,
-[data-theme="classic"] .ant-modal-content {
-    background-color: var(--bg-tertiary) !important;
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-modal-header,
-[data-theme="classic"] .ant-modal-header {
-    background-color: var(--bg-tertiary) !important;
-}
-
-[data-theme="dark"] .ant-modal-title,
-[data-theme="classic"] .ant-modal-title {
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-modal-close,
-[data-theme="classic"] .ant-modal-close {
-    color: var(--text-secondary) !important;
-}
-
-/* Collapse */
-[data-theme="dark"] .ant-collapse,
-[data-theme="classic"] .ant-collapse {
-    background: transparent !important;
-    border: none !important;
-}
-
-[data-theme="dark"] .ant-collapse-header,
-[data-theme="classic"] .ant-collapse-header {
-    color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .ant-collapse-content,
-[data-theme="classic"] .ant-collapse-content {
-    background: transparent !important;
-    color: var(--text-primary) !important;
-    border-top: 1px solid var(--border-color-light) !important;
-}
-
-/* ============================================
-   Export settings popover styling
-   ============================================ */
-.export-settings-popover .ant-popover-inner {
-    background-color: var(--bg-tertiary) !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-primary) !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-    padding: 12px 16px !important;
-}
-
-.export-settings-popover .ant-popover-title {
-    color: var(--text-white) !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    padding-bottom: 8px !important;
-    font-weight: 600 !important;
-}
-
-.export-settings-popover-content .tab-content {
-    padding: 8px 0px !important;
-}
-
-.export-settings-popover-content .setting-field {
-    margin-bottom: 12px;
-}
-
-.export-settings-popover-content .ant-segmented {
-    background: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-}
-
-.export-settings-popover-content .ant-segmented-item-selected {
-    background: var(--btn-secondary-bg) !important;
-    color: var(--accent-primary) !important;
-}
-
-.export-settings-popover-content .ant-select-selector {
-    background-color: var(--bg-primary) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-}
-
-.export-settings-popover-content textarea {
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border-color) !important;
-}
-
-.export-settings-popover-content textarea::placeholder {
-    color: var(--text-secondary) !important;
-    opacity: 0.5;
-}
-
-.export-settings-popover-content .ant-slider-rail {
-    background-color: var(--border-color) !important;
-}
-
-.export-settings-popover-content .ant-input-number {
-    background-color: var(--bg-primary) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-}
-
-.export-settings-popover-content .ant-input-number-input {
-    color: var(--text-primary) !important;
-}
-
-.export-settings-popover-content .ant-input {
-    background-color: var(--bg-primary) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-}
-
-.export-settings-popover-content .ant-divider {
-    border-top-color: var(--border-color) !important;
-}
-
-/* ============================================
-   Settings Collapse Accordion Styling
-   ============================================ */
-.settings-collapse-container .ant-collapse-item {
-    border-bottom: 1px solid var(--border-color-light) !important;
-    margin-bottom: 8px;
-}
-
-.settings-collapse-container .ant-collapse-item:last-child {
-    border-bottom: none !important;
-}
-
-.settings-collapse-container .ant-collapse-header {
-    padding: 12px 8px !important;
-    font-size: 1.05em;
-    background-color: var(--bg-primary) !important;
-    border-radius: 6px !important;
-    transition: background-color 0.2s ease;
-}
-
-.settings-collapse-container .ant-collapse-header:hover {
-    background-color: var(--bg-tertiary) !important;
-}
-
-.settings-collapse-container .ant-collapse-content-box {
-    padding: 16px 8px !important;
-    background-color: transparent !important;
-}
-
-/* Popover Content layout spacing */
-.export-style-settings-content .setting-field,
-.export-option-settings-content .setting-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-
-.export-style-settings-content .setting-field:last-child,
-.export-option-settings-content .setting-field:last-child {
-    margin-bottom: 0;
-}
-
-.export-style-settings-content textarea,
-.export-option-settings-content textarea {
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 0.9em;
-}
-
-.export-style-settings-content textarea:focus,
-.export-option-settings-content textarea:focus {
-    border-color: var(--accent-primary) !important;
-    outline: none;
+/* Desktop layout grid */
+@media (min-width: 1025px) {
+  .log-exporter-modal {
+    width: 92vw !important;
+    max-width: 1600px !important;
+    height: 90vh !important;
+  }
 }
 
-/* ============================================
-   Sidebar Toggle Handle Styling
-   ============================================ */
+/* Sidebar toggle handle */
 .sidebar-toggle-handle {
-    transition: background-color 0.15s ease, color 0.15s ease !important;
+  border: 1px solid var(--border) !important;
+  background-color: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.15s ease !important;
 }
 
 .sidebar-toggle-handle:hover {
-    background-color: var(--bg-tertiary) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border-color) !important;
-    transform: translateY(-50%) !important;
-    cursor: pointer;
+  color: var(--foreground) !important;
+  background-color: var(--secondary) !important;
+}
+
+/* Desktop Floating Action Bar (shadcn Dock & Unified Split Button) */
+.desktop-floating-action-bar {
+  position: absolute;
+  bottom: 20px;
+  right: 24px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  background: var(--card);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+.action-bar-group.export-group {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.desktop-floating-action-bar .action-bar-btn {
+  height: 32px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.desktop-floating-action-bar .btn-save-img.desktop-btn-primary {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-top-left-radius: 6px !important;
+  border-bottom-left-radius: 6px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  padding: 0 14px !important;
+}
+
+.desktop-floating-action-bar .btn-save-img.desktop-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.desktop-floating-action-bar .btn-more.desktop-btn-secondary {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-top-right-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+  width: 32px !important;
+  padding: 0 !important;
+}
+
+.desktop-floating-action-bar .btn-more.desktop-btn-secondary:hover {
+  opacity: 0.9;
+}
+
+/* Top Preview Toolbar */
+.desktop-preview-toolbar {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Progress Overlay - Guaranteed to show on top during image export */
+.progress-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 20000 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: leFadeIn 0.15s ease-out;
+}
+
+.progress-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  min-width: 280px;
+  text-align: center;
+}
+
+.progress-card .progress-message {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.progress-card .progress-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--muted);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+/* Scrollbars */
+.log-exporter-modal ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.log-exporter-modal ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.log-exporter-modal ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.log-exporter-modal ::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+.log-exporter-modal * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Popover, Dropdown, Select, Tooltip z-index Priority Overrides */
+.ant-dropdown,
+.ant-popover,
+.ant-select-dropdown,
+.ant-tooltip,
+.export-settings-popover {
+  z-index: 99999 !important;
+}
+
+.export-settings-popover .ant-popover-inner {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+  color: var(--foreground) !important;
+  padding: 12px !important;
+}
+
+.export-settings-popover .ant-popover-title {
+  color: var(--foreground) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding-bottom: 6px !important;
+}
+
+/* Mobile docked layout & Drawer tuning */
+@media (max-width: 1024px) {
+  .log-exporter-modal {
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  .mobile-preview-tab .desktop-preview-toolbar {
+    display: none !important;
+  }
+
+  .mobile-action-bar {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+    padding: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .mobile-settings-drawer .ant-drawer-body {
+    padding: 0 !important;
+    background: var(--background) !important;
+  }
 }

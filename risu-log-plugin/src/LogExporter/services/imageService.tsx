@@ -197,7 +197,7 @@ export const saveAsImage = async (
 
         const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
             onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 150));
             const safeCharName = charName.replace(/[/?%*:|"<>]/g, '-');
             const safeChatName = chatName.replace(/[/?%*:|"<>]/g, '-');
             const filename = totalParts > 1
@@ -314,7 +314,7 @@ export const saveAsImage = async (
         };
 
         onProgressStart('분할 이미지 계산 중...', 1);
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 150));
 
         if (!Array.isArray(nodes)) {
             const singleElement = nodes;
@@ -322,6 +322,7 @@ export const saveAsImage = async (
             const chunks = getChunks([singleElement], resolutionForChunking);
 
             onProgressStart(`이미지 생성 중...`, chunks.length);
+            await new Promise(resolve => setTimeout(resolve, 150));
             const { container, remove } = createOffscreenContainer();
 
             try {
@@ -340,6 +341,7 @@ export const saveAsImage = async (
                     finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
                     if (finalResolution !== oldRes) {
                         onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
+                        await new Promise(resolve => setTimeout(resolve, 100));
                     }
 
                     await waitForMedia(elementToRender);
@@ -359,13 +361,13 @@ export const saveAsImage = async (
             const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
             const chunks = getChunks(nodes, resolutionForChunking);
             onProgressStart(`이미지 생성 중...`, chunks.length);
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise(resolve => setTimeout(resolve, 150));
 
             for (let i = 0; i < chunks.length; i++) {
                 const chunk = chunks[i];
                 const chunkNodes = chunk.nodes;
                 onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
-                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(resolve => setTimeout(resolve, 150));
 
                 const globalSettings = await loadGlobalSettings();
                 await new Promise<void>(resolve => {

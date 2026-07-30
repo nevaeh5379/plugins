@@ -1,7 +1,5 @@
 import React from 'react';
-import { Switch, Typography } from 'antd';
-
-const { Text } = Typography;
+import { Switch } from 'antd';
 
 interface SettingToggleProps {
   label: string;
@@ -20,12 +18,12 @@ const SettingToggle: React.FC<SettingToggleProps> = ({
 }) => {
   const isChecked = defaultOn ? checked !== false : checked === true;
   return (
-    <div className="setting-toggle-row">
-      <div className="setting-toggle-info">
-        <Text className="setting-toggle-label">{label}</Text>
-        {description && <Text type="secondary" className="setting-toggle-desc">{description}</Text>}
+    <div className="setting-toggle-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '2px 0' }}>
+      <div className="setting-toggle-info" style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+        <span className="setting-toggle-label" style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>{label}</span>
+        {description && <span className="setting-toggle-desc" style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>{description}</span>}
       </div>
-      <Switch checked={isChecked} onChange={onChange} />
+      <Switch checked={isChecked} onChange={onChange} size="small" />
     </div>
   );
 };

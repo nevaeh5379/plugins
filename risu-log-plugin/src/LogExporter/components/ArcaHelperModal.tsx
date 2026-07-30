@@ -5,7 +5,7 @@ import { copyToClipboard } from '../services/fileService';
 import type { CharInfo, ArcaImage } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
 import { Modal, Steps, Button, Alert, Input, Spin } from 'antd';
-import { DownloadOutlined, FileAddOutlined, CopyOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Download, FilePlus, Copy, ArrowLeft } from 'lucide-react';
 
 interface ArcaHelperModalProps {
   isOpen: boolean;
@@ -275,7 +275,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
           <Button 
             key="zip" 
             type="primary" 
-            icon={<DownloadOutlined />} 
+            icon={<Download size={14} />} 
             onClick={generateInitialFiles} 
             loading={isProcessing}
           >
@@ -286,7 +286,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
           <Button 
             key="html" 
             type="primary" 
-            icon={<FileAddOutlined />} 
+            icon={<FilePlus size={14} />} 
             onClick={generateFinalHtml}
           >
             최종 HTML 생성
@@ -296,8 +296,8 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
           <Button 
             key="copy" 
             type="primary" 
-            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
-            icon={<CopyOutlined />} 
+            style={{ backgroundColor: '#22c55e', borderColor: '#22c55e', color: '#fff' }}
+            icon={<Copy size={14} />} 
             onClick={() => copyToClipboard(finalHtml)}
           >
             HTML 코드 복사
@@ -306,7 +306,7 @@ const ArcaHelperModal: React.FC<ArcaHelperModalProps> = ({ isOpen, onClose, mess
         step !== 'intro' && (
           <Button 
             key="restart" 
-            icon={<ArrowLeftOutlined />} 
+            icon={<ArrowLeft size={14} />} 
             onClick={handleRestart}
           >
             처음부터 다시

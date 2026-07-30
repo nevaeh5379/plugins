@@ -2,19 +2,19 @@
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { Button, Space, Spin, Popover, Segmented, Select, Input, Slider } from 'antd';
 import { 
-  FileTextOutlined, 
-  CodeOutlined, 
-  FileMarkdownOutlined, 
-  AlignLeftOutlined, 
-  BgColorsOutlined, 
-  EyeOutlined,
-  SkinOutlined,
-  LayoutOutlined,
-  PictureOutlined,
-  ZoomInOutlined,
-  ZoomOutOutlined,
-  CompressOutlined,
-} from '@ant-design/icons';
+  FileText, 
+  Code, 
+  FileCode, 
+  AlignLeft, 
+  Palette, 
+  Eye, 
+  Shirt, 
+  Layout, 
+  Image as ImageIcon, 
+  ZoomIn, 
+  ZoomOut, 
+  Minimize2 
+} from 'lucide-react';
 import LogContainer from './LogContainer';
 import type { LogContainerProps, ThemeInfo, ColorPalette } from '../../types';
 import { getLogHtml } from '../services/htmlGenerator';
@@ -184,7 +184,7 @@ const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children }) => {
         <Button
           size="small"
           type="text"
-          icon={<ZoomOutOutlined />}
+          icon={<ZoomOut size={13} />}
           aria-label="축소"
           title="축소"
           onClick={() => changeScale(scale - 0.1)}
@@ -201,7 +201,7 @@ const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children }) => {
         <Button
           size="small"
           type="text"
-          icon={<ZoomInOutlined />}
+          icon={<ZoomIn size={13} />}
           aria-label="확대"
           title="확대"
           onClick={() => changeScale(scale + 0.1)}
@@ -210,7 +210,7 @@ const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children }) => {
         <Button
           size="small"
           type="text"
-          icon={<CompressOutlined />}
+          icon={<Minimize2 size={13} />}
           aria-label="화면에 맞추기"
           title="화면에 맞추기"
           onClick={handleFit}
@@ -336,7 +336,28 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   const renderContent = () => {
     if (settings.rawHtmlView) {
-      return <textarea readOnly style={{width: '100%', height: '100%', whiteSpace: 'pre-wrap', wordWrap: 'break-word', backgroundColor: '#1a1b26', color: '#c0caf5', border: 'none'}} value={rawHtmlContent}></textarea>;
+      return (
+        <textarea
+          readOnly
+          style={{
+            width: '100%',
+            height: '100%',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            backgroundColor: 'var(--card)',
+            color: 'var(--foreground)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: '16px',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            boxSizing: 'border-box',
+            outline: 'none',
+            resize: 'none',
+          }}
+          value={rawHtmlContent}
+        />
+      );
     }
     if (isBasicFormat) {
       return (
@@ -645,7 +666,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                 {/* 2. 테마 설정 (출력 형식이 기본(basic)일 때만 표시) */}
                 {isBasicFormat && (
                   <Space size={4} align="center">
-                    <SkinOutlined style={{ color: 'var(--text-secondary)' }} title="테마 선택" />
+                    <span title="테마 선택"><Shirt size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.theme || 'basic'}
@@ -664,8 +685,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                         trigger="click"
                         placement="bottomRight"
                         overlayClassName="export-settings-popover"
+                        getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
                       >
-                        <Button size="small" icon={<CodeOutlined />} title="커스텀 CSS 편집">CSS</Button>
+                        <Button size="small" icon={<Code size={13} />} title="커스텀 CSS 편집">CSS</Button>
                       </Popover>
                     )}
                   </Space>
@@ -674,7 +696,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                 {/* 3. 색상 설정 */}
                 {isBasicFormat && (
                   <Space size={4} align="center">
-                    <BgColorsOutlined style={{ color: 'var(--text-secondary)' }} title="색상 선택" />
+                    <span title="색상 선택"><Palette size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.color || 'dark'}
@@ -692,7 +714,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                 {/* 4. 헤더 레이아웃 설정 */}
                 {isBasicFormat && (
                   <Space size={4} align="center">
-                    <LayoutOutlined style={{ color: 'var(--text-secondary)' }} title="헤더 레이아웃 선택" />
+                    <span title="헤더 레이아웃 선택"><Layout size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.headerLayout || 'default'}
@@ -710,7 +732,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                   </Space>
                 )}
 
-                {/* 5. 표시 옵션 Popover (기본 형식 및 HTML 형식 대응) */}
+                {/* 5. 표시 옵션 Popover */}
                 {(isBasicFormat || settings.format === 'html') && (
                   <Popover
                       content={displayOptionsContent}
@@ -718,10 +740,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       trigger="click"
                       placement="bottomRight"
                       overlayClassName="export-settings-popover"
+                      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
                   >
                       <Button 
                           size="small" 
-                          icon={<EyeOutlined />} 
+                          icon={<Eye size={13} />} 
                           title="상세 표시 옵션 변경"
                       >
                           옵션
@@ -729,7 +752,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                   </Popover>
                 )}
 
-                {/* 6. 이미지 설정 Popover (기본 형식 대응) */}
+                {/* 6. 이미지 설정 Popover */}
                 {isBasicFormat && (
                   <Popover
                       content={imageSettingsContent}
@@ -737,10 +760,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       trigger="click"
                       placement="bottomRight"
                       overlayClassName="export-settings-popover"
+                      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
                   >
                       <Button 
                           size="small" 
-                          icon={<PictureOutlined />} 
+                          icon={<ImageIcon size={13} />} 
                           title="상세 이미지 설정 변경"
                       >
                           이미지
@@ -749,27 +773,27 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                 )}
             </Space>
         </div>
-        <div className="desktop-preview-content" ref={previewContentRef} style={{ position: 'relative' }}>
+        <div className="desktop-preview-content" ref={previewContentRef} style={{ position: 'relative', height: 'calc(100% - 45px)' }}>
             {showSpinner && (
                 <div style={{
                     position: 'absolute',
                     top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(26, 27, 38, 0.7)',
+                    backgroundColor: 'rgba(9, 9, 11, 0.8)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 10,
-                    backdropFilter: 'blur(3px)',
+                    backdropFilter: 'blur(4px)',
                     gap: '12px',
                     borderRadius: '8px'
                 }}>
                     <Spin size="large" />
-                    <span style={{ color: '#c0caf5', fontSize: '14px', fontWeight: 500 }}>로딩 및 변환 중...</span>
+                    <span style={{ color: 'var(--foreground)', fontSize: '13px', fontWeight: 500 }}>로딩 및 변환 중...</span>
                 </div>
             )}
             <div className="log-exporter-modal-preview" style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-                {/* 출력 형식 토글 버튼을 absolute 플로팅으로 겹치게 배치 */}
+                {/* 출력 형식 토글 버튼 */}
                 <div className="preview-format-toggle-container" style={{
                     position: 'absolute',
                     top: '12px',
@@ -785,15 +809,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                         value={settings.format || 'basic'}
                         onChange={(val) => onSettingChange('format', val)}
                         options={[
-                          { label: '기본', value: 'basic', icon: <FileTextOutlined /> },
-                          { label: 'HTML', value: 'html', icon: <CodeOutlined /> },
-                          { label: '마크다운', value: 'markdown', icon: <FileMarkdownOutlined /> },
-                          { label: '텍스트', value: 'text', icon: <AlignLeftOutlined /> },
+                          { label: '기본', value: 'basic', icon: <FileText size={13} /> },
+                          { label: 'HTML', value: 'html', icon: <Code size={13} /> },
+                          { label: '마크다운', value: 'markdown', icon: <FileCode size={13} /> },
+                          { label: '텍스트', value: 'text', icon: <AlignLeft size={13} /> },
                         ]}
                     />
                 </div>
-                {/* 로그 본문 영역은 100% 채우되 상단 패딩을 주어 겹치게 설계 */}
-                <div className="preview-content-render-area" style={{ height: '100%', overflowY: 'auto', paddingTop: '52px', boxSizing: 'border-box' }}>
+                {/* 로그 본문 영역 */}
+                <div className="preview-content-render-area" style={{ height: '100%', width: '100%', overflow: 'hidden', position: 'relative', boxSizing: 'border-box' }}>
                     {renderContent()}
                 </div>
             </div>

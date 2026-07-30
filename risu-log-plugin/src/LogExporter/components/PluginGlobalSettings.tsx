@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
-import { Select, Input, Button, Tag, Divider, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-
-const { Title, Text } = Typography;
+import { Select, Input, Button } from 'antd';
+import { Palette, Sliders, Plus, X } from 'lucide-react';
 
 interface PluginGlobalSettingsProps {
   globalSettings: any;
@@ -45,18 +43,30 @@ const PluginGlobalSettings: React.FC<PluginGlobalSettingsProps> = ({
   };
 
   return (
-    <div className="tab-content">
-      {/* UI 테마 */}
-      <div className="tab-section">
-        <Title level={5} className="tab-section-title">UI 테마</Title>
-        <div className="setting-field">
-          <Text className="setting-field-label">모달 테마</Text>
+    <div className="tab-content" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* UI 테마 카드 */}
+      <div className="shadcn-card" style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Palette size={16} style={{ color: 'var(--foreground)' }} />
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>UI 테마</h4>
+        </div>
+
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>모달 테마</label>
           <Select
             value={uiTheme}
             onChange={(val) => onGlobalSettingChange('uiTheme', val)}
             style={{ width: '100%' }}
             options={[
-              { value: 'dark', label: '다크 모던' },
+              { value: 'dark', label: '다크 모던 (Zinc Slate)' },
               { value: 'classic', label: '클래식 다크' },
               { value: 'light', label: '라이트' },
             ]}
@@ -64,16 +74,28 @@ const PluginGlobalSettings: React.FC<PluginGlobalSettingsProps> = ({
         </div>
       </div>
 
-      <Divider />
+      {/* 커스텀 선택자 카드 */}
+      <div className="shadcn-card" style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sliders size={16} style={{ color: 'var(--foreground)' }} />
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>커스텀 선택자</h4>
+        </div>
 
-      {/* 커스텀 선택자 */}
-      <div className="tab-section">
-        <Title level={5} className="tab-section-title">커스텀 선택자</Title>
-
-        <div className="setting-field">
-          <Text className="setting-field-label">프로필 이미지 클래스</Text>
-          <Text type="secondary" style={{ fontSize: '0.85em' }}>프로필 이미지를 찾기 위한 CSS 클래스를 추가하세요</Text>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        {/* 프로필 이미지 클래스 */}
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>프로필 이미지 클래스</label>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-foreground)' }}>
+            프로필 이미지를 탐색하기 위한 추가 CSS 선택자
+          </p>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
             <Input
               value={newProfileClass}
               onChange={(e) => setNewProfileClass(e.target.value)}
@@ -81,21 +103,43 @@ const PluginGlobalSettings: React.FC<PluginGlobalSettingsProps> = ({
               onKeyDown={(e) => e.key === 'Enter' && handleAddProfileClass()}
               style={{ flex: 1 }}
             />
-            <Button icon={<PlusOutlined />} onClick={handleAddProfileClass}>추가</Button>
+            <Button icon={<Plus size={14} />} onClick={handleAddProfileClass}>추가</Button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
             {profileClasses.map((cls: string) => (
-              <Tag key={cls} closable onClose={() => handleRemoveProfileClass(cls)} style={{ fontFamily: 'monospace' }}>
+              <span
+                key={cls}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--muted)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                }}
+              >
                 {cls}
-              </Tag>
+                <X
+                  size={12}
+                  style={{ cursor: 'pointer', opacity: 0.7 }}
+                  onClick={() => handleRemoveProfileClass(cls)}
+                />
+              </span>
             ))}
           </div>
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">참가자 이름 클래스</Text>
-          <Text type="secondary" style={{ fontSize: '0.85em' }}>참가자 이름을 찾기 위한 CSS 클래스를 추가하세요</Text>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        {/* 참가자 이름 클래스 */}
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>참가자 이름 클래스</label>
+          <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-foreground)' }}>
+            참가자 이름을 탐색하기 위한 추가 CSS 선택자
+          </p>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
             <Input
               value={newParticipantNameClass}
               onChange={(e) => setNewParticipantNameClass(e.target.value)}
@@ -103,13 +147,32 @@ const PluginGlobalSettings: React.FC<PluginGlobalSettingsProps> = ({
               onKeyDown={(e) => e.key === 'Enter' && handleAddParticipantNameClass()}
               style={{ flex: 1 }}
             />
-            <Button icon={<PlusOutlined />} onClick={handleAddParticipantNameClass}>추가</Button>
+            <Button icon={<Plus size={14} />} onClick={handleAddParticipantNameClass}>추가</Button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
             {participantNameClasses.map((cls: string) => (
-              <Tag key={cls} closable onClose={() => handleRemoveParticipantNameClass(cls)} style={{ fontFamily: 'monospace' }}>
+              <span
+                key={cls}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--muted)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--foreground)',
+                }}
+              >
                 {cls}
-              </Tag>
+                <X
+                  size={12}
+                  style={{ cursor: 'pointer', opacity: 0.7 }}
+                  onClick={() => handleRemoveParticipantNameClass(cls)}
+                />
+              </span>
             ))}
           </div>
         </div>

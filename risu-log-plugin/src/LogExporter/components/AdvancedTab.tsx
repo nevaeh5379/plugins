@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect } from 'react';
-import { Select, InputNumber, Alert, Divider, Typography } from 'antd';
+import { Select, InputNumber, Alert } from 'antd';
+import { Monitor, Image as ImageIcon, Terminal, AlertTriangle } from 'lucide-react';
 import SettingToggle from './SettingToggle';
-
-const { Title, Text } = Typography;
 
 interface AdvancedTabProps {
   settings: any;
@@ -24,13 +23,24 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
   }, [settings.imageResolution, settings.maxImageHeight, maxAllowedHeight, onSettingChange]);
 
   return (
-    <div className="tab-content">
-      {/* 미리보기 */}
-      <div className="tab-section">
-        <Title level={5} className="tab-section-title">미리보기</Title>
+    <div className="tab-content" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 미리보기 카드 */}
+      <div className="shadcn-card" style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Monitor size={16} style={{ color: 'var(--foreground)' }} />
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>미리보기</h4>
+        </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">스케일 배율</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>스케일 배율</label>
           <InputNumber
             value={settings.htmlScaleFactor !== undefined ? settings.htmlScaleFactor : 1.0}
             onChange={(val) => onSettingChange('htmlScaleFactor', val)}
@@ -42,8 +52,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">스케일 모드</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>스케일 모드</label>
           <Select
             value={settings.htmlScaleMode || 'font'}
             onChange={(val) => onSettingChange('htmlScaleMode', val)}
@@ -55,8 +65,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">너비</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>너비</label>
           <InputNumber
             value={settings.previewWidth || 800}
             onChange={(val) => onSettingChange('previewWidth', val)}
@@ -69,23 +79,33 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         </div>
       </div>
 
-      <Divider />
-
-      {/* 이미지 내보내기 */}
-      <div className="tab-section">
-        <Title level={5} className="tab-section-title">이미지 내보내기</Title>
+      {/* 이미지 내보내기 카드 */}
+      <div className="shadcn-card" style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ImageIcon size={16} style={{ color: 'var(--foreground)' }} />
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>이미지 내보내기</h4>
+        </div>
 
         {imageSizeWarning && (
           <Alert
             message={imageSizeWarning}
             type="warning"
             showIcon
-            style={{ fontSize: '0.9em' }}
+            icon={<AlertTriangle size={15} />}
+            style={{ fontSize: '12px', borderRadius: 'var(--radius)' }}
           />
         )}
 
-        <div className="setting-field">
-          <Text className="setting-field-label">해상도</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>해상도</label>
           <Select
             value={settings.imageResolution || '1'}
             onChange={(val) => onSettingChange('imageResolution', val)}
@@ -105,8 +125,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">라이브러리</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>라이브러리</label>
           <Select
             value={settings.imageLibrary || 'html-to-image'}
             onChange={(val) => onSettingChange('imageLibrary', val)}
@@ -119,8 +139,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">포맷</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>포맷</label>
           <Select
             value={settings.imageFormat || 'png'}
             onChange={(val) => onSettingChange('imageFormat', val)}
@@ -133,8 +153,8 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
           />
         </div>
 
-        <div className="setting-field">
-          <Text className="setting-field-label">이미지 분할</Text>
+        <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>이미지 분할</label>
           <Select
             value={settings.splitImage || 'none'}
             onChange={(val) => onSettingChange('splitImage', val)}
@@ -148,9 +168,9 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         </div>
 
         {settings.splitImage && settings.splitImage !== 'none' && (
-          <div className="setting-subgroup">
-            <div className="setting-field">
-              <Text className="setting-field-label">최대 높이</Text>
+          <div className="setting-subgroup" style={{ paddingLeft: '12px', borderLeft: '2px solid var(--border)', marginTop: '4px' }}>
+            <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>최대 높이</label>
               <InputNumber
                 value={settings.maxImageHeight || 10000}
                 onChange={(val) => onSettingChange('maxImageHeight', val || 10000)}
@@ -165,11 +185,21 @@ const AdvancedTab: React.FC<AdvancedTabProps> = ({ settings, onSettingChange, im
         )}
       </div>
 
-      <Divider />
+      {/* 개발자 도구 카드 */}
+      <div className="shadcn-card" style={{
+        backgroundColor: 'var(--card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Terminal size={16} style={{ color: 'var(--foreground)' }} />
+          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>개발자 도구</h4>
+        </div>
 
-      {/* 개발자 도구 */}
-      <div className="tab-section">
-        <Title level={5} className="tab-section-title">개발자 도구</Title>
         <SettingToggle
           label="Raw HTML 보기"
           description="생성된 HTML 코드 직접 보기"
