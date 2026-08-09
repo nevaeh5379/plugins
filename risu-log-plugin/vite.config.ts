@@ -36,18 +36,25 @@ function prependMetadataPlugin(metadata: string): Plugin {
   }
 }
 
+// 테스트 모드(VITE_TEST_MODE=1)에서는 RisuAI 플러그인 메타데이터 주입 /
+// 단일 파일 번들링을 건너뛰고 일반 Vite 개발 서버로 동작합니다.
+// 진입 분기는 src/main.tsx 가 import.meta.env.VITE_TEST_MODE 로 처리합니다.
+const isTestMode = process.env.VITE_TEST_MODE === '1'
+
 export default defineConfig({
-  plugins: [
-    react(),
-    cssInjectedByJsPlugin(),
-    prependMetadataPlugin(PLUGIN_METADATA),
-  ],
-  build: {
+  plugins: isTestMode
+    ? [react()]
+    : [
+        react(),
+        cssInjectedByJsPlugin(),
+        prependMetadataPlugin(PLUGIN_METADATA),
+      ],
+  // 테스트 모드에서는 번들 빌드 설정 제외 (dev server 전용)
+  ...(isTestMode ? {} : { build: {
     rollupOptions: {
       output: {
         entryFileNames: `plugin.js`,
         assetFileNames: `[name].[ext]`,
-        // 청크 분할 비활성화 (단일 파일로 번들링)
         manualChunks: undefined,
         inlineDynamicImports: true,
       },
@@ -55,7 +62,7 @@ export default defineConfig({
     modulePreload: {
       polyfill: false
     },
-  },
+  }}),
   define: {
     '__NAME__': JSON.stringify('log-plugin'),
     '__DISPLAY_NAME__': JSON.stringify('LOG Plugin'),

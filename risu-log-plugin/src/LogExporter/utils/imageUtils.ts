@@ -18,6 +18,30 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   })
 }
 
+function dataUrlToBlob(dataUrl: string): Blob {
+    const commaIndex = dataUrl.indexOf(',');
+    if (commaIndex < 0) {
+        throw new Error('Invalid data URL');
+    }
+
+    const metadata = dataUrl.slice(5, commaIndex);
+    const encodedData = dataUrl.slice(commaIndex + 1);
+    const metadataParts = metadata.split(';');
+    const mimeType = metadataParts[0] || 'application/octet-stream';
+    const isBase64 = metadataParts.some((part) => part.toLowerCase() === 'base64');
+
+    if (!isBase64) {
+        return new Blob([decodeURIComponent(encodedData)], { type: mimeType });
+    }
+
+    const binary = atob(encodedData.replace(/\s/g, ''));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) {
+        bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mimeType });
+}
+
 /**
  * 헥스 문자열을 일반 문자열로 디코딩합니다.
  */
@@ -80,7 +104,17 @@ export function extractSwImageLocation(url: string): string | null {
  * Tauri asset, SW image, same-origin, 외부 URL을 모두 지원합니다.
  */
 export async function fetchToBlobNative(url: string): Promise<Blob> {
-    // 1. Tauri asset URL 처리
+    // 1. 이미 포함된 data/blob URL 처리
+    if (url.startsWith('data:')) {
+        return dataUrlToBlob(url);
+    }
+    if (url.startsWith('blob:')) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Blob URL fetch failed: ${response.status}`);
+        return response.blob();
+    }
+
+    // 2. Tauri asset URL 처리
     const isTauriAsset = url.startsWith('asset://') || url.includes('asset.localhost');
     if (isTauriAsset) {
         const loc = extractTauriAssetLocation(url);
@@ -91,14 +125,14 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
         throw new Error(`Failed to extract Tauri asset location: ${url}`);
     }
 
-    // 2. SW 이미지 URL 처리
+    // 3. SW 이미지 URL 처리
     const swLoc = extractSwImageLocation(url);
     if (swLoc) {
         console.log('[log plugin] SW image URL detected. Decoding key:', swLoc);
         return readAssetAsBlob(swLoc);
     }
 
-    // 3. Same-origin URL 처리
+    // 4. Same-origin URL 처리
     let parentHost = '';
     try {
         if (document.referrer) {
@@ -136,7 +170,7 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
         }
     }
 
-    // 4. 외부 URL — nativeFetch 사용
+    // 5. 외부 URL — nativeFetch 사용
     const res = await Risuai.nativeFetch(url, { method: 'GET' } as Record<string, unknown>);
     if (!res.ok) throw new Error(`nativeFetch failed: ${res.status} ${res.statusText} for ${url}`);
     return await res.blob();

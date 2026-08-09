@@ -1,7 +1,9 @@
 /* ============================================
    shadcn / UI Design System Tokens
    ============================================ */
-
+body {
+  margin: 0;
+}
 /* Dark Mode (Default Zinc/Slate) */
 [data-theme="dark"],
 [data-theme="classic"],
@@ -81,6 +83,24 @@
   --accent-secondary: #4f46e5;
 }
 
+.arca-instruction-card {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color)
+}
+
+.arcalive-method-button {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color)
+}
+
+.arcalive-method-button:hover {
+  background: var(--bg-tertiary);
+}
+
 /* Base Modal Reset & Keyframes */
 .log-exporter-modal-backdrop {
   position: fixed;
@@ -99,7 +119,9 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-white)
+}
 .log-exporter-modal {
   background-color: var(--background);
   color: var(--foreground);

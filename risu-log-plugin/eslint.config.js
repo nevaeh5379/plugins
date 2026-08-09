@@ -20,4 +20,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // 테스트 서버 진입점 — RisuAI API 모킹은 의도적으로 any 를 다수 사용.
+    // 빌드 산물(plugin.js)에서 제외되므로 린트 규칙을 완화합니다.
+    files: ['src/dev/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

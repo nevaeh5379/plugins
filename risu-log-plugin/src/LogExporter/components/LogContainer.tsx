@@ -127,8 +127,21 @@ const LogContainer: React.FC<LogContainerProps> = (props) => {
         setAllMessagesReady(true);
     } else {
         setAllMessagesReady(false);
+        // Export mode renders all messages at once. Each MessageRenderer calls
+        // onRendered via useMessageProcessor, but in some environments (e.g. headless
+        // / offscreen containers) useEffect timing can be unreliable. As a safety
+        // net, force allMessagesReady after a short delay if onRendered hasn't fired
+        // for every node.
+        if (isForImageExport || isForExport) {
+          const timer = setTimeout(() => {
+            if (renderedIndicesRef.current.size < nodes.length) {
+              setAllMessagesReady(true);
+            }
+          }, 2000);
+          return () => clearTimeout(timer);
+        }
     }
-  }, [nodes]);
+  }, [nodes, isForImageExport, isForExport]);
 
 
   useEffect(() => {

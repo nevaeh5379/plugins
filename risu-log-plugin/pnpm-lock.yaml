@@ -35,6 +35,9 @@ importers:
       jszip:
         specifier: ^3.10.1
         version: 3.10.1
+      lucide-react:
+        specifier: ^1.28.0
+        version: 1.28.0(react@19.2.0)
       pako:
         specifier: ^2.1.0
         version: 2.1.0
@@ -969,6 +972,7 @@ packages:
 
   '@zumer/snapdom@2.12.9':
     resolution: {integrity: sha512-Zufl1vEthT931kcZfmAaRSnucAGIRLGi9N6JI8ZsdyHww5hHHLk4t5LU1DxS5pNAPi1MptPHcGON1pkXEBf5iw==}
+    deprecated: Old versions have known fidelity bugs (text re-wrap, width freezing, KaTeX clipping). Upgrade to ^2.22 — drop-in for any 2.x. https://github.com/zumerlab/snapdom/releases
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1331,6 +1335,11 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-react@1.28.0:
+    resolution: {integrity: sha512-fARAFJULsGuDDydjp6+6blekG/sBIM29TerzLjc9bQUKAcEfrSc4ZQKb25KRz4OMKd87cZTb5dgq0w/T6KufVg==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   merge2@1.4.1:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
@@ -2919,6 +2928,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.28.0(react@19.2.0):
+    dependencies:
+      react: 19.2.0
 
   merge2@1.4.1: {}
 

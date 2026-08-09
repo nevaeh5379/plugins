@@ -976,7 +976,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
         <ArcaHelperModal
           isOpen={isArcaHelperOpen}
           onClose={() => setIsArcaHelperOpen(false)}
-          messageNodes={modalState.messageNodes}
+          messageNodes={nodesForExport as HTMLElement[]}
           charInfo={{
             name: modalState.charInfo.charName,
             chatName: modalState.charInfo.chatName,

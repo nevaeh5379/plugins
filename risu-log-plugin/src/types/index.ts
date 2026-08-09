@@ -119,6 +119,7 @@ export interface ArcaImage {
   url: string;
   filename: string;
   isWebM: boolean;
+  placeholder?: string;
 }
 
 export interface GlobalSettings {
