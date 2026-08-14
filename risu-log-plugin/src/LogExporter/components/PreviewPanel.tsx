@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react';
-import { Button, Space, Spin, Popover, Segmented, Select, Input, Slider } from 'antd';
+import { Button, Spin, Popover, Segmented, Select, Input, Slider } from '../../components/ui';
 import { 
   FileText, 
   Code, 
@@ -392,7 +392,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   );
 
   const displayOptionsContent = (
-    <div style={{ width: '320px', maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }} className="export-option-settings-content">
+    <div style={{ width: '290px', maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', padding: '2px 4px 16px 2px', boxSizing: 'border-box' }} className="export-option-settings-content">
       {isBasicFormat && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <SettingToggle
@@ -543,7 +543,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
   // 3. 이미지 설정 Popover 내용
   const imageSettingsContent = (
-    <div style={{ width: '320px', maxHeight: '60vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '4px' }} className="export-option-settings-content">
+    <div style={{ width: '290px', maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', padding: '2px 4px 16px 2px', boxSizing: 'border-box' }} className="export-option-settings-content">
       {isBasicFormat && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div className="setting-field">
@@ -653,26 +653,25 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
   return (
     <>
         <div className="desktop-preview-toolbar">
-            <Space className="desktop-selection-controls" size={6}>
+            <div className="desktop-selection-controls" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {settings.isEditable && (
                     <>
-                        <Button size="small" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</Button>
-                        <Button size="small" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</Button>
-                        <Button size="small" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</Button>
+                        <Button variant="outline" size="small" onClick={onSelectAll} title="모든 메시지 선택">전체 선택</Button>
+                        <Button variant="outline" size="small" onClick={onDeselectAll} title="모든 선택 해제">전체 해제</Button>
+                        <Button variant="outline" size="small" onClick={onInvertSelection} title="선택 상태 반전">선택 반전</Button>
                     </>
                 )}
-            </Space>
-            <Space size={6} className="desktop-export-controls">
+            </div>
+            <div className="desktop-export-controls" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 {/* 2. 테마 설정 (출력 형식이 기본(basic)일 때만 표시) */}
                 {isBasicFormat && (
-                  <Space size={4} align="center">
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <span title="테마 선택"><Shirt size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.theme || 'basic'}
                       onChange={(val) => onSettingChange('theme', val)}
                       style={{ width: '100px' }}
-                      popupMatchSelectWidth={false}
                     >
                       {Object.entries(themes).map(([key, theme]: [string, any]) =>
                         <Select.Option value={key} key={key}>{theme.name}</Select.Option>
@@ -683,44 +682,40 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                         content={customCssPopoverContent}
                         title="커스텀 CSS 편집"
                         trigger="click"
-                        placement="bottomRight"
-                        overlayClassName="export-settings-popover"
-                        getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
+                        placement="bottom"
                       >
-                        <Button size="small" icon={<Code size={13} />} title="커스텀 CSS 편집">CSS</Button>
+                        <Button variant="outline" size="small" icon={<Code size={13} />} title="커스텀 CSS 편집">CSS</Button>
                       </Popover>
                     )}
-                  </Space>
+                  </div>
                 )}
 
                 {/* 3. 색상 설정 */}
                 {isBasicFormat && (
-                  <Space size={4} align="center">
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <span title="색상 선택"><Palette size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.color || 'dark'}
                       onChange={(val) => onSettingChange('color', val)}
                       style={{ width: '90px' }}
-                      popupMatchSelectWidth={false}
                     >
                       {Object.entries(colors).map(([key, color]: [string, any]) =>
                         <Select.Option value={key} key={key}>{color.name}</Select.Option>
                       )}
                     </Select>
-                  </Space>
+                  </div>
                 )}
 
                 {/* 4. 헤더 레이아웃 설정 */}
                 {isBasicFormat && (
-                  <Space size={4} align="center">
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <span title="헤더 레이아웃 선택"><Layout size={14} style={{ color: 'var(--muted-foreground)' }} /></span>
                     <Select
                       size="small"
                       value={settings.headerLayout || 'default'}
                       onChange={(val) => onSettingChange('headerLayout', val)}
                       style={{ width: '100px' }}
-                      popupMatchSelectWidth={false}
                       options={[
                         { value: 'default', label: '기본' },
                         { value: 'compact', label: '컴팩트' },
@@ -729,7 +724,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                         { value: 'cover', label: '커버' },
                       ]}
                     />
-                  </Space>
+                  </div>
                 )}
 
                 {/* 5. 표시 옵션 Popover */}
@@ -739,10 +734,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       title="표시 옵션"
                       trigger="click"
                       placement="bottomRight"
-                      overlayClassName="export-settings-popover"
-                      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
                   >
                       <Button 
+                          variant="outline"
                           size="small" 
                           icon={<Eye size={13} />} 
                           title="상세 표시 옵션 변경"
@@ -759,10 +753,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       title="이미지 설정"
                       trigger="click"
                       placement="bottomRight"
-                      overlayClassName="export-settings-popover"
-                      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
                   >
                       <Button 
+                          variant="outline"
                           size="small" 
                           icon={<ImageIcon size={13} />} 
                           title="상세 이미지 설정 변경"
@@ -771,7 +764,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       </Button>
                   </Popover>
                 )}
-            </Space>
+            </div>
         </div>
         <div className="desktop-preview-content" ref={previewContentRef} style={{ position: 'relative', height: 'calc(100% - 45px)' }}>
             {showSpinner && (
@@ -805,7 +798,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
                     justifyContent: 'center',
                 }}>
                     <Segmented
-                        size="small"
                         value={settings.format || 'basic'}
                         onChange={(val) => onSettingChange('format', val)}
                         options={[

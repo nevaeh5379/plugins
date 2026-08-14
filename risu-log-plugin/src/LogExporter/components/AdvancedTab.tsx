@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect } from 'react';
-import { Select, InputNumber, Alert } from 'antd';
+import { Select, InputNumber, Alert } from '../../components/ui';
 import { Monitor, Image as ImageIcon, Terminal, AlertTriangle } from 'lucide-react';
 import SettingToggle from './SettingToggle';
 

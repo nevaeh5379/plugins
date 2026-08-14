@@ -44,6 +44,15 @@ body {
   --accent-secondary: #818cf8;
 }
 
+/* Enforce dark/light control tokens inside modal to prevent host app styles from forcing white background */
+.log-exporter-modal button:not(.desktop-btn-primary):not(.desktop-btn-danger):not(.preview-zoom-value),
+.log-exporter-modal [role="combobox"],
+.log-exporter-modal [role="option"] {
+  color: var(--foreground);
+  background-color: var(--card);
+  border-color: var(--border);
+}
+
 /* Light Mode */
 [data-theme="light"],
 .log-exporter-modal[data-theme="light"] {
@@ -390,12 +399,34 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Popover, Dropdown, Select, Tooltip z-index Priority Overrides */
+[data-radix-popper-content-wrapper],
 .ant-dropdown,
 .ant-popover,
 .ant-select-dropdown,
 .ant-tooltip,
 .export-settings-popover {
-  z-index: 99999 !important;
+  z-index: 100000 !important;
+}
+
+/* Ensure Radix DropdownMenu popup has solid dark card background, border, shadow, and clear text */
+[data-radix-popper-content-wrapper] [role="menu"],
+.log-exporter-modal [role="menu"],
+[role="menu"] {
+  background-color: var(--card, #18181b) !important;
+  color: var(--foreground, #f4f4f5) !important;
+  border: 1px solid var(--border, #27272a) !important;
+  border-radius: var(--radius, 8px) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+}
+
+[role="menuitem"] {
+  color: var(--foreground, #f4f4f5) !important;
+}
+
+[role="menuitem"]:hover,
+[role="menuitem"]:focus {
+  background-color: var(--secondary, #27272a) !important;
+  color: var(--foreground, #f4f4f5) !important;
 }
 
 .export-settings-popover .ant-popover-inner {

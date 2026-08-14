@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ReplacementRule } from '../../types';
-import { Input, Checkbox, Button, Switch } from 'antd';
+import { Input, Checkbox, Button, Switch } from '../../components/ui';
 import { Replace, ArrowRight, Plus, Trash2 } from 'lucide-react';
 
 interface ReplacementTabProps {

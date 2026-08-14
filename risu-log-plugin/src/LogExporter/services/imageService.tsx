@@ -13,7 +13,7 @@ import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
 import { imageUrlToBlob, fetchToBlobNative, hexToString } from '../utils/imageUtils';
 import { createOffscreenContainer } from '../utils/domUtils';
-import { message } from 'antd';
+import { message } from '../../components/ui';
 import {
     captureElementToBlob,
     createSectionWrapper,

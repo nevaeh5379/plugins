@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
-import { Select, Input, Button, message } from 'antd';
+import { Select, Input, Button, message } from '../../components/ui';
 import { Palette, Sliders, Plus, X, Server } from 'lucide-react';
 import {
   loadArcaProxyConfig,

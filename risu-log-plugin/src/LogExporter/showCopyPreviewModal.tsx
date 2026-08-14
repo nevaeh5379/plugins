@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
+import '../index.css';
 import './showCopyPreviewModal.css';
 import type { RisuCharacter } from '../types/risuai';
 import type { ColorPalette, GlobalSettings, LogContainerProps, ThemeInfo } from '../types';
-import { ConfigProvider, Spin, Button, Drawer, message } from 'antd';
+import { Spin, Button, Drawer, message, Toaster } from '../components/ui';
 import { Settings as SettingIcon, X, Pencil, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
 import SettingsTabs from './components/SettingsTabs';
@@ -473,7 +474,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
   const { settings, globalSettings, handleSettingChange, handleGlobalSettingChange } = useSettings(modalState.character);
 
   // ── Theme ──
-  const { uiTheme, colorPalette, backgroundColor, antdTheme, closedRef } = useTheme(settings, globalSettings);
+  const { uiTheme, colorPalette, backgroundColor, closedRef } = useTheme(settings, globalSettings);
 
   // ── Filtered Nodes ──
   const finalNodes = useFilteredNodes(
@@ -732,10 +733,8 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
   // ── Error View ──
   if (modalState.error) {
     return (
-      <ConfigProvider 
-        theme={antdTheme}
-        getPopupContainer={(node) => (node?.parentElement ? node.parentElement : (document.getElementById('log-exporter-react-modal-root') || document.body))}
-      >
+      <>
+        <Toaster />
         <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
           <div
             className="log-exporter-modal"
@@ -760,16 +759,14 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
             <Button type="primary" danger onClick={handleClose}>닫기</Button>
           </div>
         </div>
-      </ConfigProvider>
+      </>
     );
   }
 
   // ── Render ──
   return (
-    <ConfigProvider 
-      theme={antdTheme}
-      getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
-    >
+    <>
+      <Toaster />
       <div className="log-exporter-modal-backdrop" onClick={handleBackdropClick}>
         {!isArcaHelperOpen && (
           <div className="log-exporter-modal" data-theme={uiTheme} onClick={(e) => e.stopPropagation()}>
@@ -1014,7 +1011,7 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({ options = {
           colors={COLORS}
         />
       </Drawer>
-    </ConfigProvider>
+    </>
   );
 };
 

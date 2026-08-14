@@ -2,7 +2,7 @@
 import React from 'react';
 import type { UIClassInfo } from '../utils/domUtils';
 import { Users, EyeOff, Check } from 'lucide-react';
-import { Checkbox } from 'antd';
+import { Checkbox } from '../../components/ui';
 
 interface FilterTabProps {
   settings: any;

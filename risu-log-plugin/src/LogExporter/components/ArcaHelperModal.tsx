@@ -10,7 +10,7 @@ import {
   loadArcaProxyConfig,
   type ArcaProxyConfig,
 } from "../services/arcaProxyConfigService";
-import { Steps, Button, Alert, Input, Spin, Result } from "antd";
+import { Steps, Button, Alert, Input, Spin, Result } from "../../components/ui";
 import {
   Download,
   FilePlus,

@@ -3,8 +3,7 @@ import React from 'react';
 import { copyToClipboard, saveAsFile } from '../services/fileService';
 import { saveAsImage } from '../services/imageService';
 import { THEMES, COLORS } from './constants';
-import { Button, Dropdown, message } from 'antd';
-import type { MenuProps } from 'antd';
+import { Button, Dropdown, message, type MenuItem } from '../../components/ui';
 import {
   Image as ImageIcon,
   MoreHorizontal,
@@ -111,7 +110,7 @@ const Actionbar: React.FC<ActionbarProps> = ({
     }
   };
 
-  const exportMenuItems: MenuProps['items'] = [
+  const exportMenuItems: MenuItem[] = [
     {
       key: 'copy',
       label: 'HTML 복사',
@@ -162,7 +161,7 @@ const Actionbar: React.FC<ActionbarProps> = ({
     ] : [])
   ];
 
-  const handleMenuClick: MenuProps['onClick'] = (info) => {
+  const handleMenuClick = (info: { key: string }) => {
     if (info.key === 'copy') {
       handleCopyHtml();
     } else if (info.key === 'save-html') {
@@ -199,7 +198,6 @@ const Actionbar: React.FC<ActionbarProps> = ({
           menu={{ items: exportMenuItems, onClick: handleMenuClick }}
           placement="topRight"
           trigger={['click']}
-          getPopupContainer={() => document.getElementById('log-exporter-react-modal-root') || document.body}
         >
           <Button
             type="default"
@@ -237,4 +235,3 @@ const Actionbar: React.FC<ActionbarProps> = ({
 };
 
 export default Actionbar;
-

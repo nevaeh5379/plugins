@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { Select, Input } from 'antd';
+import { Select, Input } from '../../components/ui';
 import { Palette, Code, Info } from 'lucide-react';
 import type { ThemeInfo, ColorPalette } from '../../types';
 

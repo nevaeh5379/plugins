@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { Segmented, Select, Input, Slider, InputNumber, Divider, Typography } from 'antd';
+import { Segmented, Select, Input, Slider, InputNumber, Divider, Typography } from '../../components/ui';
 import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
-import { FileTextOutlined, CodeOutlined, FileMarkdownOutlined, AlignLeftOutlined } from '@ant-design/icons';
+import { FileText, Code, FileCode, AlignLeft } from 'lucide-react';
 import SettingToggle from './SettingToggle';
 
 const { Title, Text } = Typography;
@@ -24,10 +24,10 @@ const ExportTab: React.FC<ExportTabProps> = ({ settings, onSettingChange, themes
           value={settings.format || 'basic'}
           onChange={(val) => onSettingChange('format', val)}
           options={[
-            { label: '기본', value: 'basic', icon: <FileTextOutlined /> },
-            { label: 'HTML', value: 'html', icon: <CodeOutlined /> },
-            { label: '마크다운', value: 'markdown', icon: <FileMarkdownOutlined /> },
-            { label: '텍스트', value: 'text', icon: <AlignLeftOutlined /> },
+            { label: '기본', value: 'basic', icon: <FileText size={14} /> },
+            { label: 'HTML', value: 'html', icon: <Code size={14} /> },
+            { label: '마크다운', value: 'markdown', icon: <FileCode size={14} /> },
+            { label: '텍스트', value: 'text', icon: <AlignLeft size={14} /> },
           ]}
           block
         />

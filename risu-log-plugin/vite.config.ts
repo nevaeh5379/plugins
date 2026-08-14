@@ -36,15 +36,23 @@ function prependMetadataPlugin(metadata: string): Plugin {
   }
 }
 
+import tailwindcss from '@tailwindcss/vite'
+
 // 테스트 모드(VITE_TEST_MODE=1)에서는 RisuAI 플러그인 메타데이터 주입 /
 // 단일 파일 번들링을 건너뛰고 일반 Vite 개발 서버로 동작합니다.
 // 진입 분기는 src/main.tsx 가 import.meta.env.VITE_TEST_MODE 로 처리합니다.
 const isTestMode = process.env.VITE_TEST_MODE === '1'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   plugins: isTestMode
-    ? [react()]
+    ? [react(), tailwindcss()]
     : [
+        tailwindcss(),
         react(),
         cssInjectedByJsPlugin(),
         prependMetadataPlugin(PLUGIN_METADATA),
