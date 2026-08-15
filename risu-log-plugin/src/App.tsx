@@ -1,28 +1,77 @@
 // src/App.tsx
-import React, { useState } from 'react';
-import './App.css'; // 위에서 작성한 CSS 파일을 import
+import React, { useState, useCallback } from 'react';
+import './App.css';
 
-// 컴포넌트가 받을 props의 타입을 정의합니다. (닫기 함수)
-interface HelloPanelProps {
-  onClose: () => void;
+/**
+ * Props for the {@link HelloPanel} component.
+ */
+export interface HelloPanelProps {
+  /** Optional callback invoked when the user clicks the Close button. */
+  onClose?: () => void;
+  /** Panel heading text. Defaults to `"Hello, RisuAI!"`. */
+  title?: string;
+  /** Descriptive body text. Defaults to `"This panel is rendered by React."`. */
+  description?: string;
+  /** Initial counter value. Defaults to `0`. */
+  initialCount?: number;
+  /** Additional CSS class names to apply to the root container. */
+  className?: string;
+  /** Inline style overrides for the root container. */
+  style?: React.CSSProperties;
 }
 
-const HelloPanel: React.FC<HelloPanelProps> = ({ onClose }) => {
-  const [count, setCount] = useState(0);
+export type AppProps = HelloPanelProps;
+
+/**
+ * Starter / demo panel component used to verify React mounting
+ * and interactivity within RisuAI plugin environments or dev previews.
+ */
+export const HelloPanel: React.FC<HelloPanelProps> = ({
+  onClose,
+  title = 'Hello, RisuAI!',
+  description = 'This panel is rendered by React.',
+  initialCount = 0,
+  className = '',
+  style,
+}) => {
+  const [count, setCount] = useState<number>(initialCount);
+
+  const handleIncrement = useCallback(() => {
+    setCount((prev) => prev + 1);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    onClose?.();
+  }, [onClose]);
+
+  const containerClassName = className
+    ? `hello-panel ${className}`
+    : 'hello-panel';
 
   return (
-    <div className="hello-panel">
-      <h1>Hello, RisuAI!</h1>
-      <p>This panel is rendered by React.</p>
-      <p>Button clicked: {count} times</p>
-      <button onClick={() => setCount(count + 1)}>
+    <div
+      role="region"
+      aria-label={title}
+      className={containerClassName}
+      style={style}
+    >
+      <h1>{title}</h1>
+      <p>{description}</p>
+      <p aria-live="polite">Button clicked: {count} times</p>
+      <button type="button" onClick={handleIncrement}>
         Click Me!
       </button>
-      <button onClick={onClose} style={{ marginLeft: '10px' }}>
+      <button
+        type="button"
+        onClick={handleClose}
+        style={{ marginLeft: '10px' }}
+      >
         Close
       </button>
     </div>
   );
 };
+
+export const App = HelloPanel;
 
 export default HelloPanel;

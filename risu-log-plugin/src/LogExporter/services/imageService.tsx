@@ -1,12 +1,18 @@
-import type { ColorPalette } from '../../types';
-import type { LogExportSettings } from '../../types';
+import type {
+    ColorPalette,
+    ColorKey,
+    ThemeKey,
+    CharInfo,
+    GlobalSettings,
+    LogContainerProps,
+    LogExportSettings,
+} from '../../types';
 import JSZip from 'jszip';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import LogContainer from '../components/LogContainer';
 import { convertWebMToAnimatedWebP } from '../../services/webmConverter';
 import { getLogHtml } from './htmlGenerator';
 import { collectCharacterAvatars } from './avatarService';
-import type { CharInfo } from '../../types';
 import { loadGlobalSettings } from './settingsService';
 import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
@@ -23,37 +29,171 @@ import {
     type ImageFormat,
 } from '../utils/captureUtils';
 
-const waitForMedia = async (element: HTMLElement) => {
+// ============================================================================
+// Constants & Configuration
+// ============================================================================
+
+/** Maximum browser canvas/texture dimension limit in pixels */
+const BROWSER_MAX_HEIGHT = 16384;
+
+/** Default background color used when none is provided */
+const DEFAULT_BACKGROUND_COLOR = '#1a1b26';
+
+/** Default image export resolution multiplier */
+const DEFAULT_IMAGE_RESOLUTION = 1;
+
+/** Default maximum single image height in pixels before chunking */
+const DEFAULT_MAX_IMAGE_HEIGHT = 10000;
+
+/** Default container width used during offscreen chunk measurement */
+const DEFAULT_PREVIEW_WIDTH = 900;
+
+/** Base font size in pixels for scaling calculations */
+const DEFAULT_BASE_FONT_SIZE = 16;
+
+/** Maximum time (ms) to wait for images and videos in an element to load */
+const MEDIA_WAIT_TIMEOUT_MS = 5000;
+
+/** Delay (ms) for UI / progress transitions */
+const UI_TRANSITION_DELAY_MS = 150;
+
+/** Short delay (ms) before triggering download */
+const DOWNLOAD_PREPARATION_DELAY_MS = 50;
+
+/** Short delay (ms) after showing resolution warning */
+const WARNING_DISPLAY_DELAY_MS = 100;
+
+/** Regex pattern for stripping illegal filename characters across platforms */
+const FILENAME_SANITIZE_REGEX = /[/?%*:|"<>]/g;
+
+/** Regex pattern for validating decoded hex file extensions */
+const HEX_EXTENSION_REGEX = /^[a-z0-9]{1,5}$/i;
+
+// ============================================================================
+// General Helper Utilities
+// ============================================================================
+
+/**
+ * Delays execution for the specified number of milliseconds.
+ */
+const delay = (ms: number): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Sanitizes a string for use in safe file downloads.
+ */
+const sanitizeFilename = (name: string): string =>
+    name.replace(FILENAME_SANITIZE_REGEX, '-');
+
+/**
+ * Waits for all `<img>` and `<video>` media within an element to finish loading.
+ * Falls back to a timeout race to prevent indefinite blocking on broken assets.
+ */
+const waitForMedia = async (
+    element: HTMLElement,
+    timeoutMs = MEDIA_WAIT_TIMEOUT_MS
+): Promise<void> => {
     const images = Array.from(element.querySelectorAll('img'));
     const videos = Array.from(element.querySelectorAll('video'));
 
-    const promises = [
-        ...images.map(img => {
+    const promises: Promise<void>[] = [
+        ...images.map((img) => {
             if (img.complete) return Promise.resolve();
-            return new Promise<void>(resolve => {
+            return new Promise<void>((resolve) => {
                 img.onload = () => resolve();
                 img.onerror = () => resolve();
             });
         }),
-        ...videos.map(video => {
+        ...videos.map((video) => {
             if (video.readyState >= 2) return Promise.resolve();
-            return new Promise<void>(resolve => {
+            return new Promise<void>((resolve) => {
                 video.onloadeddata = () => resolve();
                 video.onerror = () => resolve();
             });
-        })
+        }),
     ];
 
     if (promises.length === 0) return;
 
     await Promise.race([
         Promise.all(promises),
-        new Promise(resolve => setTimeout(resolve, 5000)) // 5s timeout
+        delay(timeoutMs),
     ]);
 };
 
+// ============================================================================
+// Resolution & Scaling Utilities
+// ============================================================================
+
 /**
- * 분할된 섹션을 순회하며 캡처하는 공통 로직
+ * Automatically computes an optimal scale resolution multiplier based on element height.
+ */
+const computeAutoResolution = (height: number): number => {
+    if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) return 4;
+    if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) return 3;
+    if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) return 2;
+    return 1;
+};
+
+/**
+ * Clamps target resolution to prevent exceeding browser texture limit (BROWSER_MAX_HEIGHT).
+ */
+const clampResolution = (resolution: number, elementHeight: number): number => {
+    if (elementHeight * resolution > BROWSER_MAX_HEIGHT) {
+        const clamped = Math.floor(BROWSER_MAX_HEIGHT / elementHeight);
+        return Math.max(1, clamped);
+    }
+    return resolution;
+};
+
+interface ResolveResolutionParams {
+    imageResolutionSetting: number | 'auto';
+    elementHeight: number;
+    chunkIndex?: number;
+    totalChunks?: number;
+    onProgressUpdate: (update: { message?: string }) => void;
+}
+
+/**
+ * Determines effective capture resolution, applying auto-scaling and clamping with warnings if needed.
+ */
+const resolveEffectiveResolution = async ({
+    imageResolutionSetting,
+    elementHeight,
+    chunkIndex,
+    totalChunks,
+    onProgressUpdate,
+}: ResolveResolutionParams): Promise<number> => {
+    let resolution =
+        imageResolutionSetting === 'auto'
+            ? computeAutoResolution(elementHeight)
+            : imageResolutionSetting;
+
+    if (imageResolutionSetting === 'auto' && chunkIndex !== undefined && totalChunks !== undefined) {
+        onProgressUpdate({
+            message: `[${chunkIndex + 1}/${totalChunks}] 자동 해상도 결정: ${elementHeight}px -> ${resolution}x`,
+        });
+    }
+
+    const requestedRes = resolution;
+    resolution = clampResolution(resolution, elementHeight);
+
+    if (resolution !== requestedRes) {
+        onProgressUpdate({
+            message: `[경고] 해상도(${requestedRes}x)가 너무 높아 ${resolution}x로 자동 조정됨.`,
+        });
+        await delay(WARNING_DISPLAY_DELAY_MS);
+    }
+
+    return resolution;
+};
+
+// ============================================================================
+// Section Splitting & Binary Merging
+// ============================================================================
+
+/**
+ * Iterates across vertical sections of an element, rendering and capturing each to a Blob.
  */
 const forEachSection = async (
     element: HTMLElement,
@@ -82,7 +222,12 @@ const forEachSection = async (
             onProgressUpdate({ message: `[섹션 ${i + 1}/${numSections}] 캡처 중...` });
 
             const blob = await captureElementToBlob(
-                wrapper, format, imageLibrary, bgColor, resolution, preserveWebpAsset
+                wrapper,
+                format,
+                imageLibrary,
+                bgColor,
+                resolution,
+                preserveWebpAsset
             );
 
             console.log(`[Log Exporter] Section ${i + 1} captured: ${blob.type} (requested: image/${format})`);
@@ -91,8 +236,15 @@ const forEachSection = async (
     }
 };
 
-const mergeBlobsByFormat = async (blobs: Blob[], format: ImageFormat, onProgressUpdate: (update: { message?: string }) => void): Promise<Blob> => {
-    onProgressUpdate({ message: `이미지 병합 중...` });
+/**
+ * Merges an array of section Blobs into a single output image Blob using binary stitching.
+ */
+const mergeBlobsByFormat = async (
+    blobs: Blob[],
+    format: ImageFormat,
+    onProgressUpdate: (update: { message?: string }) => void
+): Promise<Blob> => {
+    onProgressUpdate({ message: '이미지 병합 중...' });
     if (format === 'png') {
         console.log('[Log Exporter] Using PNG binary merge (no Canvas!)');
         return await mergePNGsBinary(blobs);
@@ -106,7 +258,7 @@ const mergeBlobsByFormat = async (blobs: Blob[], format: ImageFormat, onProgress
 };
 
 /**
- * 큰 메시지를 분할하여 캡처한 후 하나의 이미지로 병합합니다.
+ * Splits a tall element vertically, captures slices, and stitches them into a single file.
  */
 const splitAndMergeAsOneFile = async (
     element: HTMLElement,
@@ -119,15 +271,23 @@ const splitAndMergeAsOneFile = async (
 ): Promise<Blob> => {
     const blobs: Blob[] = [];
     await forEachSection(
-        element, maxHeight, resolution, format, imageLibrary, bgColor, true,
+        element,
+        maxHeight,
+        resolution,
+        format,
+        imageLibrary,
+        bgColor,
+        true,
         onProgressUpdate,
-        async (blob) => { blobs.push(blob); }
+        async (blob) => {
+            blobs.push(blob);
+        }
     );
     return mergeBlobsByFormat(blobs, format, onProgressUpdate);
 };
 
 /**
- * 큰 메시지를 분할하여 여러 개의 개별 파일로 저장합니다.
+ * Splits a tall element vertically and triggers download for each slice as an independent file.
  */
 const splitAndSaveAsSeparateFiles = async (
     element: HTMLElement,
@@ -143,7 +303,13 @@ const splitAndSaveAsSeparateFiles = async (
     totalBaseParts: number
 ): Promise<void> => {
     await forEachSection(
-        element, maxHeight, resolution, format, imageLibrary, bgColor, false,
+        element,
+        maxHeight,
+        resolution,
+        format,
+        imageLibrary,
+        bgColor,
+        false,
         onProgressUpdate,
         async (blob, i, numSections) => {
             if (!blob) throw new Error('Failed to capture section');
@@ -157,19 +323,460 @@ const splitAndSaveAsSeparateFiles = async (
     );
 };
 
+// ============================================================================
+// Node Partitioning / Layout Chunking
+// ============================================================================
+
+interface ChunkPartition {
+    nodes: HTMLElement[];
+}
+
 /**
- * 요소 전체를 이미지로 캡처하여 Blob을 반환합니다.
+ * Groups DOM nodes into vertical chunks to stay under maximum canvas and export height limits.
  */
-const captureElement = async (
-    element: HTMLElement,
-    format: ImageFormat,
-    imageLibrary: ImageLibrary,
-    bgColor: string,
-    resolution: number
-): Promise<Blob> => {
-    return captureElementToBlob(element, format, imageLibrary, bgColor, resolution, false);
+const partitionNodesIntoChunks = (
+    nodesToChunk: HTMLElement[],
+    splitImage: LogExportSettings['splitImage'],
+    userMaxImageHeight: number,
+    resolutionForChunking: number,
+    previewWidth = DEFAULT_PREVIEW_WIDTH
+): ChunkPartition[] => {
+    const chunks: ChunkPartition[] = [];
+    const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
+    const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
+
+    if (splitImage === 'message') {
+        let currentChunk: HTMLElement[] = [];
+        let currentHeight = 0;
+        const { container: tempRenderDiv, remove: removeRenderDiv } = createOffscreenContainer(previewWidth);
+
+        try {
+            for (const node of nodesToChunk) {
+                const nodeClone = node.cloneNode(true) as HTMLElement;
+                tempRenderDiv.appendChild(nodeClone);
+                const nodeHeight = nodeClone.offsetHeight;
+                tempRenderDiv.removeChild(nodeClone);
+
+                if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
+                    chunks.push({ nodes: currentChunk });
+                    currentChunk = [node];
+                    currentHeight = nodeHeight;
+                } else {
+                    currentChunk.push(node);
+                    currentHeight += nodeHeight;
+                }
+            }
+            if (currentChunk.length > 0) {
+                chunks.push({ nodes: currentChunk });
+            }
+        } finally {
+            removeRenderDiv();
+        }
+    } else {
+        chunks.push({ nodes: nodesToChunk });
+    }
+
+    return chunks;
 };
 
+// ============================================================================
+// Single Element Capture & File Saving
+// ============================================================================
+
+interface RenderImageParams {
+    element: HTMLElement;
+    resolution: number;
+    partIndex: number;
+    totalParts: number;
+    charName: string;
+    chatName: string;
+    format: ImageFormat;
+    imageLibrary: ImageLibrary;
+    splitImage: LogExportSettings['splitImage'];
+    userMaxImageHeight: number;
+    bgColor: string;
+    onProgressUpdate: (update: { message?: string }) => void;
+}
+
+/**
+ * Handles capturing an element chunk (with optional splitting) and saving the final file.
+ */
+const saveElementAsImage = async ({
+    element,
+    resolution,
+    partIndex,
+    totalParts,
+    charName,
+    chatName,
+    format,
+    imageLibrary,
+    splitImage,
+    userMaxImageHeight,
+    bgColor,
+    onProgressUpdate,
+}: RenderImageParams): Promise<void> => {
+    onProgressUpdate({ message: `[${partIndex + 1}/${totalParts}] 이미지 데이터 생성 중...` });
+    await delay(UI_TRANSITION_DELAY_MS);
+
+    const safeCharName = sanitizeFilename(charName);
+    const safeChatName = sanitizeFilename(chatName);
+    const filename =
+        totalParts > 1
+            ? `Risu_Log_${safeCharName}_${safeChatName}_part${partIndex + 1}.${format}`
+            : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
+
+    try {
+        let blob: Blob | null = null;
+        const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
+        const isTooTall = element.offsetHeight > finalMaxHeight;
+
+        if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
+            if (splitImage === 'chunk') {
+                blob = await splitAndMergeAsOneFile(
+                    element,
+                    finalMaxHeight,
+                    resolution,
+                    format,
+                    imageLibrary,
+                    bgColor,
+                    onProgressUpdate
+                );
+            } else {
+                await splitAndSaveAsSeparateFiles(
+                    element,
+                    finalMaxHeight,
+                    resolution,
+                    format,
+                    imageLibrary,
+                    bgColor,
+                    onProgressUpdate,
+                    safeCharName,
+                    safeChatName,
+                    partIndex,
+                    totalParts
+                );
+                return;
+            }
+        } else {
+            blob = await captureElementToBlob(
+                element,
+                format,
+                imageLibrary,
+                bgColor,
+                resolution,
+                false
+            );
+        }
+
+        if (!blob) {
+            throw new Error('Failed to generate image blob.');
+        }
+
+        onProgressUpdate({ message: `[${partIndex + 1}/${totalParts}] 파일 다운로드 중...` });
+        await delay(DOWNLOAD_PREPARATION_DELAY_MS);
+
+        await downloadBlob(blob, filename);
+    } catch (error) {
+        console.error('Error saving image part:', error);
+        message.error(`이미지 파트 ${partIndex + 1} 저장 중 오류가 발생했습니다.`);
+    }
+};
+
+// ============================================================================
+// React LogContainer Props Builder & Offscreen Mounting
+// ============================================================================
+
+interface BuildLogContainerPropsParams {
+    chunkNodes: HTMLElement[];
+    charName: string;
+    chatName: string;
+    resolvedAvatarUrl: string;
+    resolvedBannerUrl: string;
+    globalSettings: GlobalSettings;
+    htmlOptions: Omit<
+        LogExportSettings,
+        'imageResolution' | 'imageLibrary' | 'splitImage' | 'maxImageHeight' | 'onProgressStart' | 'onProgressUpdate' | 'onProgressEnd'
+    >;
+}
+
+const buildLogContainerProps = ({
+    chunkNodes,
+    charName,
+    chatName,
+    resolvedAvatarUrl,
+    resolvedBannerUrl,
+    globalSettings,
+    htmlOptions,
+}: BuildLogContainerPropsParams): LogContainerProps => {
+    const fontSize =
+        htmlOptions.htmlScaleFactor !== undefined
+            ? DEFAULT_BASE_FONT_SIZE * Number(htmlOptions.htmlScaleFactor)
+            : Number(htmlOptions.previewFontSize || DEFAULT_BASE_FONT_SIZE);
+
+    return {
+        nodes: chunkNodes,
+        charInfo: {
+            name: charName,
+            chatName: chatName,
+            avatarUrl: resolvedAvatarUrl,
+        },
+        selectedThemeKey: htmlOptions.theme as ThemeKey | undefined,
+        selectedColorKey: htmlOptions.color as ColorKey | undefined,
+        color: htmlOptions.color as ColorPalette | undefined,
+        showAvatar: htmlOptions.showAvatar,
+        showHeader: htmlOptions.showHeader,
+        showHeaderIcon: htmlOptions.showHeaderIcon,
+        headerTags: htmlOptions.headerTags,
+        headerLayout: htmlOptions.headerLayout,
+        headerBannerUrl: resolvedBannerUrl,
+        headerBannerBlur: htmlOptions.headerBannerBlur,
+        headerBannerAlign: htmlOptions.headerBannerAlign,
+        showFooter: htmlOptions.showFooter,
+        footerLeft: htmlOptions.footerLeft,
+        footerCenter: htmlOptions.footerCenter,
+        footerRight: htmlOptions.footerRight,
+        showBubble: htmlOptions.showBubble,
+        embedImagesAsBlob: true,
+        globalSettings,
+        fontSize,
+        containerWidth: htmlOptions.previewWidth,
+        imageScale: Number(htmlOptions.imageScale),
+        imageAlign: htmlOptions.imageAlign,
+        imageStyle: htmlOptions.imageStyle,
+        imageCropActive: htmlOptions.imageCropActive,
+        imageCropAspectRatio: htmlOptions.imageCropAspectRatio,
+        imageCropVAlign: htmlOptions.imageCropVAlign,
+        imageCropHAlign: htmlOptions.imageCropHAlign,
+        imageCropHeight: htmlOptions.imageCropHeight,
+        disableAnimations: htmlOptions.disableAnimations,
+        isForArca: htmlOptions.isForArca,
+        allowHtmlRendering: htmlOptions.allowHtmlRendering,
+        avatarPosition: htmlOptions.avatarPosition,
+        avatarShape: htmlOptions.avatarShape,
+        isForImageExport: true,
+        replacementRules: htmlOptions.replacementRules,
+    };
+};
+
+/**
+ * Asynchronously mounts a LogContainer chunk into an offscreen container, resolving when onReady fires.
+ */
+const mountOffscreenLogContainer = (
+    container: HTMLElement,
+    props: LogContainerProps
+): Promise<{ root: Root; element: HTMLElement | null }> => {
+    return new Promise((resolve) => {
+        let rootInstance: Root | null = null;
+        const handleReady = () => {
+            if (rootInstance) {
+                resolve({
+                    root: rootInstance,
+                    element: container.firstChild as HTMLElement | null,
+                });
+            }
+        };
+
+        rootInstance = createRoot(container);
+        rootInstance.render(<LogContainer {...props} onReady={handleReady} />);
+    });
+};
+
+// ============================================================================
+// Single Element & Node Array Export Pipelines
+// ============================================================================
+
+const exportSingleElementPipeline = async (
+    singleElement: HTMLElement,
+    format: ImageFormat,
+    charName: string,
+    chatName: string,
+    options: LogExportSettings,
+    bgColor: string
+): Promise<void> => {
+    const {
+        imageResolution = DEFAULT_IMAGE_RESOLUTION,
+        imageLibrary = 'html-to-image',
+        splitImage = 'none',
+        maxImageHeight = DEFAULT_MAX_IMAGE_HEIGHT,
+        onProgressStart = () => {},
+        onProgressUpdate = () => {},
+        onProgressEnd = () => {},
+        previewWidth = DEFAULT_PREVIEW_WIDTH,
+    } = options;
+
+    const resolutionForChunking = imageResolution === 'auto' ? 1 : imageResolution;
+    const chunks = partitionNodesIntoChunks(
+        [singleElement],
+        splitImage,
+        maxImageHeight,
+        resolutionForChunking,
+        previewWidth
+    );
+
+    onProgressStart('이미지 생성 중...', chunks.length);
+    await delay(UI_TRANSITION_DELAY_MS);
+
+    const { container, remove } = createOffscreenContainer();
+
+    try {
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const elementToRender = chunk.nodes[0];
+
+            container.innerHTML = '';
+            container.appendChild(elementToRender);
+
+            const finalResolution = await resolveEffectiveResolution({
+                imageResolutionSetting: imageResolution,
+                elementHeight: elementToRender.offsetHeight,
+                onProgressUpdate,
+            });
+
+            await waitForMedia(elementToRender);
+            await saveElementAsImage({
+                element: elementToRender,
+                resolution: finalResolution,
+                partIndex: i,
+                totalParts: chunks.length,
+                charName,
+                chatName,
+                format,
+                imageLibrary,
+                splitImage,
+                userMaxImageHeight: maxImageHeight,
+                bgColor,
+                onProgressUpdate,
+            });
+        }
+    } finally {
+        onProgressEnd();
+        remove();
+    }
+};
+
+const exportNodeArrayPipeline = async (
+    nodes: HTMLElement[],
+    format: ImageFormat,
+    charName: string,
+    chatName: string,
+    options: LogExportSettings,
+    bgColor: string,
+    resolvedAvatarUrl: string,
+    resolvedBannerUrl: string
+): Promise<void> => {
+    const {
+        imageResolution = DEFAULT_IMAGE_RESOLUTION,
+        imageLibrary = 'html-to-image',
+        splitImage = 'none',
+        maxImageHeight = DEFAULT_MAX_IMAGE_HEIGHT,
+        onProgressStart = () => {},
+        onProgressUpdate = () => {},
+        onProgressEnd = () => {},
+        previewWidth = DEFAULT_PREVIEW_WIDTH,
+        ...htmlOptions
+    } = options;
+
+    const { container, remove } = createOffscreenContainer();
+    let currentRoot: Root | null = null;
+
+    try {
+        const resolutionForChunking = imageResolution === 'auto' ? 1 : imageResolution;
+        const chunks = partitionNodesIntoChunks(
+            nodes,
+            splitImage,
+            maxImageHeight,
+            resolutionForChunking,
+            previewWidth
+        );
+
+        onProgressStart('이미지 생성 중...', chunks.length);
+        await delay(UI_TRANSITION_DELAY_MS);
+
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const chunkNodes = chunk.nodes;
+
+            onProgressUpdate({
+                current: i + 1,
+                message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...`,
+            });
+            await delay(UI_TRANSITION_DELAY_MS);
+
+            const globalSettings = await loadGlobalSettings();
+            const props = buildLogContainerProps({
+                chunkNodes,
+                charName,
+                chatName,
+                resolvedAvatarUrl,
+                resolvedBannerUrl,
+                globalSettings,
+                htmlOptions,
+            });
+
+            const { root, element: elementToRender } = await mountOffscreenLogContainer(container, props);
+            currentRoot = root;
+
+            if (!elementToRender) {
+                currentRoot.unmount();
+                currentRoot = null;
+                continue;
+            }
+
+            const finalResolution = await resolveEffectiveResolution({
+                imageResolutionSetting: imageResolution,
+                elementHeight: elementToRender.offsetHeight,
+                chunkIndex: i,
+                totalChunks: chunks.length,
+                onProgressUpdate,
+            });
+
+            await waitForMedia(elementToRender);
+            await saveElementAsImage({
+                element: elementToRender,
+                resolution: finalResolution,
+                partIndex: i,
+                totalParts: chunks.length,
+                charName,
+                chatName,
+                format,
+                imageLibrary,
+                splitImage,
+                userMaxImageHeight: maxImageHeight,
+                bgColor,
+                onProgressUpdate,
+            });
+
+            currentRoot.unmount();
+            currentRoot = null;
+            container.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error preparing images:', error);
+        message.error('이미지 준비 중 오류가 발생했습니다.');
+    } finally {
+        if (currentRoot) {
+            try {
+                currentRoot.unmount();
+            } catch (e) {
+                console.error('Failed to unmount root in finally:', e);
+            }
+        }
+        onProgressEnd();
+        remove();
+    }
+};
+
+/**
+ * Saves chat log nodes or a rendered DOM element as image file(s).
+ * Supports single element export, chunked component rendering, auto-scaling, and binary stitching.
+ *
+ * @param nodes Single HTMLElement or array of message HTMLElements.
+ * @param format Image format ('png', 'jpeg', or 'webp').
+ * @param charName Character name for filename generation.
+ * @param chatName Chat title for filename generation.
+ * @param options Export and styling configuration options.
+ * @param backgroundColor Optional canvas background fill color.
+ */
 export const saveAsImage = async (
     nodes: HTMLElement[] | HTMLElement,
     format: ImageFormat,
@@ -177,307 +784,130 @@ export const saveAsImage = async (
     chatName: string,
     options: LogExportSettings,
     backgroundColor?: string
-) => {
+): Promise<void> => {
     try {
-        const {
-            imageResolution: initialImageResolution = 1,
-            imageLibrary = 'html-to-image',
-            splitImage = 'none',
-            maxImageHeight: userMaxImageHeight = 10000,
-            onProgressStart = () => {},
-            onProgressUpdate = () => {},
-            onProgressEnd = () => {},
-            ...htmlOptions
-        } = options;
-
-        const resolvedAvatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
-        const resolvedBannerUrl = htmlOptions.headerBannerUrl ? await imageUrlToBlob(htmlOptions.headerBannerUrl) : '';
-
-        const BROWSER_MAX_HEIGHT = 16384;
-
-        const renderImage = async (element: HTMLElement, resolution: number, part = 0, totalParts = 1) => {
-            onProgressUpdate({ message: `[${part + 1}/${totalParts}] 이미지 데이터 생성 중...` });
-            await new Promise(resolve => setTimeout(resolve, 150));
-            const safeCharName = charName.replace(/[/?%*:|"<>]/g, '-');
-            const safeChatName = chatName.replace(/[/?%*:|"<>]/g, '-');
-            const filename = totalParts > 1
-                ? `Risu_Log_${safeCharName}_${safeChatName}_part${part + 1}.${format}`
-                : `Risu_Log_${safeCharName}_${safeChatName}.${format}`;
-
-            const bgColor = backgroundColor || '#1a1b26';
-
-            try {
-                let blob: Blob | null = null;
-
-                const finalMaxHeight = Math.min(userMaxImageHeight, Math.floor(BROWSER_MAX_HEIGHT / resolution));
-                const isTooTall = element.offsetHeight > finalMaxHeight;
-
-                if (isTooTall && (splitImage === 'chunk' || splitImage === 'message')) {
-                    if (splitImage === 'chunk') {
-                        blob = await splitAndMergeAsOneFile(
-                            element,
-                            finalMaxHeight,
-                            resolution,
-                            format,
-                            imageLibrary as ImageLibrary,
-                            bgColor,
-                            onProgressUpdate
-                        );
-                    } else {
-                        await splitAndSaveAsSeparateFiles(
-                            element,
-                            finalMaxHeight,
-                            resolution,
-                            format,
-                            imageLibrary as ImageLibrary,
-                            bgColor,
-                            onProgressUpdate,
-                            safeCharName,
-                            safeChatName,
-                            part,
-                            totalParts
-                        );
-                        return;
-                    }
-                } else {
-                    blob = await captureElement(
-                        element,
-                        format,
-                        imageLibrary as ImageLibrary,
-                        bgColor,
-                        resolution
-                    );
-                }
-
-                if (!blob) {
-                    throw new Error('Failed to generate image blob.');
-                }
-
-                onProgressUpdate({ message: `[${part + 1}/${totalParts}] 파일 다운로드 중...` });
-                await new Promise(resolve => setTimeout(resolve, 50));
-
-                await downloadBlob(blob, filename);
-            } catch (error) {
-                console.error('Error saving image part:', error);
-                message.error(`이미지 파트 ${part + 1} 저장 중 오류가 발생했습니다.`);
-            }
-        };
-
-        const getChunks = (nodesToChunk: HTMLElement[], resolutionForChunking: number) => {
-            const chunks: { nodes: HTMLElement[] }[] = [];
-            const effectiveMaxHeight = Math.floor(BROWSER_MAX_HEIGHT / resolutionForChunking);
-            const maxNodeChunkHeight = Math.min(userMaxImageHeight, effectiveMaxHeight);
-
-            if (splitImage === 'message') {
-                let currentChunk: HTMLElement[] = [];
-                let currentHeight = 0;
-                const { container: tempRenderDiv, remove: removeRenderDiv } = createOffscreenContainer(htmlOptions.previewWidth || 900);
-
-                for (const node of nodesToChunk) {
-                    const nodeClone = node.cloneNode(true) as HTMLElement;
-                    tempRenderDiv.appendChild(nodeClone);
-                    const nodeHeight = nodeClone.offsetHeight;
-                    tempRenderDiv.removeChild(nodeClone);
-
-                    if (currentHeight + nodeHeight > maxNodeChunkHeight && currentChunk.length > 0) {
-                        chunks.push({ nodes: currentChunk });
-                        currentChunk = [node];
-                        currentHeight = nodeHeight;
-                    } else {
-                        currentChunk.push(node);
-                        currentHeight += nodeHeight;
-                    }
-                }
-                if (currentChunk.length > 0) {
-                    chunks.push({ nodes: currentChunk });
-                }
-                removeRenderDiv();
-            } else {
-                chunks.push({ nodes: nodesToChunk });
-            }
-            return chunks;
-        };
-
-        const computeAutoResolution = (height: number): number => {
-            if (height > 0 && height * 4 <= BROWSER_MAX_HEIGHT) return 4;
-            if (height > 0 && height * 3 <= BROWSER_MAX_HEIGHT) return 3;
-            if (height > 0 && height * 2 <= BROWSER_MAX_HEIGHT) return 2;
-            return 1;
-        };
-
-        const clampResolution = (resolution: number, elementHeight: number): number => {
-            if (elementHeight * resolution > BROWSER_MAX_HEIGHT) {
-                const clamped = Math.floor(BROWSER_MAX_HEIGHT / elementHeight);
-                return Math.max(1, clamped);
-            }
-            return resolution;
-        };
+        const { onProgressStart = () => {} } = options;
+        const bgColor = backgroundColor || DEFAULT_BACKGROUND_COLOR;
 
         onProgressStart('분할 이미지 계산 중...', 1);
-        await new Promise(resolve => setTimeout(resolve, 150));
+        await delay(UI_TRANSITION_DELAY_MS);
 
         if (!Array.isArray(nodes)) {
-            const singleElement = nodes;
-            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-            const chunks = getChunks([singleElement], resolutionForChunking);
-
-            onProgressStart(`이미지 생성 중...`, chunks.length);
-            await new Promise(resolve => setTimeout(resolve, 150));
-            const { container, remove } = createOffscreenContainer();
-
-            try {
-                for (let i = 0; i < chunks.length; i++) {
-                    const chunk = chunks[i];
-                    const elementToRender = chunk.nodes[0];
-
-                    container.innerHTML = '';
-                    container.appendChild(elementToRender);
-
-                    let finalResolution = initialImageResolution === 'auto'
-                        ? computeAutoResolution(elementToRender.offsetHeight)
-                        : (initialImageResolution as number);
-
-                    const oldRes = finalResolution;
-                    finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
-                    if (finalResolution !== oldRes) {
-                        onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-
-                    await waitForMedia(elementToRender);
-                    await renderImage(elementToRender, finalResolution, i, chunks.length);
-                }
-            } finally {
-                onProgressEnd();
-                remove();
-            }
+            await exportSingleElementPipeline(nodes, format, charName, chatName, options, bgColor);
             return;
         }
 
-        const { container, remove } = createOffscreenContainer();
-        let root: any = null;
+        const resolvedAvatarUrl = options.charAvatarUrl ? await imageUrlToBlob(options.charAvatarUrl) : '';
+        const resolvedBannerUrl = options.headerBannerUrl ? await imageUrlToBlob(options.headerBannerUrl) : '';
 
-        try {
-            const resolutionForChunking = initialImageResolution === 'auto' ? 1 : (initialImageResolution as number);
-            const chunks = getChunks(nodes, resolutionForChunking);
-            onProgressStart(`이미지 생성 중...`, chunks.length);
-            await new Promise(resolve => setTimeout(resolve, 150));
-
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
-                const chunkNodes = chunk.nodes;
-                onProgressUpdate({ current: i + 1, message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...` });
-                await new Promise(resolve => setTimeout(resolve, 150));
-
-                const globalSettings = await loadGlobalSettings();
-                await new Promise<void>(resolve => {
-                    const onReady = () => resolve();
-                    const props = {
-                        nodes: chunkNodes,
-                        charInfo: { name: charName, chatName: chatName, avatarUrl: resolvedAvatarUrl },
-                        selectedThemeKey: htmlOptions.theme as import("../../types").ThemeKey | undefined,
-                        selectedColorKey: htmlOptions.color as import("../../types").ColorKey | undefined,
-                        color: htmlOptions.color as ColorPalette | undefined,
-                        showAvatar: htmlOptions.showAvatar,
-                        showHeader: htmlOptions.showHeader,
-                        showHeaderIcon: htmlOptions.showHeaderIcon,
-                        headerTags: htmlOptions.headerTags,
-                        headerLayout: htmlOptions.headerLayout,
-                        headerBannerUrl: resolvedBannerUrl,
-                        headerBannerBlur: htmlOptions.headerBannerBlur,
-                        headerBannerAlign: htmlOptions.headerBannerAlign,
-                        showFooter: htmlOptions.showFooter,
-                        footerLeft: htmlOptions.footerLeft,
-                        footerCenter: htmlOptions.footerCenter,
-                        footerRight: htmlOptions.footerRight,
-                        showBubble: htmlOptions.showBubble,
-                        embedImagesAsBlob: true,
-                        globalSettings: globalSettings,
-                        onReady: onReady,
-                        fontSize: htmlOptions.htmlScaleFactor !== undefined ? 16 * Number(htmlOptions.htmlScaleFactor) : Number(htmlOptions.previewFontSize || 16),
-                        containerWidth: htmlOptions.previewWidth,
-                        imageScale: Number(htmlOptions.imageScale),
-                        imageAlign: htmlOptions.imageAlign,
-                        imageStyle: htmlOptions.imageStyle,
-                        imageCropActive: htmlOptions.imageCropActive,
-                        imageCropAspectRatio: htmlOptions.imageCropAspectRatio,
-                        imageCropVAlign: htmlOptions.imageCropVAlign,
-                        imageCropHAlign: htmlOptions.imageCropHAlign,
-                        imageCropHeight: htmlOptions.imageCropHeight,
-                        disableAnimations: htmlOptions.disableAnimations,
-                        isForArca: htmlOptions.isForArca,
-                        allowHtmlRendering: htmlOptions.allowHtmlRendering,
-                        avatarPosition: htmlOptions.avatarPosition,
-                        avatarShape: htmlOptions.avatarShape,
-                        isForImageExport: true,
-                        replacementRules: htmlOptions.replacementRules,
-                    };
-                    root = createRoot(container);
-                    root.render(<LogContainer {...props} />);
-                });
-
-                const elementToRender = container.firstChild as HTMLElement;
-                if (!elementToRender) continue;
-
-                let finalResolution = initialImageResolution === 'auto'
-                    ? computeAutoResolution(elementToRender.offsetHeight)
-                    : (initialImageResolution as number);
-
-                if (initialImageResolution === 'auto') {
-                    const height = elementToRender.offsetHeight;
-                    onProgressUpdate({ message: `[${i + 1}/${chunks.length}] 자동 해상도 결정: ${height}px -> ${finalResolution}x` });
-                }
-
-                const oldRes = finalResolution;
-                finalResolution = clampResolution(finalResolution, elementToRender.offsetHeight);
-                if (finalResolution !== oldRes) {
-                    onProgressUpdate({ message: `[경고] 해상도(${oldRes}x)가 너무 높아 ${finalResolution}x로 자동 조정됨.` });
-                }
-
-                await waitForMedia(elementToRender);
-                await renderImage(elementToRender, finalResolution, i, chunks.length);
-                if (root) {
-                    root.unmount();
-                    root = null;
-                }
-                container.innerHTML = '';
-            }
-        } catch (error) {
-            console.error('Error preparing images:', error);
-            message.error('이미지 준비 중 오류가 발생했습니다.');
-        } finally {
-            if (root) {
-                try {
-                    root.unmount();
-                } catch (e) {
-                    console.error('Failed to unmount root in finally:', e);
-                }
-            }
-            onProgressEnd();
-            remove();
-        }
+        await exportNodeArrayPipeline(
+            nodes,
+            format,
+            charName,
+            chatName,
+            options,
+            bgColor,
+            resolvedAvatarUrl,
+            resolvedBannerUrl
+        );
     } catch (e) {
         console.error('Error in saveAsImage:', e);
     }
 };
 
+// ============================================================================
+// Media ZIP Export Orchestration
+// ============================================================================
+
+/**
+ * Detects the file extension from a media URL or hex-encoded filename part.
+ */
+function detectMediaFileExtension(url: string, isVideo: boolean): string {
+    const urlPath = url.split(/[?#]/)[0] ?? '';
+    const filenamePart = urlPath.substring(urlPath.lastIndexOf('/') + 1);
+
+    // 1. Check for hex-encoded extension (e.g. "...2e706e67" where "2e" is ASCII for '.')
+    const hexDotIndex = filenamePart.lastIndexOf('2e');
+    if (hexDotIndex > 0) {
+        try {
+            const hexExt = filenamePart.substring(hexDotIndex + 2);
+            const decodedExt = hexToString(hexExt);
+            if (HEX_EXTENSION_REGEX.test(decodedExt)) {
+                return decodedExt;
+            }
+        } catch (e) {
+            console.warn('[Log Exporter] Failed to decode hex extension:', e);
+        }
+    }
+
+    // 2. Check standard dot extension in URL path
+    const lastDotIndex = urlPath.lastIndexOf('.');
+    if (lastDotIndex !== -1 && urlPath.length - lastDotIndex <= 6) {
+        return urlPath.substring(lastDotIndex + 1).toLowerCase();
+    }
+
+    // 3. Fallback default based on element type
+    console.error(`[Log Exporter] Could not find extension from URL, using default. URL: ${url}`);
+    return isVideo ? 'mp4' : 'png';
+}
+
+/**
+ * Checks whether a media URL or Blob represents WebM video.
+ */
+function isWebmMedia(url: string, blob: Blob): boolean {
+    const urlLower = url.toLowerCase();
+    const isWebMFromUrl = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
+    const isWebMFromMime = blob.type.includes('webm');
+    return isWebMFromUrl || isWebMFromMime;
+}
+
+/**
+ * Extracts the media source URL and media type from an image or video DOM element.
+ */
+function extractMediaSource(element: Element): { src: string; isVideo: boolean } | null {
+    if (element instanceof HTMLVideoElement || element.tagName === 'VIDEO') {
+        const videoEl = element as HTMLVideoElement;
+        const sourceEl = videoEl.querySelector('source');
+        const src = sourceEl?.src || videoEl.src;
+        return src ? { src, isVideo: true } : null;
+    }
+
+    if (element instanceof HTMLImageElement || element.tagName === 'IMG') {
+        const imgEl = element as HTMLImageElement;
+        return imgEl.src ? { src: imgEl.src, isVideo: false } : null;
+    }
+
+    return null;
+}
+
+/**
+ * Exports all images, videos, and avatars in a chat log as a zipped media archive.
+ *
+ * @param nodes Array of message DOM nodes to inspect for media.
+ * @param charInfo Character and chat metadata.
+ * @param sequentialNaming If true, extracts media sequentially from arca-formatted HTML.
+ * @param showAvatar If true, includes character avatars in the archive.
+ * @param convertWebM If true, converts WebM video assets to animated WebP format.
+ */
 export const downloadImagesAsZip = async (
     nodes: Element[],
     charInfo: CharInfo,
     sequentialNaming = false,
     showAvatar = true,
-    convertWebM = false,
-) => {
-    console.log(`[Log Exporter] downloadImagesAsZip: Media ZIP download started`);
+    convertWebM = false
+): Promise<void> => {
+    console.log('[Log Exporter] downloadImagesAsZip: Media ZIP download started');
     try {
         const zip = new JSZip();
         const mediaPromises: Promise<void>[] = [];
         let mediaCounter = 0;
         const addedUrls = new Set<string>();
 
-        const addMediaToZip = (el: HTMLImageElement | HTMLVideoElement) => {
-            const isVideo = el.tagName === 'VIDEO';
-            const src = isVideo ? (el.querySelector('source')?.src || el.src) : (el as HTMLImageElement).src;
+        const addMediaToZip = (element: Element) => {
+            const mediaSource = extractMediaSource(element);
+            if (!mediaSource) return;
+
+            const { src, isVideo } = mediaSource;
 
             if (!src || src.startsWith('data:')) return;
             if (!sequentialNaming && addedUrls.has(src)) return;
@@ -489,12 +919,7 @@ export const downloadImagesAsZip = async (
             mediaPromises.push(
                 fetchToBlobNative(src)
                     .then(async (blob) => {
-                        const urlLower = src.toLowerCase();
-                        const isWebMFromUrl = urlLower.includes('.webm') || urlLower.includes('2e7765626d');
-                        const isWebMFromMime = blob.type.includes('webm');
-                        const isWebM = isWebMFromUrl || isWebMFromMime;
-
-                        if (convertWebM && isVideo && isWebM) {
+                        if (convertWebM && isVideo && isWebmMedia(src, blob)) {
                             console.log(`[Log Exporter] WebM file detected, converting to WebP: ${baseFilename}`);
                             try {
                                 const file = new File([blob], 'video.webm', { type: 'video/webm' });
@@ -502,85 +927,62 @@ export const downloadImagesAsZip = async (
                                 zip.file(`${baseFilename}.webp`, webpBlob);
                                 return;
                             } catch (e) {
-                                console.error(`[Log Exporter] WebM conversion failed, saving original:`, e);
+                                console.error('[Log Exporter] WebM conversion failed, saving original:', e);
                             }
                         }
 
-                        let extension: string | null = null;
-                        const urlPath = src.split(/[?#]/)[0];
-                        const filenamePart = urlPath.substring(urlPath.lastIndexOf('/') + 1);
-
-                        const hexDotIndex = filenamePart.lastIndexOf('2e');
-                        if (hexDotIndex !== -1 && hexDotIndex > 0) {
-                            try {
-                                const hexExt = filenamePart.substring(hexDotIndex + 2);
-                                const decodedExt = hexToString(hexExt);
-                                if (decodedExt.match(/^[a-z0-9]{1,5}$/i)) {
-                                    extension = decodedExt;
-                                }
-                            } catch (e) {
-                                console.warn('Failed to decode hex extension', e);
-                            }
-                        }
-
-                        if (!extension) {
-                            const lastDotIndex = urlPath.lastIndexOf('.');
-                            if (lastDotIndex !== -1 && urlPath.length - lastDotIndex <= 5) {
-                                extension = urlPath.substring(lastDotIndex + 1).toLowerCase();
-                            }
-                        }
-
-                        if (!extension) {
-                            console.error(`Could not find extension from URL, using default. URL: ${src}`);
-                            extension = isVideo ? 'mp4' : 'png';
-                        }
-
+                        const extension = detectMediaFileExtension(src, isVideo);
                         const filename = `${baseFilename}.${extension}`;
                         zip.file(filename, blob);
                     })
-                    .catch(e => console.warn(`Failed to process/compress media: ${src}`, e))
+                    .catch((e) => console.warn(`Failed to process/compress media: ${src}`, e))
             );
         };
 
+        const globalSettings = await loadGlobalSettings();
+
         if (sequentialNaming) {
-            const globalSettings = await loadGlobalSettings();
             const baseHtml = await getLogHtml({
-                nodes: nodes,
-                charInfo: charInfo,
+                nodes,
+                charInfo,
                 selectedThemeKey: 'basic',
                 selectedColorKey: 'dark',
-                showAvatar: showAvatar,
+                showAvatar,
                 isForArca: true,
                 embedImagesAsBlob: false,
-                globalSettings: globalSettings,
+                globalSettings,
             });
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = baseHtml;
-            tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+            tempDiv.querySelectorAll('img, video').forEach(addMediaToZip);
         } else {
-            const globalSettings = await loadGlobalSettings();
-            const tempDiv = document.createElement('div');
             const html = await getLogHtml({
-                nodes: nodes,
-                charInfo: charInfo,
+                nodes,
+                charInfo,
                 selectedThemeKey: 'basic',
                 selectedColorKey: 'dark',
-                showAvatar: showAvatar,
+                showAvatar,
                 isForArca: false,
                 embedImagesAsBlob: false,
-                globalSettings: globalSettings,
+                globalSettings,
             });
+            const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
 
             if (showAvatar) {
-                const avatarMap = await collectCharacterAvatars(Array.from(tempDiv.children), charInfo.name, false, globalSettings);
+                const avatarMap = await collectCharacterAvatars(
+                    Array.from(tempDiv.children),
+                    charInfo.name,
+                    false,
+                    globalSettings
+                );
                 for (const avatarUrl of avatarMap.values()) {
                     const fakeImg = document.createElement('img');
                     fakeImg.src = avatarUrl;
                     addMediaToZip(fakeImg);
                 }
             }
-            tempDiv.querySelectorAll('img, video').forEach(el => addMediaToZip(el as HTMLImageElement | HTMLVideoElement));
+            tempDiv.querySelectorAll('img, video').forEach(addMediaToZip);
         }
 
         if (mediaPromises.length === 0) {
@@ -589,9 +991,9 @@ export const downloadImagesAsZip = async (
         }
 
         await Promise.all(mediaPromises);
-        const content = await zip.generateAsync({ type: "blob" });
-        const safeCharName = charInfo.name.replace(/[/?%*:|"<>]/g, '-');
-        const safeChatName = charInfo.chatName.replace(/[/?%*:|"<>]/g, '-');
+        const content = await zip.generateAsync({ type: 'blob' });
+        const safeCharName = sanitizeFilename(charInfo.name);
+        const safeChatName = sanitizeFilename(charInfo.chatName);
         const zipFilename = `Risu_Log_Media_${safeCharName}_${safeChatName}${sequentialNaming ? '_Arca' : ''}.zip`;
 
         await downloadBlob(content, zipFilename);

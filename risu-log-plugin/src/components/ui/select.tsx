@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, react-refresh/only-export-components */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown } from "lucide-react"
@@ -13,7 +13,7 @@ export interface SelectOption {
 export interface LegacySelectProps {
   value?: any
   onChange?: (value: any) => void
-  options?: SelectOption[]
+  options?: readonly SelectOption[] | SelectOption[]
   disabled?: boolean
   size?: 'small' | 'middle' | 'large' | 'sm' | 'default' | 'lg'
   popupMatchSelectWidth?: boolean
@@ -108,7 +108,7 @@ SelectItem.displayName = SelectPrimitive.Item.displayName
 
 const Select = React.forwardRef<HTMLDivElement, LegacySelectProps>(
   ({ value, onChange, options, disabled, style, className, placeholder = "선택...", children }, ref) => {
-    const parsedOptions: SelectOption[] = options || React.Children.toArray(children)
+    const parsedOptions: readonly SelectOption[] = options || React.Children.toArray(children)
       .filter((child): child is React.ReactElement<OptionProps> => React.isValidElement<OptionProps>(child))
       .map((child) => ({
         value: child.props.value,

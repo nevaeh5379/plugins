@@ -1,280 +1,688 @@
+/**
+ * PNG Binary Manipulation & Encoding Utilities
+ *
+ * Provides high-performance, canvas-free binary PNG decoding, filter reconstruction,
+ * vertical image merging, chunk generation, and metadata embedding (tEXt / iTXt).
+ */
+
 import pako from 'pako';
 
-// CRC32 계산 함수
-const crc32 = (data: Uint8Array): number => {
-    let crc = -1;
-    for (let i = 0; i < data.length; i++) {
-        crc = (crc >>> 8) ^ crc32Table[(crc ^ data[i]) & 0xFF];
-    }
-    return (crc ^ -1) >>> 0;
-};
+// ==========================================
+// Constants & Types
+// ==========================================
 
-// CRC32 테이블
-const crc32Table = (() => {
+/** Standard 8-byte PNG file magic header */
+export const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+/** PNG Color Type values defined in ISO/IEC 15948 */
+export const PNG_COLOR_TYPE = {
+    GRAYSCALE: 0,
+    RGB: 2,
+    INDEXED: 3,
+    GRAYSCALE_ALPHA: 4,
+    RGBA: 6,
+} as const;
+
+export type PngColorType = (typeof PNG_COLOR_TYPE)[keyof typeof PNG_COLOR_TYPE];
+
+/** PNG Scanline Filter Types */
+export const PNG_FILTER_TYPE = {
+    NONE: 0,
+    SUB: 1,
+    UP: 2,
+    AVERAGE: 3,
+    PAETH: 4,
+} as const;
+
+export type PngFilterType = (typeof PNG_FILTER_TYPE)[keyof typeof PNG_FILTER_TYPE];
+
+/** Parsed PNG Header (IHDR chunk data) */
+export interface PngIhdrInfo {
+    width: number;
+    height: number;
+    bitDepth: number;
+    colorType: number;
+    compression: number;
+    filter: number;
+    interlace: number;
+    bytesPerPixel: number;
+}
+
+/** Options for embedding internationalized text metadata (iTXt) */
+export interface InternationalTextOptions {
+    languageTag?: string;
+    translatedKeyword?: string;
+    compressed?: boolean;
+}
+
+// ==========================================
+// CRC32 Utilities
+// ==========================================
+
+/** Pre-computed CRC32 table for fast polynomial lookup */
+const CRC32_TABLE: Uint32Array = (() => {
     const table = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
         let c = i;
         for (let k = 0; k < 8; k++) {
             c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
         }
-        table[i] = c;
+        table[i] = c >>> 0;
     }
     return table;
 })();
 
-// PNG 청크 생성 함수
-const createPNGChunk = (type: string, data: Uint8Array): Uint8Array => {
-    const typeBytes = new TextEncoder().encode(type);
-    const chunk = new Uint8Array(4 + 4 + data.length + 4);
-    const view = new DataView(chunk.buffer);
-    
-    // Length
-    view.setUint32(0, data.length);
-    
-    // Type
-    chunk.set(typeBytes, 4);
-    
-    // Data
-    chunk.set(data, 8);
-    
-    // CRC
-    const crcData = new Uint8Array(4 + data.length);
-    crcData.set(typeBytes, 0);
-    crcData.set(data, 4);
-    view.setUint32(8 + data.length, crc32(crcData));
-    
-    return chunk;
-};
+/**
+ * Calculates standard IEEE 802.3 32-bit Cyclic Redundancy Check (CRC32).
+ *
+ * @param data Byte array over which CRC is calculated
+ * @returns 32-bit unsigned integer CRC value
+ */
+export function calculateCrc32(data: Uint8Array): number {
+    let crc = -1;
+    for (let i = 0; i < data.length; i++) {
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ data[i]) & 0xFF];
+    }
+    return (crc ^ -1) >>> 0;
+}
 
-// Paeth predictor 함수
-const paethPredictor = (a: number, b: number, c: number): number => {
+// ==========================================
+// PNG Chunk Creation & Manipulation
+// ==========================================
+
+/**
+ * Creates a raw binary PNG chunk: [Length (4B)][Type (4B)][Data (NB)][CRC (4B)].
+ *
+ * @param type 4-character ASCII chunk type (e.g., 'IHDR', 'IDAT', 'tEXt', 'IEND')
+ * @param data Byte buffer containing chunk payload
+ * @returns Complete encoded chunk byte array
+ */
+export function createPNGChunk(type: string, data: Uint8Array): Uint8Array {
+    if (type.length !== 4) {
+        throw new Error(`Invalid PNG chunk type: "${type}". Chunk types must be exactly 4 characters.`);
+    }
+
+    const typeEncoder = new TextEncoder();
+    const typeBytes = typeEncoder.encode(type);
+    const dataLength = data.length;
+    const chunkLength = 12 + dataLength; // 4 (length) + 4 (type) + dataLength + 4 (crc)
+
+    const chunk = new Uint8Array(chunkLength);
+    const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+    // 1. Chunk Length (4 bytes, Big-Endian)
+    view.setUint32(0, dataLength, false);
+
+    // 2. Chunk Type (4 bytes)
+    chunk.set(typeBytes, 4);
+
+    // 3. Chunk Data (N bytes)
+    if (dataLength > 0) {
+        chunk.set(data, 8);
+    }
+
+    // 4. CRC-32 (4 bytes, Big-Endian) computed over Type + Data
+    const crcTarget = chunk.subarray(4, 8 + dataLength);
+    const crc = calculateCrc32(crcTarget);
+    view.setUint32(8 + dataLength, crc, false);
+
+    return chunk;
+}
+
+/**
+ * Creates a PNG `tEXt` chunk for Latin-1 / UTF-8 key-value metadata.
+ *
+ * @param keyword Keyword descriptor (1-79 characters)
+ * @param text Text value associated with the keyword
+ */
+export function createPngTextChunk(keyword: string, text: string): Uint8Array {
+    const encoder = new TextEncoder();
+    const keywordBytes = encoder.encode(keyword);
+    const textBytes = encoder.encode(text);
+
+    // Layout: [Keyword][0x00 Null Separator][Text]
+    const payload = new Uint8Array(keywordBytes.length + 1 + textBytes.length);
+    payload.set(keywordBytes, 0);
+    payload[keywordBytes.length] = 0x00;
+    payload.set(textBytes, keywordBytes.length + 1);
+
+    return createPNGChunk('tEXt', payload);
+}
+
+/**
+ * Creates a PNG `iTXt` chunk for internationalized UTF-8 metadata.
+ *
+ * @param keyword Keyword descriptor (1-79 characters)
+ * @param text Text string (UTF-8)
+ * @param options Optional internationalization and compression settings
+ */
+export function createPngInternationalTextChunk(
+    keyword: string,
+    text: string,
+    options: InternationalTextOptions = {}
+): Uint8Array {
+    const encoder = new TextEncoder();
+    const keywordBytes = encoder.encode(keyword);
+    const langBytes = encoder.encode(options.languageTag ?? '');
+    const translatedKwBytes = encoder.encode(options.translatedKeyword ?? '');
+
+    const rawTextBytes = encoder.encode(text);
+    const isCompressed = Boolean(options.compressed);
+    const textPayload = isCompressed ? pako.deflate(rawTextBytes) : rawTextBytes;
+
+    // Layout: [Keyword]\0 [CompFlag:1B] [CompMethod:1B] [LangTag]\0 [TransKeyword]\0 [Text]
+    const payloadLength =
+        keywordBytes.length + 1 +
+        1 +
+        1 +
+        langBytes.length + 1 +
+        translatedKwBytes.length + 1 +
+        textPayload.length;
+
+    const payload = new Uint8Array(payloadLength);
+    let offset = 0;
+
+    payload.set(keywordBytes, offset);
+    offset += keywordBytes.length;
+    payload[offset++] = 0x00;
+
+    payload[offset++] = isCompressed ? 1 : 0;
+    payload[offset++] = 0; // Deflate compression method
+
+    payload.set(langBytes, offset);
+    offset += langBytes.length;
+    payload[offset++] = 0x00;
+
+    payload.set(translatedKwBytes, offset);
+    offset += translatedKwBytes.length;
+    payload[offset++] = 0x00;
+
+    payload.set(textPayload, offset);
+
+    return createPNGChunk('iTXt', payload);
+}
+
+/**
+ * Injects metadata key-value pairs as `tEXt` chunks into a PNG binary right after the IHDR chunk.
+ *
+ * @param pngBuffer Original PNG file buffer (ArrayBuffer or Uint8Array)
+ * @param metadata Key-value pairs of metadata to embed
+ * @returns New Uint8Array containing the PNG with embedded metadata
+ */
+export function embedPngMetadata(
+    pngBuffer: ArrayBuffer | Uint8Array,
+    metadata: Record<string, string>
+): Uint8Array {
+    const uint8 = pngBuffer instanceof Uint8Array ? pngBuffer : new Uint8Array(pngBuffer);
+    if (!isPng(uint8)) {
+        throw new Error('Cannot embed metadata: input is not a valid PNG.');
+    }
+
+    const entries = Object.entries(metadata);
+    if (entries.length === 0) {
+        return uint8;
+    }
+
+    const metadataChunks = entries.map(([key, value]) => createPngTextChunk(key, value));
+    const metadataTotalLength = metadataChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+
+    // PNG signature (8B) + IHDR chunk (12B + 13B = 25B) = 33B
+    const ihdrEndOffset = 8 + 25;
+    if (uint8.byteLength < ihdrEndOffset) {
+        throw new Error('Corrupted PNG: buffer smaller than PNG header.');
+    }
+
+    const result = new Uint8Array(uint8.byteLength + metadataTotalLength);
+
+    // Copy Signature + IHDR
+    result.set(uint8.subarray(0, ihdrEndOffset), 0);
+    let currentOffset = ihdrEndOffset;
+
+    // Insert metadata chunks
+    for (const chunk of metadataChunks) {
+        result.set(chunk, currentOffset);
+        currentOffset += chunk.byteLength;
+    }
+
+    // Copy remaining chunks (IDAT, IEND, etc.)
+    result.set(uint8.subarray(ihdrEndOffset), currentOffset);
+
+    return result;
+}
+
+/**
+ * Reads all `tEXt` key-value pairs from a PNG file buffer.
+ *
+ * @param buffer PNG file buffer
+ * @returns Record containing extracted metadata key-value pairs
+ */
+export function extractPngMetadata(buffer: ArrayBuffer | Uint8Array): Record<string, string> {
+    const uint8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    if (!isPng(uint8)) {
+        throw new Error('Cannot extract metadata: input is not a valid PNG.');
+    }
+
+    const view = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
+    const metadata: Record<string, string> = {};
+    const decoder = new TextDecoder('latin1');
+
+    let offset = 8; // Skip PNG signature
+    while (offset + 12 <= uint8.byteLength) {
+        const length = view.getUint32(offset, false);
+        const type = String.fromCharCode(
+            uint8[offset + 4],
+            uint8[offset + 5],
+            uint8[offset + 6],
+            uint8[offset + 7]
+        );
+
+        if (type === 'tEXt') {
+            const chunkData = uint8.subarray(offset + 8, offset + 8 + length);
+            const nullIndex = chunkData.indexOf(0x00);
+            if (nullIndex !== -1) {
+                const key = decoder.decode(chunkData.subarray(0, nullIndex));
+                const text = decoder.decode(chunkData.subarray(nullIndex + 1));
+                metadata[key] = text;
+            }
+        }
+
+        if (type === 'IEND') {
+            break;
+        }
+
+        offset += 12 + length;
+    }
+
+    return metadata;
+}
+
+// ==========================================
+// PNG Validation & Header Parsing
+// ==========================================
+
+/**
+ * Checks whether the given buffer starts with the standard 8-byte PNG signature.
+ */
+export function isPng(buffer: ArrayBuffer | Uint8Array): boolean {
+    const bytes = buffer instanceof Uint8Array
+        ? buffer
+        : new Uint8Array(buffer, 0, Math.min(buffer.byteLength, 8));
+
+    if (bytes.length < 8) return false;
+    for (let i = 0; i < 8; i++) {
+        if (bytes[i] !== PNG_SIGNATURE[i]) return false;
+    }
+    return true;
+}
+
+/**
+ * Calculates bytes per pixel for a given color type and bit depth.
+ */
+export function getBytesPerPixel(colorType: number, bitDepth: number): number {
+    switch (colorType) {
+        case PNG_COLOR_TYPE.GRAYSCALE:
+            return Math.max(1, Math.ceil(bitDepth / 8));
+        case PNG_COLOR_TYPE.RGB:
+            return Math.max(1, Math.ceil((bitDepth * 3) / 8));
+        case PNG_COLOR_TYPE.INDEXED:
+            return 1;
+        case PNG_COLOR_TYPE.GRAYSCALE_ALPHA:
+            return Math.max(1, Math.ceil((bitDepth * 2) / 8));
+        case PNG_COLOR_TYPE.RGBA:
+            return Math.max(1, Math.ceil((bitDepth * 4) / 8));
+        default:
+            return 4; // Fallback to RGBA 4bpp
+    }
+}
+
+/**
+ * Parses and validates the IHDR chunk from a PNG file buffer.
+ *
+ * @param buffer ArrayBuffer or Uint8Array of the PNG file
+ * @returns Parsed IHDR properties
+ */
+export function parsePngIhdr(buffer: ArrayBuffer | Uint8Array): PngIhdrInfo {
+    const uint8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+
+    if (uint8.byteLength < 33) {
+        throw new Error(`Invalid PNG: Buffer too small (${uint8.byteLength} bytes). Expected at least 33 bytes for header.`);
+    }
+
+    if (!isPng(uint8)) {
+        throw new Error('Invalid PNG: Missing valid 8-byte PNG signature.');
+    }
+
+    const view = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
+    const ihdrLength = view.getUint32(8, false);
+    const ihdrType = String.fromCharCode(uint8[12], uint8[13], uint8[14], uint8[15]);
+
+    if (ihdrType !== 'IHDR' || ihdrLength !== 13) {
+        throw new Error(`Invalid PNG: Expected IHDR chunk at offset 8, found "${ihdrType}" (length: ${ihdrLength}).`);
+    }
+
+    const width = view.getUint32(16, false);
+    const height = view.getUint32(20, false);
+    const bitDepth = uint8[24];
+    const colorType = uint8[25];
+    const compression = uint8[26];
+    const filter = uint8[27];
+    const interlace = uint8[28];
+
+    const bytesPerPixel = getBytesPerPixel(colorType, bitDepth);
+
+    return {
+        width,
+        height,
+        bitDepth,
+        colorType,
+        compression,
+        filter,
+        interlace,
+        bytesPerPixel,
+    };
+}
+
+// ==========================================
+// Scanline Filter Algorithms
+// ==========================================
+
+/**
+ * Computes the Paeth predictor value according to PNG specification RFC 2083.
+ *
+ * @param a Left pixel value
+ * @param b Above pixel value
+ * @param c Upper-left pixel value
+ */
+export function paethPredictor(a: number, b: number, c: number): number {
     const p = a + b - c;
     const pa = Math.abs(p - a);
     const pb = Math.abs(p - b);
     const pc = Math.abs(p - c);
+
     if (pa <= pb && pa <= pc) return a;
     if (pb <= pc) return b;
     return c;
-};
+}
 
-// PNG 파일을 바이너리 레벨에서 병합하는 함수
-export const mergePNGsBinary = async (
-    blobs: Blob[]
-): Promise<Blob> => {
-    // 모든 PNG Blob을 ArrayBuffer로 변환
-    const buffers = await Promise.all(blobs.map(blob => blob.arrayBuffer()));
-    
-    if (buffers.length === 0) throw new Error('No images to merge');
-    
-    // 첫 번째 이미지 정보 파싱
-    const firstView = new DataView(buffers[0]);
-    
-    // IHDR 파싱
-    const ihdrData = new Uint8Array(buffers[0], 16, 13);
-    const width = firstView.getUint32(16);
-    const bitDepth = ihdrData[8];
-    const colorType = ihdrData[9];
-    const compression = ihdrData[10];
-    const filter = ihdrData[11];
-    const interlace = ihdrData[12];
-    
-    // 각 픽셀의 바이트 수 계산
-    let bytesPerPixel = 0;
-    switch (colorType) {
-        case 0: bytesPerPixel = bitDepth / 8; break; // Grayscale
-        case 2: bytesPerPixel = (bitDepth / 8) * 3; break; // RGB
-        case 4: bytesPerPixel = (bitDepth / 8) * 2; break; // Grayscale + Alpha
-        case 6: bytesPerPixel = (bitDepth / 8) * 4; break; // RGBA
-        default: bytesPerPixel = 4; break;
-    }
-    
-    // 각 스캔라인의 바이트 수 (필터 바이트 포함)
-    const bytesPerScanline = 1 + (width * bytesPerPixel);
-    
-    console.log(`[PNG Merge] Width: ${width}, ColorType: ${colorType}, BitDepth: ${bitDepth}, BytesPerPixel: ${bytesPerPixel}, BytesPerScanline: ${bytesPerScanline}`);
-    
-    // PNG 필터 디코딩 함수
-    const decodePNGFilters = (data: Uint8Array, width: number, height: number, bpp: number): Uint8Array => {
-        const bytesPerLine = width * bpp;
-        const decoded = new Uint8Array(height * bytesPerLine);
-        
-        for (let y = 0; y < height; y++) {
-            const filterType = data[y * bytesPerScanline];
-            const scanlineStart = y * bytesPerScanline + 1; // 필터 바이트 건너뛰기
-            const scanline = data.subarray(scanlineStart, scanlineStart + bytesPerLine);
-            const decodedStart = y * bytesPerLine;
-            
-            if (filterType === 0) {
-                // None: 그대로 복사
+/**
+ * Reconstructs raw pixel data by decoding PNG scanline filters (None, Sub, Up, Average, Paeth).
+ *
+ * @param filteredData Decompressed raw filtered scanlines with leading filter byte per row
+ * @param width Image width in pixels
+ * @param height Image height in pixels
+ * @param bytesPerPixel Bytes per pixel (e.g. 4 for RGBA 8-bit)
+ * @returns Reconstructed raw pixel buffer without filter prefix bytes
+ */
+export function decodePngFilters(
+    filteredData: Uint8Array,
+    width: number,
+    height: number,
+    bytesPerPixel: number
+): Uint8Array {
+    const bytesPerLine = width * bytesPerPixel;
+    const bytesPerScanline = 1 + bytesPerLine;
+    const decoded = new Uint8Array(height * bytesPerLine);
+
+    for (let y = 0; y < height; y++) {
+        const filterType = filteredData[y * bytesPerScanline];
+        const scanlineStart = y * bytesPerScanline + 1; // Skip 1 filter byte
+        const scanline = filteredData.subarray(scanlineStart, scanlineStart + bytesPerLine);
+        const decodedStart = y * bytesPerLine;
+
+        switch (filterType) {
+            case PNG_FILTER_TYPE.NONE: {
                 decoded.set(scanline, decodedStart);
-            } else if (filterType === 1) {
-                // Sub: 왼쪽 픽셀 더하기
+                break;
+            }
+
+            case PNG_FILTER_TYPE.SUB: {
                 for (let x = 0; x < bytesPerLine; x++) {
-                    const left = x >= bpp ? decoded[decodedStart + x - bpp] : 0;
+                    const left = x >= bytesPerPixel ? decoded[decodedStart + x - bytesPerPixel] : 0;
                     decoded[decodedStart + x] = (scanline[x] + left) & 0xFF;
                 }
-            } else if (filterType === 2) {
-                // Up: 위 픽셀 더하기
+                break;
+            }
+
+            case PNG_FILTER_TYPE.UP: {
                 for (let x = 0; x < bytesPerLine; x++) {
                     const up = y > 0 ? decoded[decodedStart - bytesPerLine + x] : 0;
                     decoded[decodedStart + x] = (scanline[x] + up) & 0xFF;
                 }
-            } else if (filterType === 3) {
-                // Average: 왼쪽과 위의 평균 더하기
+                break;
+            }
+
+            case PNG_FILTER_TYPE.AVERAGE: {
                 for (let x = 0; x < bytesPerLine; x++) {
-                    const left = x >= bpp ? decoded[decodedStart + x - bpp] : 0;
+                    const left = x >= bytesPerPixel ? decoded[decodedStart + x - bytesPerPixel] : 0;
                     const up = y > 0 ? decoded[decodedStart - bytesPerLine + x] : 0;
                     decoded[decodedStart + x] = (scanline[x] + ((left + up) >> 1)) & 0xFF;
                 }
-            } else if (filterType === 4) {
-                // Paeth: Paeth predictor
+                break;
+            }
+
+            case PNG_FILTER_TYPE.PAETH: {
                 for (let x = 0; x < bytesPerLine; x++) {
-                    const left = x >= bpp ? decoded[decodedStart + x - bpp] : 0;
+                    const left = x >= bytesPerPixel ? decoded[decodedStart + x - bytesPerPixel] : 0;
                     const up = y > 0 ? decoded[decodedStart - bytesPerLine + x] : 0;
-                    const upLeft = (y > 0 && x >= bpp) ? decoded[decodedStart - bytesPerLine + x - bpp] : 0;
+                    const upLeft = (y > 0 && x >= bytesPerPixel)
+                        ? decoded[decodedStart - bytesPerLine + x - bytesPerPixel]
+                        : 0;
                     decoded[decodedStart + x] = (scanline[x] + paethPredictor(left, up, upLeft)) & 0xFF;
                 }
+                break;
             }
+
+            default:
+                throw new Error(`Unsupported PNG filter type (${filterType}) at scanline ${y}.`);
         }
-        
-        return decoded;
-    };
-    
-    // 필터 없이 인코딩 (모든 스캔라인에 필터 타입 0 추가)
-    const encodePNGWithNoFilter = (pixelData: Uint8Array, width: number, height: number, bpp: number): Uint8Array => {
-        const bytesPerLine = width * bpp;
-        const encoded = new Uint8Array(height * (1 + bytesPerLine));
-        
-        for (let y = 0; y < height; y++) {
-            encoded[y * (1 + bytesPerLine)] = 0; // 필터 타입 0 (None)
-            const srcStart = y * bytesPerLine;
-            const dstStart = y * (1 + bytesPerLine) + 1;
-            encoded.set(pixelData.subarray(srcStart, srcStart + bytesPerLine), dstStart);
+    }
+
+    return decoded;
+}
+
+/**
+ * Encodes raw pixel data by prepending Filter 0 (None) to each scanline.
+ *
+ * @param pixelData Raw uncompressed pixel buffer
+ * @param width Image width in pixels
+ * @param height Image height in pixels
+ * @param bytesPerPixel Bytes per pixel
+ * @returns Scanline-encoded byte array ready for zlib compression
+ */
+export function encodePngWithNoFilter(
+    pixelData: Uint8Array,
+    width: number,
+    height: number,
+    bytesPerPixel: number
+): Uint8Array {
+    const bytesPerLine = width * bytesPerPixel;
+    const scanlineLength = 1 + bytesPerLine;
+    const encoded = new Uint8Array(height * scanlineLength);
+
+    for (let y = 0; y < height; y++) {
+        const dstOffset = y * scanlineLength;
+        encoded[dstOffset] = PNG_FILTER_TYPE.NONE; // Filter type 0 (None)
+
+        const srcStart = y * bytesPerLine;
+        encoded.set(pixelData.subarray(srcStart, srcStart + bytesPerLine), dstOffset + 1);
+    }
+
+    return encoded;
+}
+
+// ==========================================
+// Binary Extraction Helpers
+// ==========================================
+
+/**
+ * Extracts all IDAT chunk payloads from a PNG buffer.
+ */
+export function extractIdatChunks(buffer: ArrayBuffer | Uint8Array): Uint8Array[] {
+    const uint8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    const view = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
+    const idatChunks: Uint8Array[] = [];
+
+    let offset = 8; // Skip 8-byte PNG signature
+    while (offset + 12 <= uint8.byteLength) {
+        const length = view.getUint32(offset, false);
+        const type = String.fromCharCode(
+            uint8[offset + 4],
+            uint8[offset + 5],
+            uint8[offset + 6],
+            uint8[offset + 7]
+        );
+
+        if (type === 'IDAT') {
+            const chunkData = uint8.subarray(offset + 8, offset + 8 + length);
+            idatChunks.push(chunkData);
         }
-        
-        return encoded;
-    };
-    
-    // 모든 이미지의 압축 해제된 픽셀 데이터 수집
+
+        if (type === 'IEND') {
+            break;
+        }
+
+        offset += 12 + length;
+    }
+
+    return idatChunks;
+}
+
+/**
+ * Concatenates an array of byte arrays into a single contiguous Uint8Array.
+ */
+export function combineByteArrays(arrays: Uint8Array[]): Uint8Array {
+    const totalLength = arrays.reduce((sum, arr) => sum + arr.byteLength, 0);
+    const combined = new Uint8Array(totalLength);
+    let currentOffset = 0;
+
+    for (const arr of arrays) {
+        combined.set(arr, currentOffset);
+        currentOffset += arr.byteLength;
+    }
+
+    return combined;
+}
+
+// ==========================================
+// Core Export: Vertical Binary PNG Merge
+// ==========================================
+
+/**
+ * Merges multiple PNG images vertically directly at the binary level without HTML Canvas.
+ *
+ * Stacking images via binary filter reconstruction bypasses browser Canvas memory limits,
+ * supports arbitrary pixel heights, and preserves original image fidelity.
+ *
+ * @param blobs Array of PNG Blob objects to merge vertically
+ * @returns Single merged PNG Blob
+ */
+export const mergePNGsBinary = async (
+    blobs: Blob[]
+): Promise<Blob> => {
+    if (blobs.length === 0) {
+        throw new Error('No images to merge');
+    }
+
+    // Convert all PNG blobs to ArrayBuffers concurrently
+    const buffers = await Promise.all(blobs.map(blob => blob.arrayBuffer()));
+
+    // Parse header and layout specifications from the first image
+    const firstHeader = parsePngIhdr(buffers[0]);
+    const { width, bitDepth, colorType, compression, filter, interlace, bytesPerPixel } = firstHeader;
+    const bytesPerScanline = 1 + (width * bytesPerPixel);
+
+    console.log(
+        `[PNG Merge] Merging ${buffers.length} images. Width: ${width}, ColorType: ${colorType}, ` +
+        `BitDepth: ${bitDepth}, BytesPerPixel: ${bytesPerPixel}, BytesPerScanline: ${bytesPerScanline}`
+    );
+
     const allDecodedPixels: Uint8Array[] = [];
     let totalHeight = 0;
-    
+
     for (let imgIdx = 0; imgIdx < buffers.length; imgIdx++) {
         const buffer = buffers[imgIdx];
-        const view = new DataView(buffer);
-        
-        // 현재 이미지 높이
-        const imgHeight = view.getUint32(20);
-        totalHeight += imgHeight;
-        
-        console.log(`[PNG Merge] Image ${imgIdx + 1}: height=${imgHeight}`);
-        
-        // IDAT 청크들 수집
-        let offset = 8; // PNG 서명 건너뛰기
-        const idatChunks: Uint8Array[] = [];
-        
-        while (offset < buffer.byteLength) {
-            const length = view.getUint32(offset);
-            const type = String.fromCharCode(...new Uint8Array(buffer, offset + 4, 4));
-            
-            if (type === 'IDAT') {
-                const chunkData = new Uint8Array(buffer, offset + 8, length);
-                idatChunks.push(chunkData);
-            }
-            
-            if (type === 'IEND') break;
-            
-            offset += 12 + length;
+        const header = parsePngIhdr(buffer);
+
+        if (header.width !== width) {
+            console.warn(
+                `[PNG Merge] Image ${imgIdx + 1} width (${header.width}) does not match first image width (${width}).`
+            );
         }
-        
-        // IDAT 데이터 합치기
-        const totalIDATLength = idatChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-        const combinedIDAT = new Uint8Array(totalIDATLength);
-        let pos = 0;
-        for (const chunk of idatChunks) {
-            combinedIDAT.set(chunk, pos);
-            pos += chunk.length;
+
+        totalHeight += header.height;
+        console.log(`[PNG Merge] Image ${imgIdx + 1}: height=${header.height}`);
+
+        const idatChunks = extractIdatChunks(buffer);
+        if (idatChunks.length === 0) {
+            throw new Error(`[PNG Merge] Image ${imgIdx + 1} contains no IDAT chunks.`);
         }
-        
-        // zlib 압축 해제
+
+        const combinedIdat = combineByteArrays(idatChunks);
+
         try {
-            const inflated = pako.inflate(combinedIDAT);
+            const inflated = pako.inflate(combinedIdat);
             if (!inflated) {
-                throw new Error(`pako.inflate returned undefined. combinedIDAT length: ${combinedIDAT.length}`);
+                throw new Error(`pako.inflate returned empty data for image ${imgIdx + 1}.`);
             }
-            
-            // 데이터 크기 검증
-            const expectedSize = imgHeight * bytesPerScanline;
+
+            const expectedSize = header.height * bytesPerScanline;
             if (inflated.length !== expectedSize) {
-                console.warn(`[PNG Merge] Image ${imgIdx + 1}: Expected ${expectedSize} bytes, got ${inflated.length} bytes`);
+                console.warn(
+                    `[PNG Merge] Image ${imgIdx + 1}: Expected ${expectedSize} bytes, got ${inflated.length} bytes`
+                );
             }
-            
-            // PNG 필터 디코딩 (필터 바이트 제거하고 원본 픽셀로 복원)
+
             console.log(`[PNG Merge] Decoding filters for image ${imgIdx + 1}...`);
-            const decodedPixels = decodePNGFilters(inflated, width, imgHeight, bytesPerPixel);
+            const decodedPixels = decodePngFilters(inflated, width, header.height, bytesPerPixel);
             allDecodedPixels.push(decodedPixels);
-            
-        } catch (e) {
-            console.error(`[PNG Merge] Failed to inflate image ${imgIdx + 1}:`, e);
-            throw e;
+        } catch (error) {
+            console.error(`[PNG Merge] Failed to inflate/decode image ${imgIdx + 1}:`, error);
+            throw error;
         }
     }
-    
-    // 모든 디코딩된 픽셀 데이터를 하나로 합치기
-    const totalPixelDataLength = allDecodedPixels.reduce((sum, data) => sum + data.length, 0);
-    const mergedPixelData = new Uint8Array(totalPixelDataLength);
-    let currentPos = 0;
-    
-    console.log(`[PNG Merge] Total height: ${totalHeight}, Total pixel data length: ${totalPixelDataLength}`);
-    
-    for (let i = 0; i < allDecodedPixels.length; i++) {
-        const pixelData = allDecodedPixels[i];
-        mergedPixelData.set(pixelData, currentPos);
-        currentPos += pixelData.length;
-        console.log(`[PNG Merge] Merged decoded pixels ${i + 1}: ${pixelData.length} bytes at offset ${currentPos - pixelData.length}`);
-    }
-    
-    // 필터 없이 다시 인코딩 (모든 스캔라인에 필터 타입 0 추가)
+
+    // Concatenate all decoded pixel arrays
+    const mergedPixelData = combineByteArrays(allDecodedPixels);
+    console.log(`[PNG Merge] Total height: ${totalHeight}, Total raw pixel bytes: ${mergedPixelData.byteLength}`);
+
+    // Encode scanlines with Filter 0 (None)
     console.log(`[PNG Merge] Encoding with no filter...`);
-    const encodedData = encodePNGWithNoFilter(mergedPixelData, width, totalHeight, bytesPerPixel);
-    
-    // zlib로 다시 압축
+    const encodedData = encodePngWithNoFilter(mergedPixelData, width, totalHeight, bytesPerPixel);
+
+    // Compress raw scanlines with zlib deflate level 9
     console.log(`[PNG Merge] Compressing merged data (${encodedData.length} bytes)...`);
     const compressed = pako.deflate(encodedData, { level: 9 });
     console.log(`[PNG Merge] Compressed size: ${compressed.length} bytes`);
-    
-    // 새 PNG 파일 생성
-    const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
-    
-    // 새 IHDR 생성 (높이만 변경)
-    const newIHDR = new Uint8Array(13);
-    const ihdrView = new DataView(newIHDR.buffer);
-    ihdrView.setUint32(0, width);
-    ihdrView.setUint32(4, totalHeight);
-    newIHDR[8] = bitDepth;
-    newIHDR[9] = colorType;
-    newIHDR[10] = compression;
-    newIHDR[11] = filter;
-    newIHDR[12] = interlace;
-    
-    const ihdrChunk = createPNGChunk('IHDR', newIHDR);
+
+    // Build new IHDR chunk with updated totalHeight
+    const newIhdrData = new Uint8Array(13);
+    const ihdrView = new DataView(newIhdrData.buffer, newIhdrData.byteOffset, newIhdrData.byteLength);
+    ihdrView.setUint32(0, width, false);
+    ihdrView.setUint32(4, totalHeight, false);
+    newIhdrData[8] = bitDepth;
+    newIhdrData[9] = colorType;
+    newIhdrData[10] = compression;
+    newIhdrData[11] = filter;
+    newIhdrData[12] = interlace;
+
+    const ihdrChunk = createPNGChunk('IHDR', newIhdrData);
     const idatChunk = createPNGChunk('IDAT', compressed);
     const iendChunk = createPNGChunk('IEND', new Uint8Array(0));
-    
-    // 최종 PNG 파일 조립
+
+    // Assemble final PNG: Signature + IHDR + IDAT + IEND
     const totalLength = PNG_SIGNATURE.length + ihdrChunk.length + idatChunk.length + iendChunk.length;
-    const finalPNG = new Uint8Array(totalLength);
-    
+    const finalPng = new Uint8Array(totalLength);
+
     let offset = 0;
-    finalPNG.set(PNG_SIGNATURE, offset);
+    finalPng.set(PNG_SIGNATURE, offset);
     offset += PNG_SIGNATURE.length;
-    finalPNG.set(ihdrChunk, offset);
+    finalPng.set(ihdrChunk, offset);
     offset += ihdrChunk.length;
-    finalPNG.set(idatChunk, offset);
+    finalPng.set(idatChunk, offset);
     offset += idatChunk.length;
-    finalPNG.set(iendChunk, offset);
-    
+    finalPng.set(iendChunk, offset);
+
     console.log(`[PNG Merge] Final PNG size: ${totalLength} bytes`);
-    
-    return new Blob([finalPNG], { type: 'image/png' });
+
+    return new Blob([finalPng], { type: 'image/png' });
 };

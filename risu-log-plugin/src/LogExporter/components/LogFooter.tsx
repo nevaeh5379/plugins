@@ -1,6 +1,5 @@
-
 import React, { lazy, Suspense } from 'react';
-import type { ColorPalette, ThemeKey } from '../../types';
+import type { FooterProps, ThemeKey } from '../../types';
 import DefaultFooter from './footers/DefaultFooter';
 
 const SmartFooter = lazy(() => import('./footers/SmartFooter'));
@@ -8,44 +7,40 @@ const SimpleFooter = lazy(() => import('./footers/SimpleFooter'));
 const ModernFooter = lazy(() => import('./footers/ModernFooter'));
 const LogThemeFooter = lazy(() => import('./footers/LogThemeFooter'));
 
-interface LogFooterProps {
+/**
+ * Mapping of theme keys to their dedicated lazy-loaded footer components.
+ * Themes without a dedicated footer component fall back to `DefaultFooter`.
+ */
+const FOOTER_COMPONENTS: Partial<Record<ThemeKey, React.ComponentType<FooterProps>>> = {
+  smart: SmartFooter,
+  simple: SimpleFooter,
+  modern: ModernFooter,
+  log: LogThemeFooter,
+};
+
+export interface LogFooterProps extends FooterProps {
   themeKey?: ThemeKey;
-  color: ColorPalette;
-  footerLeft?: string;
-  footerCenter?: string;
-  footerRight?: string;
 }
 
-const LogFooter: React.FC<LogFooterProps> = (props) => {
-  const { themeKey } = props;
-
-  let FooterComponent = DefaultFooter;
-
-  // 테마별 푸터 선택 로직
-  switch (themeKey) {
-    case 'smart':
-        FooterComponent = SmartFooter;
-        break;
-    case 'simple':
-        FooterComponent = SimpleFooter;
-        break;
-    case 'modern':
-        FooterComponent = ModernFooter;
-        break;
-    case 'log':
-        FooterComponent = LogThemeFooter;
-        break;
-    // Basic 등은 DefaultFooter 사용
-    default:
-        FooterComponent = DefaultFooter;
-        break;
-  }
+/**
+ * LogFooter - Variant dispatcher component for log exporter footers.
+ * Dynamically resolves and renders the appropriate themed footer based on `themeKey`.
+ */
+const LogFooter: React.FC<LogFooterProps> = ({
+  themeKey,
+  ...footerProps
+}) => {
+  const FooterComponent = (themeKey && FOOTER_COMPONENTS[themeKey]) || DefaultFooter;
 
   return (
     <Suspense fallback={<div />}>
-        <FooterComponent {...props} />
+      <FooterComponent {...footerProps} />
     </Suspense>
   );
 };
 
-export default LogFooter;
+LogFooter.displayName = 'LogFooter';
+
+export { LogFooter };
+export default React.memo(LogFooter);
+

@@ -1,9 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
-import { copyToClipboard, saveAsFile } from '../services/fileService';
-import { saveAsImage } from '../services/imageService';
-import { THEMES, COLORS } from './constants';
-import { Button, Dropdown, message, type MenuItem } from '../../components/ui';
+import React, { useMemo, useCallback } from 'react';
 import {
   Image as ImageIcon,
   MoreHorizontal,
@@ -15,17 +10,69 @@ import {
   Trash2,
   CheckSquare,
   Square,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
+import { copyToClipboard, saveAsFile, MIME_TYPES } from '../services/fileService';
+import { saveAsImage } from '../services/imageService';
+import { Button, Dropdown, message, type MenuItem } from '../../components/ui';
+import type { ColorPalette, LogExportSettings } from '../../types';
+import type { LogExporterSettings } from '../hooks/types';
 
-interface ActionbarProps {
+// ============================================================================
+// Constants & Utilities
+// ============================================================================
+
+/** Regex pattern for stripping invalid filename characters across platforms */
+const FILENAME_SANITIZE_REGEX = /[/?%*:|"<>]/g;
+
+/**
+ * Sanitizes a string part so it can be safely used in filenames.
+ */
+function sanitizeFilenamePart(name: string): string {
+  return name.replace(FILENAME_SANITIZE_REGEX, '-');
+}
+
+/**
+ * Builds the standard HTML log export filename.
+ */
+function createHtmlExportFilename(charName: string, chatName: string): string {
+  const safeCharName = sanitizeFilenamePart(charName);
+  const safeChatName = sanitizeFilenamePart(chatName);
+  return `Risu_Log_${safeCharName}_${safeChatName}.html`;
+}
+
+/**
+ * Extracts a rendered container element and appends any enclosed style blocks
+ * to ensure complete CSS capture during image rendering.
+ */
+function prepareElementForCapture(htmlContent: string): HTMLElement | null {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+
+  const elementToCapture = tempDiv.querySelector<HTMLElement>('div');
+  if (!elementToCapture) {
+    return null;
+  }
+
+  tempDiv.querySelectorAll('style').forEach((styleTag) => {
+    elementToCapture.appendChild(styleTag);
+  });
+
+  return elementToCapture;
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface ActionbarProps {
   charName: string;
   chatName: string;
   getPreviewContent: () => Promise<string>;
   messageNodes: HTMLElement[];
-  settings: any;
+  settings: LogExportSettings | LogExporterSettings;
   backgroundColor: string;
-  color?: any;
+  color?: ColorPalette;
   charAvatarUrl: string;
   onOpenArcaHelper?: () => void;
   onProgressStart: (message: string, total?: number) => void;
@@ -40,7 +87,16 @@ interface ActionbarProps {
   onInvertSelection?: () => void;
 }
 
-const Actionbar: React.FC<ActionbarProps> = ({
+// ============================================================================
+// Actionbar Component
+// ============================================================================
+
+/**
+ * Floating bottom action bar providing quick controls for log exporting
+ * (image capture, HTML copy/save, Arcalive helper, JSON backup/restore)
+ * and batch selection/deletion actions during edit mode.
+ */
+const Actionbar: React.FC<ActionbarProps> = React.memo(({
   charName,
   chatName,
   getPreviewContent,
@@ -56,33 +112,40 @@ const Actionbar: React.FC<ActionbarProps> = ({
   onSaveLogData,
   onLoadLogData,
   onDeleteSelected,
-  hasSelection,
+  hasSelection = false,
   onSelectAll,
   onDeselectAll,
   onInvertSelection,
 }) => {
+  // --------------------------------------------------------------------------
+  // Action Handlers
+  // --------------------------------------------------------------------------
 
-  const handleCopyHtml = async () => {
-    const content = await getPreviewContent();
-    copyToClipboard(content);
-  };
+  const handleCopyHtml = useCallback(async () => {
+    try {
+      const content = await getPreviewContent();
+      await copyToClipboard(content);
+    } catch (err) {
+      console.error('Failed to copy HTML preview content:', err);
+    }
+  }, [getPreviewContent]);
 
-  const handleSaveHtml = async () => {
-    const content = await getPreviewContent();
-    const safeCharName = charName.replace(/[\/\?%\*:|"<>]/g, '-');
-    const safeChatName = chatName.replace(/[\/\?%\*:|"<>]/g, '-');
-    const filename = `Risu_Log_${safeCharName}_${safeChatName}.html`;
-    saveAsFile(filename, content, 'text/html;charset=utf-8');
-  };
+  const handleSaveHtml = useCallback(async () => {
+    try {
+      const content = await getPreviewContent();
+      const filename = createHtmlExportFilename(charName, chatName);
+      saveAsFile(filename, content, MIME_TYPES.HTML);
+    } catch (err) {
+      console.error('Failed to save HTML file:', err);
+    }
+  }, [charName, chatName, getPreviewContent]);
 
-  const handleSaveAsImage = async () => {
+  const handleSaveAsImage = useCallback(async () => {
     const imageFormat = settings.imageFormat || 'png';
-    const fullOptions = {
+    const fullOptions: LogExportSettings = {
       ...settings,
       charAvatarUrl,
-      themes: THEMES,
-      colors: COLORS,
-      color: color,
+      color,
       onProgressStart,
       onProgressUpdate,
       onProgressEnd,
@@ -90,96 +153,140 @@ const Actionbar: React.FC<ActionbarProps> = ({
 
     if (settings.format !== 'basic') {
       const content = await getPreviewContent();
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-      const elementToCapture = tempDiv.querySelector('div');
+      const elementToCapture = prepareElementForCapture(content);
 
       if (!elementToCapture) {
         message.warning('이미지를 생성할 콘텐츠가 없습니다.');
         return;
       }
 
-      tempDiv.querySelectorAll('style').forEach(style => {
-        elementToCapture.appendChild(style);
-      });
-
-      const bgColor = (settings.format === 'html') ? undefined : backgroundColor;
+      const bgColor = settings.format === 'html' ? undefined : backgroundColor;
       await saveAsImage(elementToCapture, imageFormat, charName, chatName, fullOptions, bgColor);
     } else {
       await saveAsImage(messageNodes, imageFormat, charName, chatName, fullOptions, backgroundColor);
     }
-  };
+  }, [
+    settings,
+    charAvatarUrl,
+    color,
+    onProgressStart,
+    onProgressUpdate,
+    onProgressEnd,
+    getPreviewContent,
+    backgroundColor,
+    charName,
+    chatName,
+    messageNodes,
+  ]);
 
-  const exportMenuItems: MenuItem[] = [
-    {
-      key: 'copy',
-      label: 'HTML 복사',
-      icon: <Copy size={14} />,
-    },
-    {
-      key: 'save-html',
-      label: 'HTML 저장',
-      icon: <FileCode size={14} />,
-    },
-    {
-      key: 'arca',
-      label: '아카라이브 헬퍼',
-      icon: <Rocket size={14} />,
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'backup',
-      label: 'JSON 백업',
-      icon: <Download size={14} />,
-    },
-    {
-      key: 'restore',
-      label: 'JSON 복원',
-      icon: <Upload size={14} />,
-    },
-    ...(settings.isEditable ? [
-      {
-        type: 'divider' as const,
-      },
-      {
-        key: 'select-all',
-        label: '전체 선택',
-        icon: <CheckSquare size={14} />,
-      },
-      {
-        key: 'deselect-all',
-        label: '전체 해제',
-        icon: <Square size={14} />,
-      },
-      {
-        key: 'invert-selection',
-        label: '선택 반전',
-        icon: <RefreshCw size={14} />,
-      }
-    ] : [])
-  ];
+  // --------------------------------------------------------------------------
+  // Dropdown Menu Configuration
+  // --------------------------------------------------------------------------
 
-  const handleMenuClick = (info: { key: string }) => {
-    if (info.key === 'copy') {
-      handleCopyHtml();
-    } else if (info.key === 'save-html') {
-      handleSaveHtml();
-    } else if (info.key === 'arca') {
-      if (onOpenArcaHelper) onOpenArcaHelper();
-    } else if (info.key === 'backup') {
-      onSaveLogData();
-    } else if (info.key === 'restore') {
-      onLoadLogData();
-    } else if (info.key === 'select-all') {
-      if (onSelectAll) onSelectAll();
-    } else if (info.key === 'deselect-all') {
-      if (onDeselectAll) onDeselectAll();
-    } else if (info.key === 'invert-selection') {
-      if (onInvertSelection) onInvertSelection();
+  const exportMenuItems: MenuItem[] = useMemo(() => {
+    const items: MenuItem[] = [
+      {
+        key: 'copy',
+        label: 'HTML 복사',
+        icon: <Copy size={14} />,
+      },
+      {
+        key: 'save-html',
+        label: 'HTML 저장',
+        icon: <FileCode size={14} />,
+      },
+      {
+        key: 'arca',
+        label: '아카라이브 헬퍼',
+        icon: <Rocket size={14} />,
+      },
+      {
+        type: 'divider',
+      },
+      {
+        key: 'backup',
+        label: 'JSON 백업',
+        icon: <Download size={14} />,
+      },
+      {
+        key: 'restore',
+        label: 'JSON 복원',
+        icon: <Upload size={14} />,
+      },
+    ];
+
+    if (settings.isEditable) {
+      items.push(
+        {
+          type: 'divider',
+        },
+        {
+          key: 'select-all',
+          label: '전체 선택',
+          icon: <CheckSquare size={14} />,
+        },
+        {
+          key: 'deselect-all',
+          label: '전체 해제',
+          icon: <Square size={14} />,
+        },
+        {
+          key: 'invert-selection',
+          label: '선택 반전',
+          icon: <RefreshCw size={14} />,
+        }
+      );
     }
-  };
+
+    return items;
+  }, [settings.isEditable]);
+
+  const handleMenuClick = useCallback(
+    (info: { key: string }) => {
+      switch (info.key) {
+        case 'copy':
+          handleCopyHtml();
+          break;
+        case 'save-html':
+          handleSaveHtml();
+          break;
+        case 'arca':
+          onOpenArcaHelper?.();
+          break;
+        case 'backup':
+          onSaveLogData();
+          break;
+        case 'restore':
+          onLoadLogData();
+          break;
+        case 'select-all':
+          onSelectAll?.();
+          break;
+        case 'deselect-all':
+          onDeselectAll?.();
+          break;
+        case 'invert-selection':
+          onInvertSelection?.();
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      handleCopyHtml,
+      handleSaveHtml,
+      onOpenArcaHelper,
+      onSaveLogData,
+      onLoadLogData,
+      onSelectAll,
+      onDeselectAll,
+      onInvertSelection,
+    ]
+  );
+
+  // --------------------------------------------------------------------------
+  // Render
+  // --------------------------------------------------------------------------
 
   return (
     <div className="action-bar-content">
@@ -203,16 +310,25 @@ const Actionbar: React.FC<ActionbarProps> = ({
             type="default"
             icon={<MoreHorizontal size={16} className="btn-icon" />}
             title="더보기 옵션 (복사, HTML 저장, 백업, 복원, 아카라이브 헬퍼)"
+            aria-label="더보기 옵션"
             className="action-bar-btn btn-more desktop-btn-secondary"
           />
         </Dropdown>
       </div>
 
       {settings.isEditable && (
-        <div className="action-bar-divider" style={{ width: '1px', height: '20px', backgroundColor: 'var(--border)', margin: '0 6px' }}></div>
+        <div
+          className="action-bar-divider"
+          style={{
+            width: '1px',
+            height: '20px',
+            backgroundColor: 'var(--border)',
+            margin: '0 6px',
+          }}
+        />
       )}
 
-      <div style={{ flex: 1 }} className="action-spacer"></div>
+      <div style={{ flex: 1 }} className="action-spacer" />
 
       {/* 편집 모드 액션 그룹 */}
       {settings.isEditable && (
@@ -232,6 +348,9 @@ const Actionbar: React.FC<ActionbarProps> = ({
       )}
     </div>
   );
-};
+});
 
+Actionbar.displayName = 'Actionbar';
+
+export { Actionbar };
 export default Actionbar;

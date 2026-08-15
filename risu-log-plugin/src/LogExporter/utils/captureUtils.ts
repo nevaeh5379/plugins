@@ -3,17 +3,30 @@ import domtoimage from 'dom-to-image-more';
 import { snapdom, type SnapdomOptions } from '@zumer/snapdom';
 import { loadImageBlobToCanvas, canvasToBlob } from './imageUtils';
 
+/** Supported screenshot engine libraries */
 export type ImageLibrary = 'snapdom' | 'dom-to-image' | 'html-to-image';
+
+/** Supported export image formats */
 export type ImageFormat = 'png' | 'jpeg' | 'webp';
 
+/** Common dimension and resolution options for capturing DOM elements */
 export interface CaptureOptions {
     pixelRatio: number;
     width: number;
     height: number;
 }
 
+/** Default quality setting for JPEG conversion (0.0 to 1.0) */
+const DEFAULT_JPEG_QUALITY = 0.95;
+
+/** Delay (ms) to allow the browser to register download triggers before resolving */
+const DOWNLOAD_CLEANUP_DELAY_MS = 100;
+
 /**
- * Blob을 WebP로 변환합니다.
+ * Converts any image Blob into WebP format via HTMLCanvasElement.
+ *
+ * @param pngBlob - Source image blob (typically PNG).
+ * @returns A Promise resolving to the WebP image Blob.
  */
 export const convertBlobToWebP = async (pngBlob: Blob): Promise<Blob> => {
     const canvas = await loadImageBlobToCanvas(pngBlob);
@@ -21,20 +34,164 @@ export const convertBlobToWebP = async (pngBlob: Blob): Promise<Blob> => {
 };
 
 /**
- * PNG Blob을 JPEG로 변환합니다.
+ * Converts a PNG Blob into a high-quality JPEG Blob without alpha transparency.
+ *
+ * @param pngBlob - Source PNG image blob.
+ * @param quality - Optional JPEG quality (0.0 to 1.0), defaults to 0.95.
+ * @returns A Promise resolving to the JPEG image Blob.
  */
-export const convertPngToJpeg = async (pngBlob: Blob): Promise<Blob> => {
-    const canvas = await loadImageBlobToCanvas(pngBlob, { alpha: false, willReadFrequently: false });
-    const ctx = canvas.getContext('2d')!;
+export const convertPngToJpeg = async (
+    pngBlob: Blob,
+    quality = DEFAULT_JPEG_QUALITY
+): Promise<Blob> => {
+    const canvas = await loadImageBlobToCanvas(pngBlob, {
+        alpha: false,
+        willReadFrequently: false,
+    });
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Failed to get 2D rendering context from canvas');
+    }
     ctx.imageSmoothingEnabled = false;
-    return canvasToBlob(canvas, 'image/jpeg', 0.95);
+    return canvasToBlob(canvas, 'image/jpeg', quality);
 };
 
 /**
- * 지정된 이미지 라이브러리를 사용하여 요소의 Blob을 캡처합니다.
- * format이 'webp'인 경우:
- *   - preserveWebpAsset=true  → PNG로 캡처 (후속 병합에서 WebP 변환)
- *   - preserveWebpAsset=false → PNG 캡처 후 WebP로 변환
+ * Captures an element using `@zumer/snapdom`.
+ */
+async function captureWithSnapdom(
+    element: HTMLElement,
+    options: CaptureOptions,
+    captureFormat: ImageFormat,
+    bgColor: string
+): Promise<Blob> {
+    const snapdomOptions: SnapdomOptions = {
+        scale: options.pixelRatio,
+        width: options.width,
+        height: options.height,
+        type: captureFormat === 'jpeg' ? 'jpeg' : captureFormat,
+        backgroundColor: bgColor,
+    };
+
+    const blob = await snapdom.toBlob(element, snapdomOptions);
+    if (!blob) {
+        throw new Error(`Failed to capture element using snapdom (${captureFormat})`);
+    }
+    return blob;
+}
+
+/**
+ * Captures an element using `dom-to-image-more`.
+ */
+async function captureWithDomToImage(
+    element: HTMLElement,
+    options: CaptureOptions,
+    captureFormat: ImageFormat,
+    bgColor: string
+): Promise<Blob> {
+    const baseOptions = {
+        pixelRatio: options.pixelRatio,
+        width: options.width,
+        height: options.height,
+        bgcolor: bgColor,
+        copyDefaultStyles: false,
+    };
+
+    if (captureFormat === 'png') {
+        const blob = await domtoimage.toBlob(element, baseOptions);
+        if (!blob) throw new Error('Failed to capture PNG using dom-to-image');
+        return blob;
+    }
+
+    if (captureFormat === 'jpeg') {
+        const blob = await domtoimage.toBlob(element, { ...baseOptions, quality: 1.0 });
+        if (!blob) throw new Error('Failed to capture JPEG using dom-to-image');
+        return blob;
+    }
+
+    // WebP: Capture as PNG first, then convert to WebP
+    const pngBlob = await domtoimage.toBlob(element, baseOptions);
+    if (!pngBlob) {
+        throw new Error('Failed to capture intermediate PNG for WebP conversion using dom-to-image');
+    }
+    return convertBlobToWebP(pngBlob);
+}
+
+/**
+ * Captures an element using `html-to-image`.
+ */
+async function captureWithHtmlToImage(
+    element: HTMLElement,
+    options: CaptureOptions,
+    captureFormat: ImageFormat,
+    bgColor: string
+): Promise<Blob> {
+    const baseOptions = {
+        pixelRatio: options.pixelRatio,
+        width: options.width,
+        height: options.height,
+        backgroundColor: bgColor,
+    };
+
+    if (captureFormat === 'png') {
+        const blob = await htmlToImageToBlob(element, baseOptions);
+        if (!blob) throw new Error('Failed to capture PNG using html-to-image');
+        return blob;
+    }
+
+    if (captureFormat === 'jpeg') {
+        const blob = await htmlToImageToBlob(element, { ...baseOptions, quality: 1.0 });
+        if (!blob) throw new Error('Failed to capture JPEG using html-to-image');
+        return blob;
+    }
+
+    // WebP: Capture as PNG first, then convert to WebP
+    const pngBlob = await htmlToImageToBlob(element, baseOptions);
+    if (!pngBlob) {
+        throw new Error('Failed to capture intermediate PNG for WebP conversion using html-to-image');
+    }
+    return convertBlobToWebP(pngBlob);
+}
+
+/**
+ * Dispatches capture execution to the designated library engine.
+ */
+async function executeCapture(
+    library: ImageLibrary,
+    element: HTMLElement,
+    options: CaptureOptions,
+    captureFormat: ImageFormat,
+    bgColor: string
+): Promise<Blob> {
+    switch (library) {
+        case 'snapdom':
+            return captureWithSnapdom(element, options, captureFormat, bgColor);
+        case 'dom-to-image':
+            return captureWithDomToImage(element, options, captureFormat, bgColor);
+        case 'html-to-image':
+            return captureWithHtmlToImage(element, options, captureFormat, bgColor);
+        default: {
+            const exhaustiveCheck: never = library;
+            throw new Error(`Unsupported image capture library: ${String(exhaustiveCheck)}`);
+        }
+    }
+}
+
+/**
+ * Captures an HTML element into an image Blob using the specified library engine and format.
+ *
+ * Special WebP Handling:
+ * - When `preserveWebpAsset` is true and `format === 'webp'`, the element is captured as PNG
+ *   so that downstream binary stitching can assemble the chunks before final WebP encoding.
+ * - When `preserveWebpAsset` is false, it directly produces a WebP Blob.
+ *
+ * @param element - The DOM element to capture.
+ * @param format - Desired target format ('png', 'jpeg', or 'webp').
+ * @param imageLibrary - The underlying capture library to use.
+ * @param bgColor - Background color fill.
+ * @param resolution - Pixel scale multiplier / resolution.
+ * @param preserveWebpAsset - If true, retains intermediate PNG format for deferred WebP conversion.
+ * @returns A Promise resolving to the captured image Blob.
  */
 export async function captureElementToBlob(
     element: HTMLElement,
@@ -50,51 +207,12 @@ export async function captureElementToBlob(
         height: element.offsetHeight,
     };
 
-    // WebP는 PNG로 캡처 후 변환 (이미지 에셋 보존)
-    const captureFormat = preserveWebpAsset && format === 'webp' ? 'png' : format;
+    // When preserveWebpAsset is true, capture intermediate PNG for later merging
+    const captureFormat: ImageFormat = preserveWebpAsset && format === 'webp' ? 'png' : format;
 
-    let blob: Blob | null = null;
+    const blob = await executeCapture(imageLibrary, element, commonOptions, captureFormat, bgColor);
 
-    if (imageLibrary === 'snapdom') {
-        const snapdomOptions: SnapdomOptions = {
-            scale: resolution,
-            width: commonOptions.width,
-            height: commonOptions.height,
-            type: captureFormat === 'jpeg' ? 'jpeg' : captureFormat,
-            backgroundColor: bgColor,
-        };
-        blob = await snapdom.toBlob(element, snapdomOptions);
-    } else if (imageLibrary === 'dom-to-image') {
-        const libOptions = { ...commonOptions, bgcolor: bgColor, copyDefaultStyles: false };
-        if (captureFormat === 'png') {
-            blob = await domtoimage.toBlob(element, libOptions);
-        } else if (captureFormat === 'jpeg') {
-            blob = await domtoimage.toBlob(element, { ...libOptions, quality: 1.0 });
-        } else {
-            // webp: PNG로 캡처 후 변환
-            const pngBlob = await domtoimage.toBlob(element, libOptions);
-            if (!pngBlob) throw new Error('Failed to capture PNG');
-            blob = await convertBlobToWebP(pngBlob);
-        }
-    } else {
-        // html-to-image
-        const libOptions = { ...commonOptions, backgroundColor: bgColor };
-        if (captureFormat === 'png') {
-            blob = await htmlToImageToBlob(element, libOptions);
-        } else if (captureFormat === 'jpeg') {
-            blob = await htmlToImageToBlob(element, { ...libOptions, quality: 1.0 });
-        } else {
-            // webp: PNG로 캡처 후 변환
-            const pngBlob = await htmlToImageToBlob(element, libOptions);
-            if (!pngBlob) throw new Error('Failed to capture PNG');
-            blob = await convertBlobToWebP(pngBlob);
-        }
-    }
-
-    if (!blob) throw new Error('Failed to capture element');
-
-    // dom-to-image와 html-to-image는 항상 PNG를 생성하므로
-    // JPEG 요청 시에만 포맷 변환 (WebP는 preserveWebpAsset이면 병합 후 변환)
+    // If a library returned a PNG blob while JPEG was requested, perform lossless canvas conversion
     if (blob.type === 'image/png' && format === 'jpeg') {
         return convertPngToJpeg(blob);
     }
@@ -103,7 +221,15 @@ export async function captureElementToBlob(
 }
 
 /**
- * 요소의 일부를 캡처하기 위한 임시 wrapper를 생성합니다.
+ * Creates an isolated, clipped section wrapper for chunk-based rendering of long elements.
+ * Clones the element and positions it with a negative top offset to frame the desired vertical slice.
+ *
+ * @param element - Source element being chunk-rendered.
+ * @param startY - Vertical starting position (px) of the slice.
+ * @param sectionHeight - Height (px) of the slice.
+ * @param totalWidth - Total width (px) of the wrapper.
+ * @param bgColor - Background color of the slice viewport.
+ * @returns A configured wrapper DOM element containing the positioned clone.
  */
 export function createSectionWrapper(
     element: HTMLElement,
@@ -129,7 +255,12 @@ export function createSectionWrapper(
 }
 
 /**
- * 생성된 wrapper를 DOM에 추가하고, 작업 후 제거합니다.
+ * Temporarily mounts a wrapper element into document.body during execution of an async callback,
+ * guaranteeing clean unmounting and removal in a `finally` block even on failure.
+ *
+ * @param wrapper - The DOM element to temporarily mount.
+ * @param fn - The async task to execute while the wrapper is attached to the DOM.
+ * @returns The result of `fn()`.
  */
 export async function withTempWrapper<T>(
     wrapper: HTMLElement,
@@ -139,12 +270,19 @@ export async function withTempWrapper<T>(
     try {
         return await fn();
     } finally {
-        document.body.removeChild(wrapper);
+        if (wrapper.parentElement) {
+            wrapper.parentElement.removeChild(wrapper);
+        }
     }
 }
 
 /**
- * Blob을 파일로 다운로드합니다.
+ * Triggers a client-side file download for a given Blob.
+ * Automatically cleans up the object URL and temporary DOM anchor after dispatching.
+ *
+ * @param blob - The Blob to download.
+ * @param filename - The filename to save as.
+ * @returns A Promise that resolves shortly after the download is initiated.
  */
 export function downloadBlob(blob: Blob, filename: string): Promise<void> {
     const url = URL.createObjectURL(blob);
@@ -155,5 +293,5 @@ export function downloadBlob(blob: Blob, filename: string): Promise<void> {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    return new Promise(resolve => setTimeout(resolve, 100));
+    return new Promise(resolve => setTimeout(resolve, DOWNLOAD_CLEANUP_DELAY_MS));
 }

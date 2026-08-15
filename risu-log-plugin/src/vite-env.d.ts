@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /// <reference types="vite/client" />
-/// <reference path="./types/risuai-api.d.ts" />
+import './types/risuai-api.d.ts';
 
 // --------------------------------------------------------------------------
 // Vite 주입 변수 선언 (플러그인 빌드 시 사용)

@@ -2,9 +2,13 @@ import { getNameFromNode, applyReplacements } from '../utils/domUtils';
 import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { loadGlobalSettings } from './settingsService';
 import { showWarning } from '../utils/notify';
-import type { LogExportSettings, ColorPalette, ThemeInfo } from '../../types';
+import type { LogExportSettings, ColorPalette, ThemeInfo, GlobalSettings } from '../../types';
 
-// CSS 변수 목록 (중복 제거)
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/**
+ * CSS variables to extract from computed styles as fallback.
+ */
 const THEME_CSS_VARIABLES = [
     '--risu-theme-textcolor',
     '--risu-theme-textcolor2',
@@ -33,9 +37,20 @@ const THEME_CSS_VARIABLES = [
     '--risu-font-family',
 ] as const;
 
+const ROOT_DOC_FONT_VARIABLES = [
+    '--FontColorStandard',
+    '--FontColorItalic',
+    '--FontColorBold',
+    '--FontColorItalicBold',
+    '--FontColorQuote1',
+    '--FontColorQuote2',
+    '--risu-font-family',
+] as const;
+
+// ─── Message Data Extraction ─────────────────────────────────────────────────
+
 /**
- * 메시지 노드에서 텍스트를 추출합니다.
- * replacementRules가 있으면 적용합니다.
+ * Extracts inner text from a message element, applying replacement rules if configured.
  */
 function extractMessageText(
     messageEl: Element | null,
@@ -53,11 +68,11 @@ function extractMessageText(
 }
 
 /**
- * 메시지 노드에서 이름과 메시지 텍스트를 추출합니다.
+ * Extracts participant name and formatted message text from a chat message node.
  */
 function extractMessageData(
     node: HTMLElement,
-    globalSettings: import('../../types').GlobalSettings,
+    globalSettings: GlobalSettings,
     charName: string,
     settings?: LogExportSettings
 ): { name: string; messageText: string } {
@@ -67,6 +82,84 @@ function extractMessageData(
     return { name, messageText };
 }
 
+// ─── Basic Log Formatting Helpers ────────────────────────────────────────────
+
+/**
+ * Resolves active color palette for basic log export based on theme and color settings.
+ */
+function resolveColorPalette(
+    settings: LogExportSettings,
+    themes: Record<string, ThemeInfo>,
+    colors: Record<string, ColorPalette>
+): ColorPalette {
+    const fallbackColor: ColorPalette = colors.dark || {
+        background: '#1a1b26',
+        text: '#c0caf5',
+        cardBg: '#24283b',
+        cardBgUser: '#2f354f',
+        border: '#414868',
+        nameColor: '#7aa2f7',
+        avatarBorder: '#7aa2f7',
+        shadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    };
+
+    if (settings.theme === 'basic') {
+        const colorKey = typeof settings.color === 'string' ? (settings.color || 'dark') : 'dark';
+        return colors[colorKey] || fallbackColor;
+    }
+
+    const themeInfo = themes[settings.theme || 'basic'] || themes.basic;
+    return themeInfo?.color || fallbackColor;
+}
+
+/**
+ * Renders the top header for basic HTML log export.
+ */
+function renderBasicLogHeader(
+    charName: string,
+    chatName: string,
+    charAvatarUrl: string,
+    palette: ColorPalette
+): string {
+    return `
+        <header style="text-align: center; padding-bottom: 1.5em; margin-bottom: 2em; border-bottom: 2px solid ${palette.border};">
+            <img src="${charAvatarUrl}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 1em; display: block; border: 3px solid ${palette.avatarBorder}; box-shadow: ${palette.shadow};" />
+            <h1 style="color: ${palette.nameColor}; margin: 0 0 0.25em 0; font-size: 1.8em; letter-spacing: 1px;">${charName}</h1>
+            <p style="color: ${palette.text}; opacity: 0.8; margin: 0; font-size: 0.9em;">${chatName}</p>
+        </header>
+    `;
+}
+
+/**
+ * Renders an individual message card for basic HTML log export.
+ */
+function renderBasicLogMessage(
+    name: string,
+    messageHtml: string,
+    isUser: boolean,
+    palette: ColorPalette
+): string {
+    const cardBg = isUser ? palette.cardBgUser : palette.cardBg;
+    const textAlign = isUser ? 'right' : 'left';
+    const flexDirection = isUser ? 'row-reverse' : 'row';
+
+    return `
+        <div class="chat-message-container" style="display: flex; align-items: flex-start; margin-bottom: 20px; flex-direction: ${flexDirection};">
+            <div style="flex: 1;">
+                <strong style="color: ${palette.nameColor}; font-weight: 600; display: block; margin-bottom: 8px; text-align: ${textAlign};">${name}</strong>
+                <div style="background-color: ${cardBg}; border-radius: 16px; padding: 14px 18px; color: ${palette.text};">
+                    ${messageHtml}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ─── Export Generators: Basic, Markdown, Text ─────────────────────────────────
+
+/**
+ * Generates standalone styled HTML markup for the "Basic" theme log.
+ */
 export const generateBasicLog = async (
     nodes: HTMLElement[],
     charName: string,
@@ -75,114 +168,100 @@ export const generateBasicLog = async (
     settings: LogExportSettings,
     themes: Record<string, ThemeInfo>,
     colors: Record<string, ColorPalette>
-) => {
-    let contentHtml = '';
+): Promise<string> => {
     const globalSettings = await loadGlobalSettings();
+    const palette = resolveColorPalette(settings, themes, colors);
 
-    const themeInfo = themes[settings.theme || 'basic'] || themes.basic;
-    const colorPalette = settings.theme === 'basic'
-        ? ((typeof settings.color === 'string' ? colors[settings.color || 'dark'] : colors.dark) || colors.dark)
-        : (themeInfo.color || colors.dark);
+    const headerHtml = settings.showHeader !== false
+        ? renderBasicLogHeader(charName, chatName, charAvatarUrl, palette)
+        : '';
 
-    if (settings.showHeader !== false) {
-        contentHtml += `
-            <header style="text-align: center; padding-bottom: 1.5em; margin-bottom: 2em; border-bottom: 2px solid ${colorPalette.border};">
-                <img src="${charAvatarUrl}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 1em; display: block; border: 3px solid ${colorPalette.avatarBorder}; box-shadow: ${colorPalette.shadow};" />
-                <h1 style="color: ${colorPalette.nameColor}; margin: 0 0 0.25em 0; font-size: 1.8em; letter-spacing: 1px;">${charName}</h1>
-                <p style="color: ${colorPalette.text}; opacity: 0.8; margin: 0; font-size: 0.9em;">${chatName}</p>
-            </header>
-        `;
-    }
-
-    for (const node of nodes) {
+    const messagesHtml = nodes.map(node => {
         const isUser = node.classList.contains('justify-end');
-        const { name, messageText: messageHtml } = extractMessageData(node, globalSettings, charName);
+        const { name, messageText: messageHtml } = extractMessageData(node, globalSettings, charName, settings);
+        return renderBasicLogMessage(name, messageHtml, isUser, palette);
+    }).join('');
 
-        contentHtml += `
-            <div class="chat-message-container" style="display: flex; align-items: flex-start; margin-bottom: 20px; flex-direction: ${isUser ? 'row-reverse' : 'row'};">
-                <div style="flex: 1;">
-                    <strong style="color: ${colorPalette.nameColor}; font-weight: 600; display: block; margin-bottom: 8px; text-align: ${isUser ? 'right' : 'left'};">${name}</strong>
-                    <div style="background-color: ${isUser ? colorPalette.cardBgUser : colorPalette.cardBg}; border-radius: 16px; padding: 14px 18px; color: ${colorPalette.text};">
-                        ${messageHtml}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    return `<div style="padding: 20px; background-color: ${colorPalette.background};">${contentHtml}</div>`;
+    return `<div style="padding: 20px; background-color: ${palette.background};">${headerHtml}${messagesHtml}</div>`;
 };
 
+/**
+ * Generates formatted Markdown log representation from chat nodes.
+ */
 export const generateMarkdownLog = async (
     nodes: HTMLElement[],
     charName: string,
     settings?: LogExportSettings
-) => {
-    let markdown = '';
+): Promise<string> => {
     const globalSettings = await loadGlobalSettings();
 
-    for (const node of nodes) {
+    return nodes.map(node => {
         const { name, messageText } = extractMessageData(node, globalSettings, charName, settings);
-        markdown += `**${name}**\n\n${messageText}\n\n---\n\n`;
-    }
-    return markdown;
+        return `**${name}**\n\n${messageText}\n\n---\n\n`;
+    }).join('');
 };
 
+/**
+ * Generates plain text chat log representation from chat nodes.
+ */
 export const generateTextLog = async (
     nodes: HTMLElement[],
     charName: string,
     settings?: LogExportSettings
-) => {
-    let text = '';
+): Promise<string> => {
     const globalSettings = await loadGlobalSettings();
 
-    for (const node of nodes) {
+    return nodes.map(node => {
         const { name, messageText } = extractMessageData(node, globalSettings, charName, settings);
-        text += `${name}: ${messageText}\n\n`;
-    }
-    return text;
+        return `${name}: ${messageText}\n\n`;
+    }).join('');
 };
 
+// ─── Stylesheet & Theme Extraction Helpers ───────────────────────────────────
+
+/**
+ * Collects style rules from parent page via Risuai host document APIs.
+ */
 async function getParentPageStyles(): Promise<string[]> {
     const cssTexts: string[] = [];
     try {
         const rootDoc = await Risuai.getRootDocument();
-        if (rootDoc) {
-            // Collect parent <style> blocks
-            const styleEls = await rootDoc.querySelectorAll('style');
-            const styleList = await Risuai.unwarpSafeArray(styleEls);
-            for (const el of styleList) {
-                try {
-                    const html = await el.getInnerHTML();
-                    if (html && html.trim()) {
-                        cssTexts.push(html);
-                    }
-                } catch (e) {
-                    console.error('[log plugin] Failed to get style innerHTML:', e);
-                    showWarning('스타일 시트 읽기 중 오류가 발생했습니다.');
-                }
-            }
+        if (!rootDoc) return cssTexts;
 
-            // Collect parent <link rel="stylesheet"> blocks
-            const linkEls = await rootDoc.querySelectorAll('link[rel="stylesheet"]');
-            const linkList = await Risuai.unwarpSafeArray(linkEls);
-            for (const el of linkList) {
-                try {
-                    const outerHTML = await el.getOuterHTML();
-                    const match = outerHTML.match(/href\s*=\s*["']?([^"'\s>]+)/);
-                    if (match && match[1]) {
-                        const href = match[1];
-                        const res = await Risuai.nativeFetch(href, { method: 'GET' } as Record<string, unknown>);
-                        if (res.ok) {
-                            const text = await res.text();
-                            if (text && text.trim()) {
-                                cssTexts.push(text);
-                            }
+        // 1. Collect parent <style> blocks
+        const styleEls = await rootDoc.querySelectorAll('style');
+        const styleList = await Risuai.unwarpSafeArray(styleEls);
+        for (const el of styleList) {
+            try {
+                const html = await el.getInnerHTML();
+                if (html && html.trim()) {
+                    cssTexts.push(html);
+                }
+            } catch (e) {
+                console.error('[log plugin] Failed to get style innerHTML:', e);
+                showWarning('스타일 시트 읽기 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 2. Collect parent <link rel="stylesheet"> blocks
+        const linkEls = await rootDoc.querySelectorAll('link[rel="stylesheet"]');
+        const linkList = await Risuai.unwarpSafeArray(linkEls);
+        for (const el of linkList) {
+            try {
+                const outerHTML = await el.getOuterHTML();
+                const match = outerHTML.match(/href\s*=\s*["']?([^"'\s>]+)/);
+                if (match && match[1]) {
+                    const href = match[1];
+                    const res = await Risuai.nativeFetch(href, { method: 'GET' } as Record<string, unknown>);
+                    if (res.ok) {
+                        const text = await res.text();
+                        if (text && text.trim()) {
+                            cssTexts.push(text);
                         }
                     }
-                } catch (e) {
-                    console.warn('[log plugin] Failed to fetch link stylesheet:', e);
                 }
+            } catch (e) {
+                console.warn('[log plugin] Failed to fetch link stylesheet:', e);
             }
         }
     } catch (e) {
@@ -191,34 +270,143 @@ async function getParentPageStyles(): Promise<string[]> {
     return cssTexts;
 }
 
+/**
+ * Builds CSS `:root, :host` theme custom properties from RisuAI environment.
+ */
+async function getThemeCssVariables(): Promise<string> {
+    let colors: Record<string, string> | null = null;
+    try {
+        const res = await Risuai.getColorScheme();
+        if (res && res.scheme) {
+            colors = res.scheme as unknown as Record<string, string>;
+        }
+    } catch (e) {
+        console.warn('[log plugin] Failed to getColorScheme:', e);
+    }
+
+    const textColors: Record<string, string> = {};
+    try {
+        const rootDoc = await Risuai.getRootDocument();
+        if (rootDoc) {
+            for (const v of ROOT_DOC_FONT_VARIABLES) {
+                const val = await rootDoc.getStyle(v);
+                if (val) {
+                    textColors[v] = val;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('[log plugin] Failed to get rootDoc style variables:', e);
+    }
+
+    let cssText = ':root, :host {\n';
+
+    if (colors) {
+        const cssVars: [string, string | undefined][] = [
+            ['textcolor', colors.textcolor],
+            ['textcolor2', colors.textcolor2],
+            ['bgcolor', colors.bgcolor],
+            ['darkbg', colors.darkbg],
+            ['borderc', colors.borderc],
+            ['darkborderc', colors.darkBorderc || colors.darkborderc || '#4b5563'],
+            ['selected', colors.selected],
+            ['darkbutton', colors.darkbutton],
+            ['draculared', colors.draculared],
+        ];
+        for (const [name, value] of cssVars) {
+            if (value !== undefined) {
+                cssText += `  --risu-theme-${name}: ${value};\n`;
+                cssText += `  --color-${name}: ${value};\n`;
+            }
+        }
+    }
+
+    for (const [k, v] of Object.entries(textColors)) {
+        cssText += `  ${k}: ${v};\n`;
+    }
+
+    // Fallback: read computed styles from root / body if neither API returned values
+    const hasColors = colors && Object.keys(colors).length > 0;
+    const hasTextColors = Object.keys(textColors).length > 0;
+    if (!hasColors && !hasTextColors) {
+        const root = document.documentElement;
+        const body = document.body;
+        const computedRoot = window.getComputedStyle(root);
+        const computedBody = window.getComputedStyle(body);
+        for (const v of THEME_CSS_VARIABLES) {
+            const val = root.style.getPropertyValue(v) ||
+                body.style.getPropertyValue(v) ||
+                computedRoot.getPropertyValue(v) ||
+                computedBody.getPropertyValue(v);
+            if (val) {
+                cssText += `  ${v}: ${val};\n`;
+            }
+        }
+    }
+
+    cssText += '}\n';
+    return cssText;
+}
+
+/**
+ * Collects all loaded stylesheets and `<style>` blocks in the document.
+ */
+function getComprehensivePageCSS(): string {
+    const cssTexts = new Set<string>();
+
+    for (const sheet of Array.from(document.styleSheets)) {
+        try {
+            const rules = sheet.cssRules;
+            for (const rule of Array.from(rules)) {
+                cssTexts.add(rule.cssText);
+            }
+        } catch {
+            // Ignore cross-origin stylesheet access restrictions
+        }
+    }
+
+    document.querySelectorAll('style').forEach(styleElement => {
+        if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
+            cssTexts.add(styleElement.textContent);
+        }
+    });
+
+    return Array.from(cssTexts).join('\n');
+}
+
+/**
+ * Creates an override CSS rule for `:hover` pseudoclasses within `.expand-hover-globally`.
+ */
+function createHoverOverrideRule(rule: CSSRule, hoverRegex: RegExp): string | null {
+    if (!(rule instanceof CSSStyleRule)) return null;
+
+    if (!rule.selectorText || !hoverRegex.test(rule.selectorText)) return null;
+
+    const newSelector = rule.selectorText
+        .split(',')
+        .map(part => `.expand-hover-globally ${part.trim().replace(hoverRegex, '')}`)
+        .join(', ');
+
+    let declarations = '';
+    for (let i = 0; i < rule.style.length; i++) {
+        const propName = rule.style[i];
+        const propValue = rule.style.getPropertyValue(propName);
+        const propPriority = rule.style.getPropertyPriority(propName);
+        declarations += `${propName}: ${propValue} ${propPriority || '!important'}; `;
+    }
+
+    if (newSelector && declarations) {
+        return `${newSelector} { ${declarations} }`;
+    }
+    return null;
+}
+
+/**
+ * Generates forced-hover CSS rules so hover-only elements remain visible in static log preview.
+ */
 async function generateForceHoverCss(): Promise<string> {
     const newRules = new Set<string>();
     const hoverRegex = /:hover/g;
-
-    const createImportantRule = (rule: CSSRule): string | null => {
-        if (!(rule instanceof CSSStyleRule)) return null;
-        const styleRule = rule as CSSStyleRule;
-
-        if (!styleRule.selectorText || !hoverRegex.test(styleRule.selectorText)) return null;
-
-        const newSelector = styleRule.selectorText
-            .split(',')
-            .map(part => `.expand-hover-globally ${part.trim().replace(hoverRegex, '')}`)
-            .join(', ');
-
-        let newDeclarations = '';
-        for (let i = 0; i < styleRule.style.length; i++) {
-            const propName = styleRule.style[i];
-            const propValue = styleRule.style.getPropertyValue(propName);
-            const propPriority = styleRule.style.getPropertyPriority(propName);
-            newDeclarations += `${propName}: ${propValue} ${propPriority || '!important'}; `;
-        }
-
-        if (newSelector && newDeclarations) {
-            return `${newSelector} { ${newDeclarations} }`;
-        }
-        return null;
-    };
 
     for (const sheet of Array.from(document.styleSheets)) {
         try {
@@ -228,314 +416,262 @@ async function generateForceHoverCss(): Promise<string> {
                     const mediaRule = rule as CSSMediaRule;
                     let mediaRules = '';
                     for (const nestedRule of Array.from(mediaRule.cssRules)) {
-                        const importantRule = createImportantRule(nestedRule);
+                        const importantRule = createHoverOverrideRule(nestedRule, hoverRegex);
                         if (importantRule) mediaRules += importantRule;
                     }
                     if (mediaRules) {
                         newRules.add(`@media ${mediaRule.conditionText} { ${mediaRules} }`);
                     }
                 } else {
-                    const importantRule = createImportantRule(rule);
+                    const importantRule = createHoverOverrideRule(rule, hoverRegex);
                     if (importantRule) newRules.add(importantRule);
                 }
             }
         } catch {
-            // ignore CORS errors
+            // Ignore cross-origin stylesheet access restrictions
         }
     }
     return Array.from(newRules).join('\n');
 }
 
-export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExportSettings, avatarMap?: Map<string, string> | Record<string, string>) => {
-    // 1. Fetch parent page styles (style elements + link elements fetched via nativeFetch)
-    const parentStyles = await getParentPageStyles();
+// ─── Style Scaling Utilities ──────────────────────────────────────────────────
 
-    const getThemeCssVariables = async () => {
-        let colors: Record<string, string> = {};
-        try {
-            const res = await Risuai.getColorScheme();
-            if (res && res.scheme) {
-                colors = res.scheme as unknown as Record<string, string>;
-            }
-        } catch (e) {
-            console.warn('[log plugin] Failed to getColorScheme:', e);
-        }
+/**
+ * Scales numeric px and rem values within a CSS property string.
+ * Preserves hairline borders and sub-pixel values (<= 1px).
+ */
+function scaleValue(val: string, scaleFactor: number): string {
+    return val.replace(/(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match, p1, p2) => {
+        const num = parseFloat(p1);
+        if (p2 === 'px' && Math.abs(num) <= 1) return match;
+        return `${Number((num * scaleFactor).toFixed(4))}${p2}`;
+    });
+}
 
-        const textColors: Record<string, string> = {};
-        try {
-            const rootDoc = await Risuai.getRootDocument();
-            if (rootDoc) {
-                const vars = [
-                    '--FontColorStandard',
-                    '--FontColorItalic',
-                    '--FontColorBold',
-                    '--FontColorItalicBold',
-                    '--FontColorQuote1',
-                    '--FontColorQuote2',
-                    '--risu-font-family'
-                ];
-                for (const v of vars) {
-                    const val = await rootDoc.getStyle(v);
-                    if (val) {
-                        textColors[v] = val;
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('[log plugin] Failed to get rootDoc style variables:', e);
-        }
-
-        let cssText = ':root, :host {\n';
-        if (colors) {
-            const cssVars: [string, string][] = [
-                ['textcolor', colors.textcolor],
-                ['textcolor2', colors.textcolor2],
-                ['bgcolor', colors.bgcolor],
-                ['darkbg', colors.darkbg],
-                ['borderc', colors.borderc],
-                ['darkborderc', colors.darkBorderc || colors.darkborderc || '#4b5563'],
-                ['selected', colors.selected],
-                ['darkbutton', colors.darkbutton],
-                ['draculared', colors.draculared],
-            ];
-            for (const [name, value] of cssVars) {
-                cssText += `  --risu-theme-${name}: ${value};\n`;
-                cssText += `  --color-${name}: ${value};\n`;
-            }
-        }
-
-        for (const [k, v] of Object.entries(textColors)) {
-            cssText += `  ${k}: ${v};\n`;
-        }
-
-        if (!colors && Object.keys(textColors).length === 0) {
-            const root = document.documentElement;
-            const body = document.body;
-            const computedRoot = window.getComputedStyle(root);
-            const computedBody = window.getComputedStyle(body);
-            const variables = THEME_CSS_VARIABLES;
-            for (const v of variables) {
-                const val = root.style.getPropertyValue(v) || body.style.getPropertyValue(v) || computedRoot.getPropertyValue(v) || computedBody.getPropertyValue(v);
-                if (val) {
-                    cssText += `  ${v}: ${val};\n`;
+/**
+ * Recursively scales inline styles for an element and its descendants.
+ */
+function scaleInlineStyles(node: HTMLElement, scaleFactor: number): void {
+    const processElement = (el: HTMLElement) => {
+        if (!el.style) return;
+        for (let i = 0; i < el.style.length; i++) {
+            const prop = el.style[i];
+            if (prop === 'background-image' || prop === 'background') continue;
+            const val = el.style.getPropertyValue(prop);
+            if (val) {
+                const newVal = scaleValue(val, scaleFactor);
+                if (newVal !== val) {
+                    el.style.setProperty(prop, newVal, el.style.getPropertyPriority(prop));
                 }
             }
         }
-        cssText += '}\n';
+    };
+
+    processElement(node);
+    node.querySelectorAll<HTMLElement>('*').forEach(processElement);
+}
+
+/**
+ * Scales CSS stylesheet declarations using CSSOM in a detached `<style>` element.
+ */
+function scaleStylesheetCSSOM(cssText: string, scaleFactor: number): string {
+    const tempStyle = document.createElement('style');
+    tempStyle.textContent = cssText;
+    document.head.appendChild(tempStyle);
+
+    const sheet = tempStyle.sheet;
+    if (!sheet) {
+        document.head.removeChild(tempStyle);
         return cssText;
+    }
+
+    const processStyleDeclaration = (style: CSSStyleDeclaration) => {
+        for (let j = 0; j < style.length; j++) {
+            const prop = style[j];
+            if (prop === 'background-image' || prop === 'background') continue;
+            const val = style.getPropertyValue(prop);
+            if (val) {
+                const newVal = scaleValue(val, scaleFactor);
+                if (newVal !== val) {
+                    style.setProperty(prop, newVal, style.getPropertyPriority(prop));
+                }
+            }
+        }
     };
 
-    const getComprehensivePageCSS = async () => {
-        const cssTexts = new Set<string>();
-        for (const sheet of Array.from(document.styleSheets)) {
+    const processRules = (rules: CSSRuleList) => {
+        for (let i = 0; i < rules.length; i++) {
+            const rule = rules[i];
+            if (rule instanceof CSSStyleRule) {
+                processStyleDeclaration(rule.style);
+            } else if (rule instanceof CSSMediaRule) {
+                processRules(rule.cssRules);
+            } else if (rule instanceof CSSKeyframesRule) {
+                for (let j = 0; j < rule.cssRules.length; j++) {
+                    const kfRule = rule.cssRules[j];
+                    if (kfRule instanceof CSSKeyframeRule) {
+                        processStyleDeclaration(kfRule.style);
+                    }
+                }
+            }
+        }
+    };
+
+    try {
+        processRules(sheet.cssRules);
+        const result = Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
+        document.head.removeChild(tempStyle);
+        return result;
+    } catch (e) {
+        console.error('[log plugin] scaleStylesheetCSSOM error:', e);
+        document.head.removeChild(tempStyle);
+        return cssText;
+    }
+}
+
+// ─── Node Transformation for HTML Preview ─────────────────────────────────────
+
+/**
+ * Resolves avatar data URL from avatarMap for a given participant name.
+ */
+function resolveAvatarDataUrl(
+    name: string,
+    avatarMap?: Map<string, string> | Record<string, string>
+): string {
+    if (!avatarMap || !name) return '';
+    const trimmed = name.trim();
+    if (avatarMap instanceof Map) {
+        return avatarMap.get(name) || avatarMap.get(trimmed) || '';
+    }
+    return avatarMap[name] || avatarMap[trimmed] || '';
+}
+
+/**
+ * Replaces avatar `<img>` tags and `background-image` styles outside the message prose content.
+ */
+function replaceNodeAvatars(clonedNode: HTMLElement, avatarDataUrl: string): void {
+    if (!avatarDataUrl) return;
+
+    // 1. Replace <img> src outside prose/chattext
+    clonedNode.querySelectorAll<HTMLImageElement>('img').forEach(img => {
+        if (!img.closest('.prose, .chattext')) {
+            img.src = avatarDataUrl;
+        }
+    });
+
+    // 2. Replace background-image outside prose/chattext
+    clonedNode.querySelectorAll<HTMLElement>('[style*="background"]').forEach(el => {
+        if (!el.closest('.prose, .chattext')) {
+            const styleAttr = el.getAttribute('style');
+            if (styleAttr) {
+                const newStyle = styleAttr
+                    .replace(/url\(['"]?[^'"]+?['"]?\)/g, `url('${avatarDataUrl}')`)
+                    .replace(/url\(&quot;[^&]+?&quot;\)/g, `url('${avatarDataUrl}')`);
+                el.setAttribute('style', newStyle);
+            }
+        }
+    });
+}
+
+/**
+ * Converts external/remote images and background-images in the node to local blob URLs.
+ */
+async function inlineImagesAsBlobs(clonedNode: HTMLElement): Promise<void> {
+    // 1. Convert <img> elements
+    const images = Array.from(clonedNode.querySelectorAll<HTMLImageElement>('img'));
+    for (const img of images) {
+        if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
             try {
-                const rules = sheet.cssRules;
-                for (const rule of Array.from(rules)) {
-                    cssTexts.add(rule.cssText);
-                }
-            } catch {
-                // ignore CORS
+                img.src = await imageUrlToBlob(img.src);
+            } catch (e) {
+                console.warn(`Blob conversion error for ${img.src}:`, e);
             }
         }
-        document.querySelectorAll('style').forEach(styleElement => {
-            if (styleElement.id !== 'log-exporter-styles' && styleElement.textContent) {
-                cssTexts.add(styleElement.textContent);
-            }
-        });
-        return Array.from(cssTexts).join('\n');
-    };
+    }
 
-    const scaleMode = settings.htmlScaleMode || 'font';
-    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
+    // 2. Convert background-image inline styles
+    const bgElements = Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'));
+    for (const el of bgElements) {
+        const styleAttr = el.getAttribute('style');
+        if (!styleAttr) continue;
 
-    const scaleValue = (val: string): string => {
-        return val.replace(/(-?\d+(?:\.\d+)?)\s*(px|rem)\b/g, (match, p1, p2) => {
-            const num = parseFloat(p1);
-            if (p2 === 'px' && Math.abs(num) <= 1) return match;
-            return `${Number((num * scaleFactor).toFixed(4))}${p2}`;
-        });
-    };
-
-    const scaleInlineStyles = (node: HTMLElement) => {
-        const processElement = (el: HTMLElement) => {
-            if (!el.style) return;
-            for (let i = 0; i < el.style.length; i++) {
-                const prop = el.style[i];
-                if (prop === 'background-image' || prop === 'background') continue;
-                const val = el.style.getPropertyValue(prop);
-                if (val) {
-                    const newVal = scaleValue(val);
-                    if (newVal !== val) {
-                        el.style.setProperty(prop, newVal, el.style.getPropertyPriority(prop));
-                    }
-                }
-            }
-        };
-
-        processElement(node);
-        node.querySelectorAll('*').forEach(el => processElement(el as HTMLElement));
-    };
-
-    const scaleStylesheetCSSOM = (cssText: string): string => {
-        const tempStyle = document.createElement('style');
-        tempStyle.textContent = cssText;
-        document.head.appendChild(tempStyle);
-
-        const sheet = tempStyle.sheet;
-        if (!sheet) {
-            document.head.removeChild(tempStyle);
-            return cssText;
-        }
-
-        const processRules = (rules: CSSRuleList) => {
-            for (let i = 0; i < rules.length; i++) {
-                const rule = rules[i];
-                if (rule instanceof CSSStyleRule) {
-                    const style = rule.style;
-                    for (let j = 0; j < style.length; j++) {
-                        const prop = style[j];
-                        if (prop === 'background-image' || prop === 'background') continue;
-                        const val = style.getPropertyValue(prop);
-                        if (val) {
-                            const newVal = scaleValue(val);
-                            if (newVal !== val) {
-                                style.setProperty(prop, newVal, style.getPropertyPriority(prop));
-                            }
-                        }
-                    }
-                } else if (rule instanceof CSSMediaRule) {
-                    processRules(rule.cssRules);
-                } else if (rule instanceof CSSKeyframesRule) {
-                    for (let j = 0; j < rule.cssRules.length; j++) {
-                        const kfRule = rule.cssRules[j];
-                        if (kfRule instanceof CSSKeyframeRule) {
-                            const style = kfRule.style;
-                            for (let k = 0; k < style.length; k++) {
-                                const prop = style[k];
-                                const val = style.getPropertyValue(prop);
-                                if (val) {
-                                    const newVal = scaleValue(val);
-                                    if (newVal !== val) {
-                                        style.setProperty(prop, newVal, style.getPropertyPriority(prop));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        };
-
-        try {
-            processRules(sheet.cssRules);
-            const result = Array.from(sheet.cssRules).map(r => r.cssText).join('\n');
-            document.head.removeChild(tempStyle);
-            return result;
-        } catch (e) {
-            console.error('[log plugin] scaleStylesheetCSSOM error:', e);
-            document.head.removeChild(tempStyle);
-            return cssText;
-        }
-    };
-
-    const clonedNodesHtml = await Promise.all(nodes.map(async (node) => {
-        const clonedNode = node.cloneNode(true) as HTMLElement;
-
-        // Remove RisuAI's utility buttons, model badges, and custom injected buttons
-        clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
-
-        // 이름 폰트 색상 강제 지정 (CSS 우선순위 이슈 및 테마 클래스 누락 방지)
-        clonedNode.querySelectorAll('.text-textcolor, .text-textcolor span').forEach(el => {
-            (el as HTMLElement).style.setProperty('color', 'var(--risu-theme-textcolor)', 'important');
-        });
-
-        // 아바타 이미지 강제 치환 (샌드박스 파일 접근/보안 에러 방지)
-        const globalSettings = await loadGlobalSettings();
-        const name = getNameFromNode(clonedNode, globalSettings, '');
-        if (name && avatarMap) {
-            let avatarDataUrl = '';
-            if (avatarMap instanceof Map) {
-                avatarDataUrl = avatarMap.get(name) || avatarMap.get(name.trim()) || '';
-            } else {
-                avatarDataUrl = avatarMap[name] || avatarMap[name.trim()] || '';
-            }
-
-            if (avatarDataUrl) {
-                // 본문 바깥 영역의 <img> 태그 교체
-                clonedNode.querySelectorAll('img').forEach(img => {
-                    if (!img.closest('.prose, .chattext')) {
-                        (img as HTMLImageElement).src = avatarDataUrl;
-                    }
-                });
-
-                // 본문 바깥 영역의 background-image 스타일 요소 교체
-                clonedNode.querySelectorAll<HTMLElement>('[style*="background"]').forEach(el => {
-                    if (!el.closest('.prose, .chattext')) {
-                        const styleAttr = el.getAttribute('style');
-                        if (styleAttr) {
-                            const newStyle = styleAttr.replace(/url\(['"]?[^'"]+?['"]?\)/g, `url('${avatarDataUrl}')`)
-                                                     .replace(/url\(&quot;[^&]+?&quot;\)/g, `url('${avatarDataUrl}')`);
-                            el.setAttribute('style', newStyle);
-                        }
-                    }
-                });
+        const originalUrl = extractBackgroundImageUrl(styleAttr);
+        if (originalUrl && !originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
+            try {
+                const dataUrl = await imageUrlToBlob(originalUrl);
+                const newStyle = styleAttr.replace(originalUrl, dataUrl);
+                el.setAttribute('style', newStyle);
+                console.log('[log plugin] Successfully replaced background url in style attribute:', originalUrl.substring(0, 50));
+            } catch (e) {
+                console.warn(`Background image blob conversion error for ${originalUrl}:`, e);
             }
         }
+    }
+}
 
-        if (settings.embedImages !== false) {
-            for (const img of Array.from(clonedNode.querySelectorAll('img'))) {
-                if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
-                    try {
-                        img.src = await imageUrlToBlob(img.src);
-                    } catch (e) {
-                        console.warn(`Blob conversion error for ${img.src}:`, e);
-                    }
-                }
-            }
+/**
+ * Transforms an individual chat DOM node for the HTML preview.
+ */
+async function transformPreviewNode(
+    node: HTMLElement,
+    globalSettings: GlobalSettings,
+    settings: LogExportSettings,
+    avatarMap?: Map<string, string> | Record<string, string>,
+    scaleMode: 'font' | 'full' = 'font',
+    scaleFactor: number = 1.0
+): Promise<string> {
+    const clonedNode = node.cloneNode(true) as HTMLElement;
 
-            // 가상 DOM 에서 style 속성 파서 한계를 우회하기 위해 getAttribute/setAttribute를 활용한 속성 문자열 파싱
-            for (const el of Array.from(clonedNode.querySelectorAll<HTMLElement>('[style*="background"]'))) {
-                const styleAttr = el.getAttribute('style');
-                if (styleAttr) {
-                    const originalUrl = extractBackgroundImageUrl(styleAttr);
-                    if (originalUrl) {
-                        if (!originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
-                            try {
-                                const dataUrl = await imageUrlToBlob(originalUrl);
-                                const newStyle = styleAttr.replace(originalUrl, dataUrl);
-                                el.setAttribute('style', newStyle);
-                                console.log('[log plugin] Successfully replaced background url in style attribute:', originalUrl.substring(0, 50));
-                            } catch (e) {
-                                console.warn(`Background image blob conversion error for ${originalUrl}:`, e);
-                            }
-                        }
-                    }
-                }
-            }
+    // 1. Remove RisuAI's utility buttons, model badges, and custom injected buttons
+    clonedNode.querySelectorAll('button, .log-exporter-msg-btn-group, .grow.flex.items-center.justify-end, .flex-grow.flex.items-center.justify-end').forEach(el => el.remove());
+
+    // 2. Force text color styling to prevent CSS specificity issues
+    clonedNode.querySelectorAll<HTMLElement>('.text-textcolor, .text-textcolor span').forEach(el => {
+        el.style.setProperty('color', 'var(--risu-theme-textcolor)', 'important');
+    });
+
+    // 3. Replace avatars to prevent sandboxed file access/CORS security errors
+    const name = getNameFromNode(clonedNode, globalSettings, '');
+    const avatarDataUrl = resolveAvatarDataUrl(name, avatarMap);
+    if (avatarDataUrl) {
+        replaceNodeAvatars(clonedNode, avatarDataUrl);
+    }
+
+    // 4. Embed images as blobs if enabled
+    if (settings.embedImages !== false) {
+        await inlineImagesAsBlobs(clonedNode);
+    }
+
+    // 5. Apply text replacement rules to the message body
+    if (settings.replacementRules && settings.replacementRules.length > 0) {
+        const messageEl = clonedNode.querySelector<HTMLElement>('.prose, .chattext');
+        if (messageEl) {
+            applyReplacements(messageEl, settings.replacementRules);
         }
+    }
 
-        if (settings.replacementRules && settings.replacementRules.length > 0) {
-            // Apply replacements to the message content within the cloned node
-            const messageEl = clonedNode.querySelector('.prose, .chattext');
-            if (messageEl) {
-                applyReplacements(messageEl as HTMLElement, settings.replacementRules);
-            }
-        }
+    // 6. Scale inline styles if full scaling mode is active
+    if (scaleMode === 'full' && scaleFactor !== 1.0) {
+        scaleInlineStyles(clonedNode, scaleFactor);
+    }
 
-        // Scale inline styles for full scaling mode
-        if (scaleMode === 'full' && scaleFactor !== 1.0) {
-            scaleInlineStyles(clonedNode);
-        }
+    return clonedNode.outerHTML;
+}
 
-        return clonedNode.outerHTML;
-    }));
-
-    let fullCss = await getThemeCssVariables() + '\n' + parentStyles.join('\n') + '\n' + await getComprehensivePageCSS();
-
+/**
+ * Assembles optional CSS extensions (force-hover, animation disable, font scaling).
+ */
+async function buildExtraCss(
+    settings: LogExportSettings,
+    scaleMode: 'font' | 'full',
+    scaleFactor: number
+): Promise<string> {
     let extraCss = '';
+
     if (settings.expandHover) {
         extraCss += await generateForceHoverCss();
     }
+
     if (settings.disableAnimations) {
         extraCss += `
             *, *::before, *::after {
@@ -553,22 +689,51 @@ export const generateHtmlPreview = async (nodes: HTMLElement[], settings: LogExp
         `;
     }
 
-    // Scale CSS stylesheets for full scaling mode
+    return extraCss;
+}
+
+// ─── HTML Preview Generator ───────────────────────────────────────────────────
+
+/**
+ * Generates full standalone HTML with embedded styles for live preview and copy operations.
+ */
+export const generateHtmlPreview = async (
+    nodes: HTMLElement[],
+    settings: LogExportSettings,
+    avatarMap?: Map<string, string> | Record<string, string>
+): Promise<string> => {
+    const scaleMode = settings.htmlScaleMode || 'font';
+    const scaleFactor = settings.htmlScaleFactor !== undefined ? Number(settings.htmlScaleFactor) : 1.0;
+
+    const [parentStyles, themeCss, pageCss, globalSettings] = await Promise.all([
+        getParentPageStyles(),
+        getThemeCssVariables(),
+        Promise.resolve(getComprehensivePageCSS()),
+        loadGlobalSettings(),
+    ]);
+
+    const clonedNodesHtml = await Promise.all(
+        nodes.map(node =>
+            transformPreviewNode(node, globalSettings, settings, avatarMap, scaleMode, scaleFactor)
+        )
+    );
+
+    let fullCss = `${themeCss}\n${parentStyles.join('\n')}\n${pageCss}`;
+    let extraCss = await buildExtraCss(settings, scaleMode, scaleFactor);
+
     if (scaleMode === 'full' && scaleFactor !== 1.0) {
-        fullCss = scaleStylesheetCSSOM(fullCss);
-        extraCss = scaleStylesheetCSSOM(extraCss);
+        fullCss = scaleStylesheetCSSOM(fullCss, scaleFactor);
+        extraCss = scaleStylesheetCSSOM(extraCss, scaleFactor);
     }
 
     const wrapperClassAttr = settings.expandHover ? 'class="expand-hover-globally"' : '';
-    const wrapperStyle = `
-    max-width: ${settings.previewWidth || 800}px;
-    `;
+    const wrapperMaxWidth = settings.previewWidth || 800;
 
     return `
         <style>${fullCss}\n${extraCss}</style>
-        <div id="log-html-preview-container" ${wrapperClassAttr} style="${wrapperStyle}">
-        <div id="log-html-scaler">
-            ${clonedNodesHtml.join('')}
+        <div id="log-html-preview-container" ${wrapperClassAttr} style="max-width: ${wrapperMaxWidth}px;">
+            <div id="log-html-scaler">
+                ${clonedNodesHtml.join('')}
             </div>
         </div>
     `;

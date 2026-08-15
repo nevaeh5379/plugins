@@ -1406,7 +1406,7 @@ interface RisuaiPluginAPI {
      * }
      * ```
      */
-    getDatabase(includeOnly:string[]|'all' = 'all'): Promise<DatabaseSubset|null>;
+    getDatabase(includeOnly?: string[] | 'all'): Promise<DatabaseSubset | null>;
 
     /**
      * Sets the database (lightweight save)
@@ -1793,7 +1793,7 @@ interface RisuaiPluginAPI {
      */
     removeRisuReplacer(
         type: ReplacerType,
-        func: Function
+        func: (...args: unknown[]) => unknown
     ): Promise<void>;
 
     // ========== Body Interceptors ==========
@@ -1924,7 +1924,7 @@ interface RisuaiPluginAPI {
      * @param callback - Function to call when a message is received on this channel
      * @remarks This API is subject to change. API might be changed, deprecated, or removed in the future without prior notice.
      */
-    addPluginChannelListener(channelName: string, callback: Function): Promise<void>;
+    addPluginChannelListener(channelName: string, callback: (...args: unknown[]) => unknown): Promise<void>;
 
     /**
      * Sends a message to another plugin's named channel (IPC between plugins).
