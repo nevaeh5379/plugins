@@ -371,6 +371,13 @@ const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({ content }) => {
         :host {
           all: initial;
           display: block;
+          height: 100%;
+          overflow: auto;
+          box-sizing: border-box;
+          background-color: var(--risu-theme-bgcolor, var(--color-bgcolor, var(--background, #1a1b26)));
+        }
+        #log-html-preview-container {
+          margin: 0 auto;
         }
         img, video {
           max-width: 100%;
@@ -382,7 +389,7 @@ const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({ content }) => {
     `;
   }, [content]);
 
-  return <div ref={hostRef} />;
+  return <div ref={hostRef} style={{ height: '100%' }} />;
 };
 
 interface RawHtmlViewerProps {
