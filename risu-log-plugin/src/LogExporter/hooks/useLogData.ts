@@ -255,6 +255,16 @@ export function useFilteredNodes(
       return [];
     }
 
+    const hasParticipantFilter =
+      Array.isArray(globalSettings?.filteredParticipants) &&
+      globalSettings.filteredParticipants.length > 0;
+
+    // Fast path: no custom class filters and no participant exclusions —
+    // return the original array without cloning any nodes.
+    if (activeFilters.length === 0 && !hasParticipantFilter) {
+      return messageNodes;
+    }
+
     return messageNodes
       .map((node) => {
         if (activeFilters.length > 0) {

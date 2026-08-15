@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import type {
   LogContainerProps,
   ColorPalette,
@@ -19,13 +19,12 @@ import MessageRenderer from './MessageRenderer';
 const DEFAULT_CONTAINER_WIDTH = 900;
 const DEFAULT_FONT_SIZE = 16;
 const EXPORT_SAFETY_TIMEOUT_MS = 2000;
-const MOBILE_BREAKPOINT = 1024;
-const IDLE_CALLBACK_TIMEOUT_MS = 250;
 
-const BATCH_CONFIG = {
-  mobile: { initial: 24, batch: 16, timeout: 120 },
-  desktop: { initial: 50, batch: 50, timeout: 60 },
-} as const;
+/** Number of extra messages rendered above/below the visible viewport in preview mode. */
+const VIRTUAL_OVERSCAN = 8;
+
+/** Fallback height (px) for messages that have not yet been measured. */
+const ESTIMATED_MESSAGE_HEIGHT = 120;
 
 /** Style rules injected when animations and transitions are globally disabled */
 const DISABLE_ANIMATIONS_CSS = `
@@ -149,57 +148,146 @@ function useAvatarResolution(
 }
 
 /**
- * Hook to manage progressive batch rendering for large logs in preview mode,
- * while rendering all nodes immediately during export.
+ * Hook to virtualize the message list in preview mode, rendering only the
+ * messages within (and slightly beyond) the visible viewport. Export mode
+ * renders every node immediately.
+ *
+ * Message heights are measured in scaled screen coordinates (via
+ * `getBoundingClientRect`) so they stay consistent with the scroll container's
+ * `scrollTop`, which is also in scaled coordinates.
  */
-function useIncrementalRendering(
+function useVirtualizedRange(
   totalNodes: number,
   isExportMode: boolean,
-): number {
-  const isMobile =
-    typeof window !== 'undefined' &&
-    window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+  listRef: React.RefObject<HTMLElement | null>,
+): { start: number; end: number; topPad: number; bottomPad: number } {
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [listTop, setListTop] = useState(0);
+  const [measureVersion, setMeasureVersion] = useState(0);
+  const heightsRef = useRef<number[]>([]);
+  const startRef = useRef(0);
 
-  const batchConfig = isMobile ? BATCH_CONFIG.mobile : BATCH_CONFIG.desktop;
-  const initialCount = isExportMode
-    ? totalNodes
-    : Math.min(batchConfig.initial, totalNodes);
-
-  const [visibleCount, setVisibleCount] = useState<number>(initialCount);
-
-  // Reset visible count when total node count or export mode changes
+  // Locate the scroll container and track its scroll position / size.
   useEffect(() => {
-    if (isExportMode) {
-      setVisibleCount(totalNodes);
-    } else {
-      setVisibleCount(Math.min(batchConfig.initial, totalNodes));
-    }
-  }, [totalNodes, isExportMode, batchConfig.initial]);
+    if (isExportMode) return;
+    const list = listRef.current;
+    if (!list) return;
 
-  // Incrementally render next batch using requestIdleCallback or setTimeout
-  useEffect(() => {
-    if (isExportMode || visibleCount >= totalNodes) return;
+    const scrollEl = list.closest('.preview-viewport') as HTMLElement | null;
+    if (!scrollEl) return;
 
-    const renderNextBatch = () => {
-      setVisibleCount((prev) => Math.min(prev + batchConfig.batch, totalNodes));
+    let rafId = 0;
+    const measure = () => {
+      rafId = 0;
+      const listRect = list.getBoundingClientRect();
+      const scrollRect = scrollEl.getBoundingClientRect();
+      setListTop(listRect.top - scrollRect.top + scrollEl.scrollTop);
+      setScrollTop(scrollEl.scrollTop);
+      setViewportHeight(scrollEl.clientHeight);
+    };
+    const scheduleMeasure = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(measure);
     };
 
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const idleId = window.requestIdleCallback(renderNextBatch, {
-        timeout: IDLE_CALLBACK_TIMEOUT_MS,
-      });
-      return () => window.cancelIdleCallback(idleId);
+    scheduleMeasure();
+    scrollEl.addEventListener('scroll', scheduleMeasure, { passive: true });
+    const ro = new ResizeObserver(scheduleMeasure);
+    ro.observe(scrollEl);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      scrollEl.removeEventListener('scroll', scheduleMeasure);
+      ro.disconnect();
+    };
+  }, [isExportMode, listRef, totalNodes]);
+
+  // Measure rendered message heights (scaled) and store them for offset math.
+  useLayoutEffect(() => {
+    if (isExportMode) return;
+    const list = listRef.current;
+    if (!list) return;
+
+    const children = Array.from(list.children) as HTMLElement[];
+    const start = startRef.current;
+    const heights = heightsRef.current;
+    let changed = false;
+
+    children.forEach((child, i) => {
+      const idx = start + i;
+      const h = child.getBoundingClientRect().height;
+      if (h > 0 && heights[idx] !== h) {
+        heights[idx] = h;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      setMeasureVersion((v) => v + 1);
+    }
+  }, [isExportMode, listRef, measureVersion]);
+
+  // Compute the visible slice and spacer paddings from measured offsets.
+  const { start, end, topPad, bottomPad } = useMemo(() => {
+    if (isExportMode) {
+      return { start: 0, end: totalNodes, topPad: 0, bottomPad: 0 };
     }
 
-    const timer = setTimeout(renderNextBatch, batchConfig.timeout);
-    return () => clearTimeout(timer);
-  }, [visibleCount, totalNodes, isExportMode, batchConfig.batch, batchConfig.timeout]);
+    // `measureVersion` is read to invalidate this memo when message heights change.
+    void measureVersion;
 
-  return visibleCount;
+    const heights = heightsRef.current;
+    const offsets: number[] = new Array(totalNodes + 1);
+    offsets[0] = 0;
+    for (let i = 0; i < totalNodes; i++) {
+      offsets[i + 1] = offsets[i] + (heights[i] || ESTIMATED_MESSAGE_HEIGHT);
+    }
+    const totalHeight = offsets[totalNodes];
+
+    const localScrollTop = Math.max(0, scrollTop - listTop);
+    const viewBottom = localScrollTop + viewportHeight;
+    const overscan = VIRTUAL_OVERSCAN * ESTIMATED_MESSAGE_HEIGHT;
+
+    let start = 0;
+    for (let i = 0; i < totalNodes; i++) {
+      if (offsets[i + 1] > localScrollTop - overscan) {
+        start = i;
+        break;
+      }
+    }
+
+    let end = totalNodes;
+    for (let i = start; i < totalNodes; i++) {
+      if (offsets[i] > viewBottom + overscan) {
+        end = i;
+        break;
+      }
+    }
+
+    start = Math.max(0, start);
+    end = Math.min(totalNodes, end);
+
+    return {
+      start,
+      end,
+      topPad: offsets[start],
+      bottomPad: totalHeight - offsets[end],
+    };
+  }, [isExportMode, totalNodes, scrollTop, viewportHeight, listTop, measureVersion]);
+
+  startRef.current = start;
+
+  return { start, end, topPad, bottomPad };
 }
 
 /**
  * Hook to track message rendering progress and safely trigger onReady callback.
+ *
+ * - Export mode: waits for every message to report rendered (with a safety
+ *   timeout for headless/offscreen environments).
+ * - Preview mode: only the visible slice is rendered, so `onReady` fires after
+ *   the initial visible batch has painted (used for dimension measurement).
  */
 function useMessageReadinessSync(
   nodeCount: number,
@@ -239,6 +327,11 @@ function useMessageReadinessSync(
       }, EXPORT_SAFETY_TIMEOUT_MS);
       return () => clearTimeout(timer);
     }
+
+    // Preview mode: only the visible slice renders, so mark ready after the
+    // initial paint to allow dimension measurement.
+    const timer = setTimeout(() => setAllMessagesReady(true), 0);
+    return () => clearTimeout(timer);
   }, [nodeCount, isExportMode]);
 
   useEffect(() => {
@@ -324,8 +417,13 @@ export const LogContainer: React.FC<LogContainerProps> = (props) => {
     preCollectedAvatarMap,
   );
 
-  // 3. Progressive / Batch Rendering in Preview
-  const visibleCount = useIncrementalRendering(nodes.length, isExportMode);
+  // 3. Virtualized message range (preview) / full render (export)
+  const messageListRef = useRef<HTMLElement>(null);
+  const { start, end, topPad, bottomPad } = useVirtualizedRange(
+    nodes.length,
+    isExportMode,
+    messageListRef,
+  );
 
   // 4. Message Readiness & onReady Trigger Synchronization
   const { handleMessageRendered } = useMessageReadinessSync(
@@ -384,40 +482,45 @@ export const LogContainer: React.FC<LogContainerProps> = (props) => {
       )}
 
       {/* Message List */}
-      <main className="risu-log-messages">
-        {nodes.slice(0, visibleCount).map((node, index) => (
-          <MessageRenderer
-            key={index}
-            node={node}
-            index={index}
-            charInfoName={charInfo.name}
-            color={color}
-            themeKey={selectedThemeKey}
-            avatarMap={avatarMap}
-            showAvatar={showAvatar}
-            showBubble={showBubble}
-            isForArca={isForArca}
-            embedImagesAsBlob={embedImagesAsBlob}
-            allowHtmlRendering={allowHtmlRendering}
-            globalSettings={globalSettings}
-            imageScale={imageScale}
-            imageAlign={imageAlign}
-            imageStyle={imageStyle}
-            imageCropActive={imageCropActive}
-            imageCropAspectRatio={imageCropAspectRatio}
-            imageCropVAlign={imageCropVAlign}
-            imageCropHAlign={imageCropHAlign}
-            imageCropHeight={imageCropHeight}
-            isEditable={isEditable}
-            onMessageUpdate={onMessageUpdate}
-            isSelected={selectedIndices?.has(index)}
-            onSelect={onMessageSelect}
-            isForExport={isForExport}
-            onRendered={() => handleMessageRendered(index)}
-            replacementRules={replacementRules}
-            fontSize={fontSize}
-          />
-        ))}
+      <main className="risu-log-messages" ref={messageListRef}>
+        {topPad > 0 && <div style={{ height: topPad }} aria-hidden="true" />}
+        {nodes.slice(start, end).map((node, i) => {
+          const index = start + i;
+          return (
+            <MessageRenderer
+              key={index}
+              node={node}
+              index={index}
+              charInfoName={charInfo.name}
+              color={color}
+              themeKey={selectedThemeKey}
+              avatarMap={avatarMap}
+              showAvatar={showAvatar}
+              showBubble={showBubble}
+              isForArca={isForArca}
+              embedImagesAsBlob={embedImagesAsBlob}
+              allowHtmlRendering={allowHtmlRendering}
+              globalSettings={globalSettings}
+              imageScale={imageScale}
+              imageAlign={imageAlign}
+              imageStyle={imageStyle}
+              imageCropActive={imageCropActive}
+              imageCropAspectRatio={imageCropAspectRatio}
+              imageCropVAlign={imageCropVAlign}
+              imageCropHAlign={imageCropHAlign}
+              imageCropHeight={imageCropHeight}
+              isEditable={isEditable}
+              onMessageUpdate={onMessageUpdate}
+              isSelected={selectedIndices?.has(index)}
+              onSelect={onMessageSelect}
+              isForExport={isForExport}
+              onRendered={() => handleMessageRendered(index)}
+              replacementRules={replacementRules}
+              fontSize={fontSize}
+            />
+          );
+        })}
+        {bottomPad > 0 && <div style={{ height: bottomPad }} aria-hidden="true" />}
       </main>
 
       {/* Log Footer */}

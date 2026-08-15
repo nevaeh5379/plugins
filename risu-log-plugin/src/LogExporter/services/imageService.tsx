@@ -54,8 +54,15 @@ const DEFAULT_BASE_FONT_SIZE = 16;
 /** Maximum time (ms) to wait for images and videos in an element to load */
 const MEDIA_WAIT_TIMEOUT_MS = 5000;
 
-/** Delay (ms) for UI / progress transitions */
-const UI_TRANSITION_DELAY_MS = 150;
+/** Yields to the browser so progress UI can paint without an artificial delay. */
+const yieldToUI = (): Promise<void> =>
+    new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => resolve());
+        } else {
+            setTimeout(resolve, 0);
+        }
+    });
 
 /** Short delay (ms) before triggering download */
 const DOWNLOAD_PREPARATION_DELAY_MS = 50;
@@ -416,7 +423,7 @@ const saveElementAsImage = async ({
     onProgressUpdate,
 }: RenderImageParams): Promise<void> => {
     onProgressUpdate({ message: `[${partIndex + 1}/${totalParts}] 이미지 데이터 생성 중...` });
-    await delay(UI_TRANSITION_DELAY_MS);
+    await yieldToUI();
 
     const safeCharName = sanitizeFilename(charName);
     const safeChatName = sanitizeFilename(chatName);
@@ -614,7 +621,7 @@ const exportSingleElementPipeline = async (
     );
 
     onProgressStart('이미지 생성 중...', chunks.length);
-    await delay(UI_TRANSITION_DELAY_MS);
+    await yieldToUI();
 
     const { container, remove } = createOffscreenContainer();
 
@@ -690,7 +697,9 @@ const exportNodeArrayPipeline = async (
         );
 
         onProgressStart('이미지 생성 중...', chunks.length);
-        await delay(UI_TRANSITION_DELAY_MS);
+        await yieldToUI();
+
+        const globalSettings = await loadGlobalSettings();
 
         for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i];
@@ -700,9 +709,8 @@ const exportNodeArrayPipeline = async (
                 current: i + 1,
                 message: `[${i + 1}/${chunks.length}] 컴포넌트 렌더링 중...`,
             });
-            await delay(UI_TRANSITION_DELAY_MS);
+            await yieldToUI();
 
-            const globalSettings = await loadGlobalSettings();
             const props = buildLogContainerProps({
                 chunkNodes,
                 charName,
@@ -790,7 +798,7 @@ export const saveAsImage = async (
         const bgColor = backgroundColor || DEFAULT_BACKGROUND_COLOR;
 
         onProgressStart('분할 이미지 계산 중...', 1);
-        await delay(UI_TRANSITION_DELAY_MS);
+        await yieldToUI();
 
         if (!Array.isArray(nodes)) {
             await exportSingleElementPipeline(nodes, format, charName, chatName, options, bgColor);

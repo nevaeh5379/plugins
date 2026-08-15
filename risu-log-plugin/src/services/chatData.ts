@@ -277,22 +277,24 @@ async function collectAvatarsMain(
   }
 
   // 3. 각 대화 노드를 순회하며 background style로부터 추가적인 아바타(그룹 챗 등) 수집
-  for (const node of nodes) {
-    try {
-      const name = await extractParticipantName(node)
-      if (!name || avatarMap[name]) continue
+  await Promise.all(
+    nodes.map(async (node) => {
+      try {
+        const name = await extractParticipantName(node)
+        if (!name || avatarMap[name]) return
 
-      const rawAvatarUrl = await extractAvatarUrlFromNode(node)
-      if (!rawAvatarUrl) continue
+        const rawAvatarUrl = await extractAvatarUrlFromNode(node)
+        if (!rawAvatarUrl) return
 
-      const finalDataUrl = await resolveAvatarDataUrl(rawAvatarUrl)
-      if (finalDataUrl) {
-        avatarMap[name] = finalDataUrl
+        const finalDataUrl = await resolveAvatarDataUrl(rawAvatarUrl)
+        if (finalDataUrl) {
+          avatarMap[name] = finalDataUrl
+        }
+      } catch (e) {
+        console.warn('[log plugin] Error collecting avatar for a node:', e)
       }
-    } catch (e) {
-      console.warn('[log plugin] Error collecting avatar for a node:', e)
-    }
-  }
+    })
+  )
 
   return avatarMap
 }
@@ -311,11 +313,15 @@ export async function processChatLog(
   chatIndex?: number,
   options: ProcessOptions = {}
 ): Promise<ChatLogData> {
-  const rootDoc = await ensureRootDoc()
-  const charIdx = await Risuai.getCurrentCharacterIndex()
-  const character = (await Risuai.getCharacter()) as RisuCharacter | null
+  // Independent RisuAI API calls are resolved concurrently to reduce startup latency.
+  const [rootDoc, charIdx, character, currentChatIndex] = await Promise.all([
+    ensureRootDoc(),
+    Risuai.getCurrentCharacterIndex(),
+    Risuai.getCharacter() as Promise<RisuCharacter | null>,
+    Risuai.getCurrentChatIndex(),
+  ])
 
-  const targetChatIndex = chatIndex ?? (await Risuai.getCurrentChatIndex())
+  const targetChatIndex = chatIndex ?? currentChatIndex
 
   let chat: RisuChat | null = null
   if (character && targetChatIndex >= 0) {
