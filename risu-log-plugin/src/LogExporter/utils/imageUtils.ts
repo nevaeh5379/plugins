@@ -204,6 +204,47 @@ function loadImageElement(blob: Blob): Promise<HTMLImageElement> {
     });
 }
 
+/**
+ * Loads an image directly from a URL (data:, blob:, or http(s):) into an HTMLImageElement.
+ * Unlike `loadImageElement`, this does not create an intermediate object URL, so it can
+ * load `blob:` URLs without triggering a `fetch` (which is blocked by iframe CSP `connect-src 'none'`).
+ */
+function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+
+        image.onload = () => resolve(image);
+        image.onerror = (event) =>
+            reject(new Error(`Failed to load image from URL: ${String(event)}`));
+
+        image.src = url;
+    });
+}
+
+/**
+ * Converts a `blob:` URL into a base64 Data URL without using `fetch`.
+ *
+ * `blob:` URLs cannot be read via `fetch` inside the plugin iframe because the host
+ * enforces CSP `connect-src 'none'`. However, `blob:` URLs are still loadable as an
+ * `<img>` source (img-src), so we draw the image onto a canvas and export it as a
+ * Data URL. This lets capture libraries (html-to-image / dom-to-image / snapdom)
+ * inline the image without any network request.
+ */
+async function blobUrlToDataUrl(blobUrl: string): Promise<string> {
+    const image = await loadImageFromUrl(blobUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Canvas context not available');
+    }
+    ctx.drawImage(image, 0, 0);
+
+    return canvas.toDataURL('image/png');
+}
+
 // ==========================================
 // Exported Core Functions
 // ==========================================
@@ -334,8 +375,14 @@ export async function fetchToBlobNative(url: string): Promise<Blob> {
  * @returns Data URL 문자열
  */
 export const imageUrlToBlob = async (url: string): Promise<string> => {
-    if (!url || url.startsWith('data:') || url.startsWith('blob:')) {
+    if (!url || url.startsWith('data:')) {
         return url;
+    }
+
+    // blob: URLs cannot be fetched under iframe CSP `connect-src 'none'`, so convert
+    // them to data URLs via canvas (img-src) to keep capture libraries working.
+    if (url.startsWith('blob:')) {
+        return blobUrlToDataUrl(url);
     }
 
     const cached = dataUrlCache.get(url);

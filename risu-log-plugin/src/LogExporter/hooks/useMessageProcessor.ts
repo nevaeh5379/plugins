@@ -90,7 +90,7 @@ const embedImagesInElement = async (
   const mediaPromises = mediaElements.map(async (el) => {
     if (el.tagName === 'IMG') {
       const img = el as HTMLImageElement;
-      if (img.src && embedImages && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+      if (img.src && embedImages && !img.src.startsWith('data:')) {
         try {
           img.src = await imageUrlToBlob(img.src);
         } catch (e) {
@@ -115,7 +115,7 @@ const embedImagesInElement = async (
  * Retains background-image CSS property while embedding url as blob.
  */
 const keepBackgroundImage: BackgroundImageHandler = async (element, bgUrl, embedImages) => {
-  if (embedImages && !bgUrl.startsWith('data:') && !bgUrl.startsWith('blob:')) {
+  if (embedImages && !bgUrl.startsWith('data:')) {
     try {
       const convertedUrl = await imageUrlToBlob(bgUrl);
       element.style.backgroundImage = `url("${convertedUrl}")`;

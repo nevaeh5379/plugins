@@ -580,7 +580,7 @@ async function inlineImagesAsBlobs(clonedNode: HTMLElement): Promise<void> {
     // 1. Convert <img> elements
     const images = Array.from(clonedNode.querySelectorAll<HTMLImageElement>('img'));
     for (const img of images) {
-        if (img.src && !img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+        if (img.src && !img.src.startsWith('data:')) {
             try {
                 img.src = await imageUrlToBlob(img.src);
             } catch (e) {
@@ -596,7 +596,7 @@ async function inlineImagesAsBlobs(clonedNode: HTMLElement): Promise<void> {
         if (!styleAttr) continue;
 
         const originalUrl = extractBackgroundImageUrl(styleAttr);
-        if (originalUrl && !originalUrl.startsWith('data:') && !originalUrl.startsWith('blob:')) {
+        if (originalUrl && !originalUrl.startsWith('data:')) {
             try {
                 const dataUrl = await imageUrlToBlob(originalUrl);
                 const newStyle = styleAttr.replace(originalUrl, dataUrl);
