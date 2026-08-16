@@ -1,0 +1,3 @@
+[submodule "reference/risuai"]
+	path = reference/risuai
+	url = https://github.com/kwaroran/Risuai.git
