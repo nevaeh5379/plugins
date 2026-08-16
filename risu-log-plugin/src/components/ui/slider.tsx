@@ -33,23 +33,37 @@ const Slider = React.forwardRef<
       onValueChange={handleValueChange}
       disabled={disabled}
       className={cn(
-        "relative flex w-full touch-none select-none items-center py-2",
+        "relative flex w-full touch-none select-none items-center py-2 cursor-pointer outline-none",
         className
       )}
+      style={{
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        caretColor: 'transparent',
+        ...props.style,
+      }}
       {...props}
     >
       <SliderPrimitive.Track
-        style={{ backgroundColor: 'var(--muted, #3f3f46)' }}
-        className="relative h-2 w-full grow overflow-hidden rounded-full bg-muted"
+        style={{ backgroundColor: 'var(--muted, #27272a)' }}
+        className="relative h-2 w-full grow overflow-hidden rounded-full bg-muted cursor-pointer"
       >
         <SliderPrimitive.Range
-          style={{ backgroundColor: 'var(--primary, #2563eb)' }}
+          style={{ backgroundColor: 'var(--primary, #fafafa)' }}
           className="absolute h-full bg-primary"
         />
       </SliderPrimitive.Track>
       <SliderPrimitive.Thumb
-        style={{ backgroundColor: 'var(--primary, #2563eb)', borderColor: '#ffffff' }}
-        className="block h-4 w-4 rounded-full border-2 border-white bg-primary shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+        style={{
+          backgroundColor: 'var(--primary, #fafafa)',
+          border: '2px solid var(--background, #09090b)',
+          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+          outline: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          caretColor: 'transparent',
+        }}
+        className="block h-4 w-4 rounded-full bg-primary shadow transition-all hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-grab active:cursor-grabbing"
       />
     </SliderPrimitive.Root>
   )

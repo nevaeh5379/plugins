@@ -32,45 +32,38 @@ interface SectionHeaderProps {
   icon: React.ReactNode;
   title: string;
   badge?: string;
-  description: string;
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({
   icon,
   title,
   badge,
-  description,
 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ color: 'var(--foreground)', display: 'flex', alignItems: 'center' }}>
-          {icon}
-        </span>
-        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
-          {title}
-        </h4>
-      </div>
-      {badge && (
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 500,
-            padding: '2px 8px',
-            borderRadius: '9999px',
-            backgroundColor: 'var(--muted)',
-            color: 'var(--muted-foreground)',
-            border: '1px solid var(--border)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {badge}
-        </span>
-      )}
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span style={{ color: 'var(--foreground)', display: 'flex', alignItems: 'center' }}>
+        {icon}
+      </span>
+      <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
+        {title}
+      </h4>
     </div>
-    <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)', lineHeight: 1.4 }}>
-      {description}
-    </p>
+    {badge && (
+      <span
+        style={{
+          fontSize: '11px',
+          fontWeight: 500,
+          padding: '1px 8px',
+          borderRadius: '9999px',
+          backgroundColor: 'var(--muted)',
+          color: 'var(--muted-foreground)',
+          border: '1px solid var(--border)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {badge}
+      </span>
+    )}
   </div>
 );
 
@@ -127,7 +120,6 @@ const ParticipantFilterSection: React.FC<ParticipantFilterSectionProps> = ({
         icon={<Users size={16} />}
         title="참가자 필터"
         badge={totalCount > 0 ? `${visibleCount}/${totalCount}명 표시` : undefined}
-        description="표시할 참가자를 선택하세요 (선택된 참가자만 로그에 표시됩니다)"
       />
 
       {totalCount > 0 && (
@@ -206,7 +198,7 @@ const ParticipantFilterSection: React.FC<ParticipantFilterSectionProps> = ({
                     fontSize: '12px',
                     fontWeight: isVisible ? 600 : 500,
                     borderRadius: 'calc(var(--radius) - 2px)',
-                    border: isVisible ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    border: isVisible ? '1px solid var(--border)' : '1px dashed var(--border)',
                     backgroundColor: isVisible ? 'var(--secondary)' : 'transparent',
                     color: isVisible ? 'var(--foreground)' : 'var(--muted-foreground)',
                     cursor: 'pointer',
@@ -216,7 +208,7 @@ const ParticipantFilterSection: React.FC<ParticipantFilterSectionProps> = ({
                   }}
                 >
                   {isVisible ? (
-                    <Check size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <Check size={12} style={{ color: 'var(--foreground)', flexShrink: 0 }} />
                   ) : (
                     <EyeOff size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                   )}
@@ -332,9 +324,9 @@ const UiClassItem: React.FC<UiClassItemProps> = ({
             fontWeight: 500,
             padding: '1px 6px',
             borderRadius: '4px',
-            backgroundColor: 'rgba(59, 130, 246, 0.12)',
-            color: '#3b82f6',
-            border: '1px solid rgba(59, 130, 246, 0.25)',
+            backgroundColor: 'var(--muted)',
+            color: 'var(--muted-foreground)',
+            border: '1px solid var(--border)',
             flexShrink: 0,
           }}
         >
@@ -423,7 +415,6 @@ const UiClassFilterSection: React.FC<UiClassFilterSectionProps> = ({
         icon={<EyeOff size={16} />}
         title="UI 요소 필터"
         badge={hiddenCount > 0 ? `${hiddenCount}개 숨김 중` : undefined}
-        description="숨길 UI 요소를 선택하세요 (체크 시 해당 요소가 로그에서 제외됩니다)"
       />
 
       {/* Action Bar: Search & Batch Controls */}

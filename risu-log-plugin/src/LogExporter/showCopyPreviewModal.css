@@ -14,8 +14,8 @@ body {
   --card-foreground: #f4f4f5;
   --popover: #18181b;
   --popover-foreground: #f4f4f5;
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
   --secondary: #27272a;
   --secondary-foreground: #fafafa;
   --muted: #27272a;
@@ -41,16 +41,73 @@ body {
   --text-title: var(--foreground);
   --text-white: #ffffff;
   --accent-primary: var(--primary);
-  --accent-secondary: #818cf8;
+  --accent-secondary: var(--muted-foreground);
 }
 
-/* Enforce dark/light control tokens inside modal to prevent host app styles from forcing white background */
+/* Enforce theme control tokens & prevent host app white/unwanted border styles */
 .log-exporter-modal button:not(.desktop-btn-primary):not(.desktop-btn-danger):not(.preview-zoom-value),
-.log-exporter-modal [role="combobox"],
-.log-exporter-modal [role="option"] {
+.log-exporter-modal [role="combobox"] {
   color: var(--foreground);
   background-color: var(--card);
   border-color: var(--border);
+}
+
+/* Enforce input / textarea styling across the entire plugin modal */
+.log-exporter-modal input:not([type="checkbox"]):not([type="radio"]),
+.log-exporter-modal textarea {
+  color: var(--foreground) !important;
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius, 8px);
+  caret-color: var(--foreground);
+}
+
+.log-exporter-modal input:not([type="checkbox"]):not([type="radio"]):focus,
+.log-exporter-modal textarea:focus {
+  border-color: var(--ring, #3f3f46) !important;
+  box-shadow: 0 0 0 1px var(--ring, #3f3f46) !important;
+  outline: none;
+}
+
+/* Prevent unwanted text selection and I-beam caret artifacts across interactive UI */
+.log-exporter-modal,
+.log-exporter-modal * {
+  -webkit-font-smoothing: antialiased;
+}
+
+.log-exporter-modal button,
+.log-exporter-modal [role="button"],
+.log-exporter-modal [role="tab"],
+.log-exporter-modal [role="switch"],
+.log-exporter-modal [role="checkbox"],
+.log-exporter-modal [role="combobox"],
+.log-exporter-modal [role="option"],
+.log-exporter-modal label {
+  cursor: pointer !important;
+}
+
+.log-exporter-modal button,
+.log-exporter-modal label,
+.log-exporter-modal [role="slider"],
+.log-exporter-modal [role="combobox"],
+.log-exporter-modal [role="tab"],
+.log-exporter-modal [role="switch"],
+.log-exporter-modal [role="checkbox"],
+.log-exporter-modal [data-radix-slider-thumb],
+.log-exporter-modal [data-radix-slider-track],
+.log-exporter-modal .setting-field label,
+.log-exporter-modal .shadcn-card h4 {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  caret-color: transparent !important;
+}
+
+.log-exporter-modal input,
+.log-exporter-modal textarea,
+.log-exporter-modal [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  caret-color: var(--foreground) !important;
 }
 
 /* Light Mode */
@@ -62,8 +119,8 @@ body {
   --card-foreground: #09090b;
   --popover: #ffffff;
   --popover-foreground: #09090b;
-  --primary: #2563eb;
-  --primary-foreground: #ffffff;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
   --secondary: #f4f4f5;
   --secondary-foreground: #09090b;
   --muted: #f4f4f5;
@@ -89,7 +146,7 @@ body {
   --text-title: var(--foreground);
   --text-white: #09090b;
   --accent-primary: var(--primary);
-  --accent-secondary: #4f46e5;
+  --accent-secondary: var(--muted-foreground);
 }
 
 .arca-instruction-card {
@@ -167,7 +224,7 @@ h1, h2, h3, h4, h5, h6 {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-x pan-y;
-  padding-top: 52px;
+  padding: 56px 20px 24px 20px;
   box-sizing: border-box;
 }
 
@@ -188,38 +245,73 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0 !important;
 }
 
-/* Zoom controls */
+/* Zoom controls floating on canvas - precisely matched with Segmented toggle */
 .preview-zoom-controls {
-  position: sticky;
-  top: 12px;
-  width: max-content;
-  margin: 12px 12px -42px auto;
-  z-index: 20;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
+  justify-content: center;
+  height: 36px;
+  padding: 4px;
   border-radius: var(--radius);
-  background: var(--card);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  background-color: var(--muted);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
   gap: 2px;
+  user-select: none;
+}
+
+.preview-zoom-controls .zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.preview-zoom-controls .zoom-btn:hover:not(:disabled) {
+  background-color: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.preview-zoom-controls .zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .preview-zoom-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 44px;
-  padding: 0 4px;
-  border: none;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
   background: transparent;
   color: var(--foreground);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   text-align: center;
+  transition: all 0.15s ease;
+  outline: none;
 }
 
 .preview-zoom-value:hover {
-  color: var(--primary);
+  background-color: var(--card);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Desktop layout grid */
@@ -245,7 +337,7 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--secondary) !important;
 }
 
-/* Desktop Floating Action Bar (shadcn Dock & Unified Split Button) */
+/* Desktop Floating Action Bar (Clean Single-Layer Split Button) */
 .desktop-floating-action-bar {
   position: absolute;
   bottom: 20px;
@@ -254,24 +346,30 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 4px 6px;
-  background: var(--card);
-  background: color-mix(in srgb, var(--card) 90%, transparent);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.action-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .action-bar-group.export-group {
   display: inline-flex;
   align-items: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .desktop-floating-action-bar .action-bar-btn {
-  height: 32px !important;
+  height: 34px !important;
   font-size: 12px !important;
   font-weight: 500 !important;
   border: none !important;
@@ -280,37 +378,51 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center !important;
   justify-content: center !important;
   gap: 6px !important;
-  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .desktop-floating-action-bar .btn-save-img.desktop-btn-primary {
-  background-color: var(--primary) !important;
-  color: var(--primary-foreground) !important;
-  border-top-left-radius: 6px !important;
-  border-bottom-left-radius: 6px !important;
+  background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
+  border-top-left-radius: calc(var(--radius) - 1px) !important;
+  border-bottom-left-radius: calc(var(--radius) - 1px) !important;
   border-top-right-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
   padding: 0 14px !important;
 }
 
 .desktop-floating-action-bar .btn-save-img.desktop-btn-primary:hover {
-  opacity: 0.9;
+  background-color: var(--accent) !important;
+  color: var(--foreground) !important;
+  filter: brightness(1.1);
+}
+
+.desktop-floating-action-bar .btn-save-img.desktop-btn-primary:active {
+  transform: scale(0.97);
 }
 
 .desktop-floating-action-bar .btn-more.desktop-btn-secondary {
-  background-color: var(--primary) !important;
-  color: var(--primary-foreground) !important;
+  background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 6px !important;
-  border-bottom-right-radius: 6px !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-top-right-radius: calc(var(--radius) - 1px) !important;
+  border-bottom-right-radius: calc(var(--radius) - 1px) !important;
+  border-left: 1px solid var(--border) !important;
   width: 32px !important;
   padding: 0 !important;
 }
 
 .desktop-floating-action-bar .btn-more.desktop-btn-secondary:hover {
-  opacity: 0.9;
+  background-color: var(--accent) !important;
+  color: var(--foreground) !important;
+  filter: brightness(1.1);
+}
+
+.desktop-floating-action-bar .btn-more.desktop-btn-secondary:active {
+  transform: scale(0.97);
 }
 
 /* Top Preview Toolbar */
@@ -408,25 +520,78 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 100000 !important;
 }
 
-/* Ensure Radix DropdownMenu popup has solid dark card background, border, shadow, and clear text */
+/* Ensure Radix DropdownMenu & Select popups have solid dark popover background, border, shadow, and clear text */
 [data-radix-popper-content-wrapper] [role="menu"],
+[data-radix-popper-content-wrapper] [role="listbox"],
 .log-exporter-modal [role="menu"],
+.log-exporter-modal [role="listbox"],
 [role="menu"] {
-  background-color: var(--card, #18181b) !important;
-  color: var(--foreground, #f4f4f5) !important;
+  background-color: var(--popover, #18181b) !important;
+  color: var(--popover-foreground, #f4f4f5) !important;
   border: 1px solid var(--border, #27272a) !important;
   border-radius: var(--radius, 8px) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+  padding: 4px !important;
 }
 
+/* Radix Dropdown Menu Item */
 [role="menuitem"] {
   color: var(--foreground, #f4f4f5) !important;
+  border-radius: 4px;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  caret-color: transparent !important;
 }
 
 [role="menuitem"]:hover,
-[role="menuitem"]:focus {
+[role="menuitem"]:focus,
+[role="menuitem"][data-highlighted] {
   background-color: var(--secondary, #27272a) !important;
   color: var(--foreground, #f4f4f5) !important;
+}
+
+/* Radix Select Options ([role="option"]) - pure shadcn neutral styling */
+[data-radix-popper-content-wrapper] [role="option"],
+.log-exporter-modal [role="option"],
+[role="option"] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px 6px 30px !important;
+  font-size: 12px;
+  color: var(--foreground, #f4f4f5) !important;
+  background-color: transparent !important;
+  border-radius: 4px;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  caret-color: transparent !important;
+  outline: none !important;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  margin: 1px 0;
+}
+
+/* Option Hover & Highlighted State (순정 shadcn: bg-accent / bg-secondary 뉴트럴 하이라이트) */
+[data-radix-popper-content-wrapper] [role="option"][data-highlighted],
+[data-radix-popper-content-wrapper] [role="option"]:hover,
+[data-radix-popper-content-wrapper] [role="option"]:focus,
+.log-exporter-modal [role="option"][data-highlighted],
+.log-exporter-modal [role="option"]:hover,
+.log-exporter-modal [role="option"]:focus,
+[role="option"][data-highlighted],
+[role="option"]:hover,
+[role="option"]:focus {
+  background-color: var(--accent, #27272a) !important;
+  color: var(--accent-foreground, #fafafa) !important;
+}
+
+/* Option Disabled */
+[role="option"][data-disabled],
+[role="option"][aria-disabled="true"] {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
 }
 
 .export-settings-popover .ant-popover-inner {

@@ -111,6 +111,8 @@ const getTabTriggerStyle = (isActive: boolean): React.CSSProperties => ({
   cursor: 'pointer',
   transition: 'all 0.15s ease-in-out',
   userSelect: 'none',
+  WebkitUserSelect: 'none',
+  caretColor: 'transparent',
   whiteSpace: 'nowrap',
 });
 

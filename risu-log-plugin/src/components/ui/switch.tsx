@@ -21,7 +21,7 @@ const Switch = React.forwardRef<
   return (
     <SwitchPrimitives.Root
       style={{
-        backgroundColor: checked ? 'var(--primary, #2563eb)' : 'var(--input, #3f3f46)',
+        backgroundColor: checked ? 'var(--primary, #fafafa)' : 'var(--input, #27272a)',
         ...style
       }}
       className={cn(
@@ -35,9 +35,11 @@ const Switch = React.forwardRef<
       {...props}
     >
       <SwitchPrimitives.Thumb
-        style={{ backgroundColor: '#ffffff' }}
+        style={{
+          backgroundColor: checked ? 'var(--primary-foreground, #09090b)' : '#fafafa',
+        }}
         className={cn(
-          "pointer-events-none block rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=unchecked]:translate-x-0",
+          "pointer-events-none block rounded-full shadow-lg ring-0 transition-transform data-[state=unchecked]:translate-x-0",
           isSmall ? "h-3.5 w-3.5 data-[state=checked]:translate-x-3.5" : "h-4 w-4 data-[state=checked]:translate-x-4"
         )}
       />

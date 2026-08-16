@@ -46,16 +46,10 @@ interface EditRuleState {
 // Helper Functions
 // ============================================================================
 
-/**
- * Generates a unique identifier for a replacement rule.
- */
 const generateRuleId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 };
 
-/**
- * Validates a regular expression pattern and its flags.
- */
 const validateRegex = (pattern: string, flags = 'g'): RegexValidationResult => {
   if (!pattern) {
     return { isValid: false, errorMessage: '패턴을 입력해주세요.' };
@@ -69,10 +63,6 @@ const validateRegex = (pattern: string, flags = 'g'): RegexValidationResult => {
   }
 };
 
-/**
- * Applies active replacement rules sequentially to an input text string.
- * Uses the exact logic matching the core log processing pipeline.
- */
 const applyRulesToText = (text: string, rules: ReplacementRule[]): string => {
   if (!text || !rules || rules.length === 0) return text;
 
@@ -86,7 +76,7 @@ const applyRulesToText = (text: string, rules: ReplacementRule[]): string => {
         const regex = new RegExp(rule.pattern, rule.flags || 'g');
         currentText = currentText.replace(regex, rule.replacement ?? '');
       } catch {
-        // Skip invalid regex pattern during execution
+        // Skip invalid regex pattern
       }
     } else {
       currentText = currentText.split(rule.pattern).join(rule.replacement ?? '');
@@ -100,14 +90,12 @@ const applyRulesToText = (text: string, rules: ReplacementRule[]): string => {
 // Sub-components
 // ============================================================================
 
-/**
- * Test preview playground allowing users to test rules against sample input in real time.
- */
 interface TestPlaygroundProps {
   rules: ReplacementRule[];
+  onClose: () => void;
 }
 
-const TestPlayground: React.FC<TestPlaygroundProps> = ({ rules }) => {
+const TestPlayground: React.FC<TestPlaygroundProps> = ({ rules, onClose }) => {
   const [testInput, setTestInput] = useState<string>(
     'User: 안녕하세요! <font color="red">반갑습니다.</font>\nAssistant: 안녕하세요! 무엇을 도와드릴까요?'
   );
@@ -127,80 +115,92 @@ const TestPlayground: React.FC<TestPlaygroundProps> = ({ rules }) => {
 
   return (
     <div
+      className="shadcn-card"
       style={{
         backgroundColor: 'var(--card)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius)',
-        padding: '14px 16px',
+        padding: '12px 14px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '10px',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FlaskConical size={15} style={{ color: 'var(--primary)' }} />
-          <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
-            실시간 규칙 테스트 (Playground)
-          </h4>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <FlaskConical size={15} style={{ color: 'var(--foreground)' }} />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--foreground)' }}>
+            실시간 규칙 테스트
+          </span>
           <span
             style={{
-              fontSize: '11px',
-              padding: '2px 7px',
+              fontSize: '10px',
+              padding: '1px 6px',
               borderRadius: '9999px',
-              backgroundColor: isChanged ? 'rgba(34, 197, 94, 0.15)' : 'var(--muted)',
+              backgroundColor: isChanged ? 'rgba(34, 197, 94, 0.12)' : 'var(--muted)',
               color: isChanged ? '#22c55e' : 'var(--muted-foreground)',
-              border: `1px solid ${isChanged ? 'rgba(34, 197, 94, 0.3)' : 'var(--border)'}`,
+              border: `1px solid ${isChanged ? 'rgba(34, 197, 94, 0.25)' : 'var(--border)'}`,
               fontWeight: 500,
             }}
           >
             {activeCount === 0
               ? '활성 규칙 없음'
               : isChanged
-              ? '✓ 규칙 적용됨'
-              : '변경 사항 없음'}
+              ? '규칙 적용됨'
+              : '일치 항목 없음'}
           </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Button
             size="small"
             variant="ghost"
             onClick={handleResetSample}
-            style={{ fontSize: '11px', height: '24px', padding: '0 8px' }}
-            title="예시 텍스트 불러오기"
+            style={{ fontSize: '11px', height: '24px', padding: '0 6px' }}
+            title="예시 문장 불러오기"
           >
-            <Sparkles size={12} style={{ marginRight: '4px' }} />
+            <Sparkles size={11} style={{ marginRight: '3px' }} />
             예시
+          </Button>
+          <Button
+            size="small"
+            variant="ghost"
+            onClick={onClose}
+            style={{ height: '24px', width: '24px', padding: 0 }}
+            title="테스트 창 닫기"
+          >
+            <X size={13} />
           </Button>
         </div>
       </div>
 
-      <p style={{ margin: 0, fontSize: '11px', color: 'var(--muted-foreground)', lineHeight: 1.4 }}>
-        테스트 문장을 입력하여 현재 활성화된 규칙들이 어떻게 적용되는지 실시간으로 확인하세요.
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
         {/* Input area */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--muted-foreground)' }}>
-            테스트 입력 ({testInput.length}자)
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--muted-foreground)' }}>
+              입력 텍스트
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>
+              {testInput.length}자
+            </span>
+          </div>
           <textarea
             value={testInput}
             onChange={(e) => setTestInput(e.target.value)}
-            placeholder="테스트할 로그 텍스트를 입력하세요..."
-            rows={4}
+            placeholder="테스트할 문장 입력..."
+            rows={3}
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '8px 10px',
+              padding: '6px 8px',
               fontSize: '11px',
               fontFamily: 'monospace',
               lineHeight: 1.4,
               backgroundColor: 'var(--background)',
               color: 'var(--foreground)',
               border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
+              borderRadius: 'calc(var(--radius) - 2px)',
               resize: 'vertical',
               outline: 'none',
             }}
@@ -208,26 +208,31 @@ const TestPlayground: React.FC<TestPlaygroundProps> = ({ rules }) => {
         </div>
 
         {/* Output preview area */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--muted-foreground)' }}>
-            변환 결과 ({previewOutput.length}자)
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--muted-foreground)' }}>
+              변환 결과
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>
+              {previewOutput.length}자
+            </span>
+          </div>
           <textarea
             readOnly
             value={previewOutput}
-            placeholder="결과가 여기에 표시됩니다..."
-            rows={4}
+            placeholder="치환 결과..."
+            rows={3}
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '8px 10px',
+              padding: '6px 8px',
               fontSize: '11px',
               fontFamily: 'monospace',
               lineHeight: 1.4,
-              backgroundColor: isChanged ? 'rgba(34, 197, 94, 0.04)' : 'var(--background)',
+              backgroundColor: 'var(--background)',
               color: 'var(--foreground)',
-              border: `1px solid ${isChanged ? 'rgba(34, 197, 94, 0.4)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius)',
+              border: `1px solid ${isChanged ? 'rgba(34, 197, 94, 0.3)' : 'var(--border)'}`,
+              borderRadius: 'calc(var(--radius) - 2px)',
               resize: 'vertical',
               outline: 'none',
             }}
@@ -242,10 +247,6 @@ const TestPlayground: React.FC<TestPlaygroundProps> = ({ rules }) => {
 // Main Component
 // ============================================================================
 
-/**
- * ReplacementTab allows users to create, edit, reorder, and test text and regular expression
- * replacement rules for log exports.
- */
 export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRulesChange }) => {
   // New rule creation state
   const [newPattern, setNewPattern] = useState('');
@@ -262,8 +263,8 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
     flags: 'g',
   });
 
-  // UI view state
-  const [showPlayground, setShowPlayground] = useState(true);
+  // UI view state - default closed for clean initial view
+  const [showPlayground, setShowPlayground] = useState(false);
 
   // Validation for new rule
   const newRuleValidation = useMemo(() => {
@@ -277,17 +278,14 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
     return validateRegex(editState.pattern, editState.flags);
   }, [editState.pattern, editState.isRegex, editState.flags]);
 
-  // Total and active count
+  // Active count
   const activeCount = useMemo(() => {
     return rules.filter((r) => r.isEnabled !== false).length;
   }, [rules]);
 
-  // --------------------------------------------------------------------------
-  // Rule Manipulation Handlers
-  // --------------------------------------------------------------------------
-
+  // Handlers
   const handleAddRule = useCallback(() => {
-    if (!newPattern) return;
+    if (!newPattern.trim()) return;
     if (isRegex && !newRuleValidation.isValid) return;
 
     const newRule: ReplacementRule = {
@@ -369,7 +367,7 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
 
   const handleSaveEdit = useCallback(
     (id: string) => {
-      if (!editState.pattern) return;
+      if (!editState.pattern.trim()) return;
       if (editState.isRegex && !editRuleValidation.isValid) return;
 
       onRulesChange(
@@ -417,10 +415,6 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
     }
   };
 
-  // --------------------------------------------------------------------------
-  // Render
-  // --------------------------------------------------------------------------
-
   return (
     <div
       className="tab-content"
@@ -428,10 +422,10 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
+        gap: '14px',
       }}
     >
-      {/* Header card with information & quick actions */}
+      {/* ── Main Replacement Rules Card ── */}
       <div
         className="shadcn-card"
         style={{
@@ -441,14 +435,15 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
           padding: '14px 16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '14px',
+          gap: '12px',
         }}
       >
+        {/* Header Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Replace size={16} style={{ color: 'var(--foreground)' }} />
             <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>
-              단어 바꾸기 (치환 규칙)
+              단어 치환 규칙
             </h4>
             <span
               style={{
@@ -460,20 +455,36 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                 fontWeight: 500,
               }}
             >
-              총 {rules.length}개 (활성 {activeCount}개)
+              {rules.length > 0 ? `${activeCount}/${rules.length}개 활성` : '0개'}
+            </span>
+            <span
+              title="규칙은 위에서 아래로 순차 적용됩니다."
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                color: 'var(--muted-foreground)',
+                cursor: 'help',
+              }}
+            >
+              <HelpCircle size={13} />
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Button
               variant="ghost"
               size="small"
               onClick={() => setShowPlayground((prev) => !prev)}
-              style={{ fontSize: '11px', height: '26px', padding: '0 8px' }}
-              title="테스트 영역 토글"
+              style={{
+                fontSize: '11px',
+                height: '26px',
+                padding: '0 8px',
+                backgroundColor: showPlayground ? 'var(--secondary)' : 'transparent',
+              }}
+              title="실시간 테스트 영역 열기/닫기"
             >
-              <FlaskConical size={13} style={{ marginRight: '4px' }} />
-              {showPlayground ? '테스트 닫기' : '테스트 열기'}
+              <FlaskConical size={12} style={{ marginRight: '4px' }} />
+              {showPlayground ? '테스트 닫기' : '테스트'}
             </Button>
 
             {rules.length > 0 && (
@@ -485,7 +496,7 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                   style={{ fontSize: '11px', height: '26px', padding: '0 8px' }}
                   title="모든 규칙 일괄 켜기 / 끄기"
                 >
-                  <RefreshCw size={12} style={{ marginRight: '4px' }} />
+                  <RefreshCw size={11} style={{ marginRight: '4px' }} />
                   {activeCount === rules.length ? '모두 끄기' : '모두 켜기'}
                 </Button>
                 <Button
@@ -495,40 +506,35 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                   style={{
                     fontSize: '11px',
                     height: '26px',
-                    padding: '0 8px',
+                    padding: '0 6px',
                     color: 'var(--destructive, #ef4444)',
                   }}
                   title="모든 규칙 삭제"
                 >
-                  <Trash2 size={12} style={{ marginRight: '4px' }} />
-                  전체 삭제
+                  <Trash2 size={12} />
                 </Button>
               </>
             )}
           </div>
         </div>
 
-        <p style={{ margin: 0, fontSize: '12px', color: 'var(--muted-foreground)', lineHeight: 1.4 }}>
-          로그 내용에서 특정 단어나 정규식 패턴을 찾아 바꿉니다. 규칙은 위에서 아래로 순차적으로
-          적용되며, 순서를 위/아래로 이동할 수 있습니다.
-        </p>
-
-        {/* New Rule Creation Form */}
+        {/* Compact Add Rule Bar */}
         <div
           style={{
-            backgroundColor: 'var(--background)',
+            backgroundColor: 'var(--muted)',
             border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '12px',
+            borderRadius: 'calc(var(--radius) - 2px)',
+            padding: '8px 10px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '10px',
+            gap: '8px',
           }}
         >
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
               <Input
-                placeholder={isRegex ? '찾을 정규식 패턴 (예: <.*?>)' : '찾을 단어 (예: user)'}
+                size="small"
+                placeholder={isRegex ? '찾을 정규식 (예: <.*?>)' : '찾을 단어 (예: user)'}
                 value={newPattern}
                 onChange={(e) => setNewPattern(e.target.value)}
                 onKeyDown={handleNewKeyDown}
@@ -541,77 +547,62 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                 }}
               />
             </div>
-            <ArrowRight size={14} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+            <ArrowRight size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <Input
-                placeholder="바꿀 단어 (비워두면 제거)"
+                size="small"
+                placeholder="바꿀 단어 (비워두면 삭제)"
                 value={newReplacement}
                 onChange={(e) => setNewReplacement(e.target.value)}
                 onKeyDown={handleNewKeyDown}
                 style={{ width: '100%' }}
               />
             </div>
+            <Button
+              type="primary"
+              size="small"
+              icon={<Plus size={13} />}
+              onClick={handleAddRule}
+              disabled={!newPattern.trim() || (isRegex && !newRuleValidation.isValid)}
+              style={{ flexShrink: 0, height: '28px', padding: '0 10px' }}
+            >
+              추가
+            </Button>
           </div>
 
-          {/* Regex validation warning message */}
-          {isRegex && newPattern && !newRuleValidation.isValid && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '11px',
-                color: 'var(--destructive, #ef4444)',
-                padding: '2px 4px',
-              }}
-            >
-              <AlertCircle size={13} style={{ flexShrink: 0 }} />
-              <span>정규식 오류: {newRuleValidation.errorMessage}</span>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Checkbox checked={isRegex} onChange={(e) => setIsRegex(e.target.checked)}>
-                <span style={{ fontSize: '12px', color: 'var(--foreground)' }}>정규식 (Regex)</span>
+                <span style={{ fontSize: '11px', color: 'var(--foreground)' }}>정규식 (Regex)</span>
               </Checkbox>
 
               {isRegex && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>플래그:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--muted-foreground)' }}>플래그:</span>
                   <Input
                     value={regexFlags}
                     onChange={(e) => setRegexFlags(e.target.value.toLowerCase())}
                     placeholder="g, i, m"
-                    style={{ width: '68px', fontFamily: 'monospace' }}
-                    size="small"
+                    style={{ width: '56px', fontFamily: 'monospace', height: '22px', fontSize: '10px', padding: '0 4px' }}
                   />
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      color: 'var(--muted-foreground)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '2px',
-                    }}
-                    title="g: 전체 일치, i: 대소문자 무시, m: 여러 줄 일치, s: 점이 줄바꿈 포함"
-                  >
-                    <HelpCircle size={11} />
-                    g, i, m, s
-                  </span>
                 </div>
               )}
             </div>
 
-            <Button
-              type="primary"
-              icon={<Plus size={14} />}
-              onClick={handleAddRule}
-              disabled={!newPattern || (isRegex && !newRuleValidation.isValid)}
-              size="small"
-            >
-              추가
-            </Button>
+            {isRegex && newPattern && !newRuleValidation.isValid && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  color: 'var(--destructive, #ef4444)',
+                }}
+              >
+                <AlertCircle size={11} />
+                <span>{newRuleValidation.errorMessage}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -621,7 +612,7 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
             display: 'flex',
             flexDirection: 'column',
             border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
+            borderRadius: 'calc(var(--radius) - 2px)',
             overflow: 'hidden',
             backgroundColor: 'var(--background)',
           }}
@@ -629,30 +620,26 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
           {rules.length === 0 ? (
             <div
               style={{
-                padding: '28px 16px',
+                padding: '24px 16px',
                 textAlign: 'center',
                 color: 'var(--muted-foreground)',
                 fontSize: '12px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '4px',
               }}
             >
-              <Replace size={24} style={{ opacity: 0.4 }} />
-              <span>등록된 치환 규칙이 없습니다.</span>
+              <Replace size={20} style={{ opacity: 0.35, marginBottom: '2px' }} />
+              <span style={{ fontWeight: 500 }}>등록된 치환 규칙이 없습니다</span>
               <span style={{ fontSize: '11px', opacity: 0.7 }}>
-                상단에서 찾을 단어와 바꿀 단어를 입력하여 규칙을 추가해보세요.
+                상단 입력창에서 단어를 입력하여 규칙을 추가하세요
               </span>
             </div>
           ) : (
             rules.map((rule, idx) => {
               const isEditing = editingId === rule.id;
               const isEnabled = rule.isEnabled !== false;
-
-              // Validate regex for display badge
-              const ruleRegexValid =
-                rule.isRegex && rule.pattern ? validateRegex(rule.pattern, rule.flags || 'g').isValid : true;
 
               if (isEditing) {
                 return (
@@ -661,14 +648,14 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '8px',
-                      padding: '10px 12px',
+                      gap: '6px',
+                      padding: '8px 10px',
                       backgroundColor: 'var(--muted)',
                       borderBottom: idx < rules.length - 1 ? '1px solid var(--border)' : 'none',
                     }}
                   >
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)', width: '24px' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--muted-foreground)', width: '22px' }}>
                         #{idx + 1}
                       </span>
                       <Input
@@ -686,42 +673,26 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                         size="small"
                         autoFocus
                       />
-                      <ArrowRight size={13} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                      <ArrowRight size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
                       <Input
                         value={editState.replacement}
                         onChange={(e) => setEditState({ ...editState, replacement: e.target.value })}
                         onKeyDown={(e) => handleEditKeyDown(e, rule.id)}
-                        placeholder="바꿀 단어 (비워두면 제거)"
+                        placeholder="바꿀 단어 (비워두면 삭제)"
                         style={{ flex: 1 }}
                         size="small"
                       />
                     </div>
-
-                    {editState.isRegex && editState.pattern && !editRuleValidation.isValid && (
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: 'var(--destructive, #ef4444)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          paddingLeft: '32px',
-                        }}
-                      >
-                        <AlertCircle size={12} />
-                        <span>정규식 오류: {editRuleValidation.errorMessage}</span>
-                      </div>
-                    )}
 
                     <div
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        paddingLeft: '32px',
+                        paddingLeft: '28px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Checkbox
                           checked={editState.isRegex}
                           onChange={(e) => setEditState({ ...editState, isRegex: e.target.checked })}
@@ -735,30 +706,29 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                               setEditState({ ...editState, flags: e.target.value.toLowerCase() })
                             }
                             placeholder="g, i, m"
-                            style={{ width: '60px', fontFamily: 'monospace' }}
-                            size="small"
+                            style={{ width: '50px', fontFamily: 'monospace', height: '22px', fontSize: '10px', padding: '0 4px' }}
                           />
                         )}
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div style={{ display: 'flex', gap: '4px' }}>
                         <Button
                           size="small"
                           variant="ghost"
                           onClick={handleCancelEdit}
-                          style={{ height: '24px', padding: '0 8px', fontSize: '11px' }}
+                          style={{ height: '24px', padding: '0 6px', fontSize: '11px' }}
                         >
-                          <X size={12} style={{ marginRight: '4px' }} />
+                          <X size={11} style={{ marginRight: '3px' }} />
                           취소
                         </Button>
                         <Button
                           size="small"
                           type="primary"
                           onClick={() => handleSaveEdit(rule.id)}
-                          disabled={!editState.pattern || (editState.isRegex && !editRuleValidation.isValid)}
+                          disabled={!editState.pattern.trim() || (editState.isRegex && !editRuleValidation.isValid)}
                           style={{ height: '24px', padding: '0 8px', fontSize: '11px' }}
                         >
-                          <Check size={12} style={{ marginRight: '4px' }} />
+                          <Check size={11} style={{ marginRight: '3px' }} />
                           저장
                         </Button>
                       </div>
@@ -774,20 +744,19 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '8px 12px',
+                    padding: '6px 10px',
                     borderBottom: idx < rules.length - 1 ? '1px solid var(--border)' : 'none',
-                    opacity: isEnabled ? 1 : 0.5,
+                    opacity: isEnabled ? 1 : 0.45,
                     fontSize: '12px',
-                    transition: 'opacity 0.15s ease, background-color 0.15s ease',
+                    transition: 'opacity 0.15s ease',
                   }}
                 >
-                  {/* Order Index & Enable Switch */}
                   <span
                     style={{
-                      fontSize: '11px',
+                      fontSize: '10px',
                       color: 'var(--muted-foreground)',
                       fontFamily: 'monospace',
-                      minWidth: '20px',
+                      minWidth: '18px',
                     }}
                   >
                     #{idx + 1}
@@ -800,13 +769,13 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                     title={isEnabled ? '규칙 비활성화' : '규칙 활성화'}
                   />
 
-                  {/* Pattern and Replacement Display */}
+                  {/* Pattern and Replacement Flow */}
                   <div
                     style={{
                       flex: 1,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '5px',
                       overflow: 'hidden',
                       minWidth: 0,
                     }}
@@ -815,71 +784,65 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                       style={{
                         fontFamily: 'monospace',
                         backgroundColor: 'var(--muted)',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
                         border: '1px solid var(--border)',
-                        maxWidth: '140px',
+                        maxWidth: '130px',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         color: 'var(--foreground)',
+                        fontSize: '11px',
                       }}
                       title={rule.pattern}
                     >
                       {rule.pattern}
                     </span>
 
-                    <ArrowRight size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                    {rule.isRegex && (
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          padding: '0 4px',
+                          borderRadius: '3px',
+                          backgroundColor: 'var(--muted)',
+                          color: 'var(--muted-foreground)',
+                          border: '1px solid var(--border)',
+                          fontWeight: 500,
+                          flexShrink: 0,
+                          fontFamily: 'monospace',
+                        }}
+                        title={`정규식 플래그: /${rule.flags || 'g'}`}
+                      >
+                        /{rule.flags || 'g'}
+                      </span>
+                    )}
+
+                    <ArrowRight size={11} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
 
                     <span
                       style={{
                         fontFamily: 'monospace',
                         backgroundColor: 'var(--muted)',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
                         border: '1px solid var(--border)',
-                        maxWidth: '140px',
+                        maxWidth: '130px',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         color: rule.replacement ? 'var(--foreground)' : 'var(--muted-foreground)',
                         fontStyle: rule.replacement ? 'normal' : 'italic',
+                        fontSize: '11px',
                       }}
-                      title={rule.replacement || '(빈 문자열로 치환)'}
+                      title={rule.replacement || '(빈 문자열로 삭제)'}
                     >
                       {rule.replacement || '(삭제)'}
                     </span>
-
-                    {/* Regex Badge */}
-                    {rule.isRegex && (
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          backgroundColor: ruleRegexValid
-                            ? 'rgba(168, 85, 247, 0.15)'
-                            : 'rgba(239, 68, 68, 0.15)',
-                          color: ruleRegexValid ? '#a855f7' : '#ef4444',
-                          border: `1px solid ${
-                            ruleRegexValid ? 'rgba(168, 85, 247, 0.3)' : 'rgba(239, 68, 68, 0.3)'
-                          }`,
-                          fontWeight: 500,
-                          flexShrink: 0,
-                        }}
-                        title={
-                          ruleRegexValid
-                            ? `정규식 모드 (플래그: /${rule.flags || 'g'})`
-                            : '정규식 문법 오류'
-                        }
-                      >
-                        {ruleRegexValid ? `Regex /${rule.flags || 'g'}` : 'Regex 오류'}
-                      </span>
-                    )}
                   </div>
 
-                  {/* Actions (Reorder, Edit, Duplicate, Delete) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                  {/* Quick Actions (Move, Edit, Duplicate, Delete) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1px', flexShrink: 0 }}>
                     <button
                       type="button"
                       disabled={idx === 0}
@@ -887,18 +850,18 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: idx === 0 ? 'var(--muted-foreground)' : 'var(--foreground)',
-                        opacity: idx === 0 ? 0.3 : 0.7,
+                        color: 'var(--muted-foreground)',
+                        opacity: idx === 0 ? 0.25 : 0.8,
                         cursor: idx === 0 ? 'default' : 'pointer',
-                        padding: '4px',
+                        padding: '3px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
+                        borderRadius: '3px',
                       }}
                       title="위로 이동"
                     >
-                      <ChevronUp size={14} />
+                      <ChevronUp size={13} />
                     </button>
 
                     <button
@@ -908,18 +871,18 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: idx === rules.length - 1 ? 'var(--muted-foreground)' : 'var(--foreground)',
-                        opacity: idx === rules.length - 1 ? 0.3 : 0.7,
+                        color: 'var(--muted-foreground)',
+                        opacity: idx === rules.length - 1 ? 0.25 : 0.8,
                         cursor: idx === rules.length - 1 ? 'default' : 'pointer',
-                        padding: '4px',
+                        padding: '3px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
+                        borderRadius: '3px',
                       }}
                       title="아래로 이동"
                     >
-                      <ChevronDown size={14} />
+                      <ChevronDown size={13} />
                     </button>
 
                     <button
@@ -928,18 +891,18 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: 'var(--foreground)',
-                        opacity: 0.7,
+                        color: 'var(--muted-foreground)',
+                        opacity: 0.8,
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '3px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
+                        borderRadius: '3px',
                       }}
-                      title="규칙 수정"
+                      title="수정"
                     >
-                      <Pencil size={13} />
+                      <Pencil size={12} />
                     </button>
 
                     <button
@@ -948,18 +911,18 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: 'var(--foreground)',
-                        opacity: 0.7,
+                        color: 'var(--muted-foreground)',
+                        opacity: 0.8,
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '3px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
+                        borderRadius: '3px',
                       }}
-                      title="규칙 복제"
+                      title="복제"
                     >
-                      <Copy size={13} />
+                      <Copy size={12} />
                     </button>
 
                     <button
@@ -969,16 +932,17 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
                         border: 'none',
                         background: 'transparent',
                         color: 'var(--destructive, #ef4444)',
+                        opacity: 0.8,
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '3px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
+                        borderRadius: '3px',
                       }}
-                      title="규칙 삭제"
+                      title="삭제"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
@@ -988,8 +952,8 @@ export const ReplacementTab: React.FC<ReplacementTabProps> = ({ rules = [], onRu
         </div>
       </div>
 
-      {/* Test Playground Card */}
-      {showPlayground && <TestPlayground rules={rules} />}
+      {/* ── Test Playground Collapsible Card ── */}
+      {showPlayground && <TestPlayground rules={rules} onClose={() => setShowPlayground(false)} />}
     </div>
   );
 };

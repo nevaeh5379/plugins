@@ -293,7 +293,7 @@ const Actionbar: React.FC<ActionbarProps> = React.memo(({
       {/* 내보내기 및 데이터 관리 액션 그룹 */}
       <div className="action-bar-group export-group">
         <Button
-          type="primary"
+          type="default"
           icon={<ImageIcon size={15} className="btn-icon" />}
           onClick={handleSaveAsImage}
           title="이미지 파일로 저장"

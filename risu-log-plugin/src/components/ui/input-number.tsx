@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { Input, type InputProps } from './input';
+import { cn } from '@/lib/utils';
 
 export interface InputNumberProps extends Omit<InputProps, 'onChange' | 'value'> {
   value?: number | string | null;
@@ -14,7 +15,7 @@ export interface InputNumberProps extends Omit<InputProps, 'onChange' | 'value'>
 }
 
 export const InputNumber = React.forwardRef<HTMLInputElement, InputNumberProps>(
-  ({ value, onChange, min, max, step = 1, addonAfter, formatter, parser, style, ...props }, ref) => {
+  ({ value, onChange, min, max, step = 1, addonAfter, formatter, parser, className, style, ...props }, ref) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let valStr = e.target.value;
       if (parser) {
@@ -47,6 +48,7 @@ export const InputNumber = React.forwardRef<HTMLInputElement, InputNumberProps>(
         onChange={handleChange}
         addonAfter={addonAfter}
         style={style}
+        className={cn("text-center font-medium tabular-nums", className)}
         {...props}
       />
     );

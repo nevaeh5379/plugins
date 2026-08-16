@@ -149,15 +149,16 @@ const ZoomControls: React.FC<ZoomControlsProps> = React.memo(({
   onFit,
 }) => (
   <div className="preview-zoom-controls" role="group" aria-label="미리보기 확대/축소">
-    <Button
-      size="small"
-      type="text"
-      icon={<ZoomOut size={13} />}
+    <button
+      type="button"
+      className="zoom-btn"
       aria-label="축소"
       title="축소"
       onClick={onZoomOut}
       disabled={scale <= MIN_PREVIEW_SCALE}
-    />
+    >
+      <ZoomOut size={13} />
+    </button>
     <button
       type="button"
       className="preview-zoom-value"
@@ -166,34 +167,42 @@ const ZoomControls: React.FC<ZoomControlsProps> = React.memo(({
     >
       {Math.round(scale * 100)}%
     </button>
-    <Button
-      size="small"
-      type="text"
-      icon={<ZoomIn size={13} />}
+    <button
+      type="button"
+      className="zoom-btn"
       aria-label="확대"
       title="확대"
       onClick={onZoomIn}
       disabled={scale >= MAX_PREVIEW_SCALE}
-    />
-    <Button
-      size="small"
-      type="text"
-      icon={<Minimize2 size={13} />}
+    >
+      <ZoomIn size={13} />
+    </button>
+    <button
+      type="button"
+      className="zoom-btn"
       aria-label="화면에 맞추기"
       title="화면에 맞추기"
       onClick={onFit}
-    />
+    >
+      <Minimize2 size={13} />
+    </button>
   </div>
 ));
 
 ZoomControls.displayName = 'ZoomControls';
+
+export interface ScaledPreviewProps {
+  width: number;
+  children: React.ReactNode;
+  onZoomPropsChange?: (props: ZoomControlsProps) => void;
+}
 
 /**
  * ScaledPreview - Renders the export document at its real output width and scales only
  * the viewport container. This keeps line wrapping, typography, and image layouts
  * identical to exported output while supporting pan and pinch-to-zoom on any viewport.
  */
-export const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children }) => {
+export const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children, onZoomPropsChange }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<PinchState | null>(null);
@@ -264,6 +273,15 @@ export const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children })
   const handleZoomIn = useCallback(() => changeScale(scale + SCALE_STEP), [changeScale, scale]);
   const handleZoomOut = useCallback(() => changeScale(scale - SCALE_STEP), [changeScale, scale]);
 
+  useEffect(() => {
+    onZoomPropsChange?.({
+      scale,
+      onZoomIn: handleZoomIn,
+      onZoomOut: handleZoomOut,
+      onFit: handleFit,
+    });
+  }, [scale, handleZoomIn, handleZoomOut, handleFit, onZoomPropsChange]);
+
   const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (event.touches.length !== 2 || !viewportRef.current) return;
     const [first, second] = Array.from(event.touches);
@@ -318,17 +336,13 @@ export const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children })
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
     >
-      <ZoomControls
-        scale={scale}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFit={handleFit}
-      />
       <div
         className="preview-scaled-stage"
         style={{
           width: `${width * scale}px`,
           height: `${documentHeight * scale}px`,
+          position: 'relative',
+          margin: '0 auto',
         }}
       >
         <div
@@ -1149,6 +1163,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
     };
   }, [settings.rawHtmlView, isBasicFormat, logContainerProps, otherFormatContent]);
 
+  const [zoomProps, setZoomProps] = useState<ZoomControlsProps | null>(null);
+
   // Render appropriate content view based on format and active flags
   const renderPreviewBody = () => {
     if (settings.rawHtmlView) {
@@ -1157,7 +1173,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
     if (isBasicFormat) {
       return (
-        <ScaledPreview width={containerWidth}>
+        <ScaledPreview width={containerWidth} onZoomPropsChange={setZoomProps}>
           <LogContainer
             {...logContainerProps}
             onReady={handleContentReady}
@@ -1240,6 +1256,23 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
               options={FORMAT_OPTIONS}
             />
           </div>
+
+          {/* Zoom floating controls - exactly matched with format toggle top offset */}
+          {isBasicFormat && zoomProps && (
+            <div
+              className="preview-zoom-toggle-container"
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '16px',
+                zIndex: 10,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <ZoomControls {...zoomProps} />
+            </div>
+          )}
 
           {/* Main render viewport */}
           <div

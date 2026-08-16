@@ -169,7 +169,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
 
   return (
     <div className="setting-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', userSelect: 'none' }}>
         <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--foreground)' }}>
           {label}
         </label>
@@ -200,7 +200,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
           }}
           formatter={activeFormatter}
           parser={activeParser}
-          style={{ width: '80px' }}
+          style={{ width: '80px', textAlign: 'center' }}
         />
       </div>
     </div>

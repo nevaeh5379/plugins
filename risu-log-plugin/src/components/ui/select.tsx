@@ -31,25 +31,43 @@ export interface OptionProps {
 
 const Option: React.FC<OptionProps> = ({ children }) => <>{children}</>
 
+export interface SelectTriggerProps
+  extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> {
+  size?: 'small' | 'middle' | 'large' | 'sm' | 'default' | 'lg'
+}
+
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, style, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    style={{ backgroundColor: 'var(--card)', color: 'var(--foreground)', borderColor: 'var(--border)', ...style }}
-    className={cn(
-      "flex h-8.5 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-1.5 text-xs text-foreground shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1.5 flex-shrink-0 text-foreground" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-))
+  SelectTriggerProps
+>(({ className, children, size = 'default', style, ...props }, ref) => {
+  const isSmall = size === 'small' || size === 'sm'
+
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      style={{
+        backgroundColor: 'var(--card, #18181b)',
+        color: 'var(--foreground, #f4f4f5)',
+        borderColor: 'var(--border, #27272a)',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        caretColor: 'transparent',
+        ...style,
+      }}
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between rounded-md border border-input bg-card text-foreground shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        isSmall ? "h-7 px-2.5 py-1 text-xs" : "h-8.5 px-3 py-1.5 text-xs",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="h-3.5 w-3.5 opacity-50 ml-1.5 flex-shrink-0 text-foreground" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  )
+})
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
 const SelectContent = React.forwardRef<
@@ -59,9 +77,14 @@ const SelectContent = React.forwardRef<
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
-      style={{ backgroundColor: 'var(--popover)', color: 'var(--popover-foreground)', borderColor: 'var(--border)', ...style }}
+      style={{
+        backgroundColor: 'var(--popover, #18181b)',
+        color: 'var(--popover-foreground, #f4f4f5)',
+        borderColor: 'var(--border, #27272a)',
+        ...style,
+      }}
       className={cn(
-        "relative z-[10050] max-h-60 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "relative z-[10050] max-h-60 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className
@@ -86,18 +109,24 @@ SelectContent.displayName = SelectPrimitive.Content.displayName
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, style, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
+    style={{
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      caretColor: 'transparent',
+      ...style,
+    }}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-xs outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-3.5 w-3.5" />
+        <Check className="h-3.5 w-3.5 text-foreground" />
       </SelectPrimitive.ItemIndicator>
     </span>
 
@@ -107,7 +136,7 @@ const SelectItem = React.forwardRef<
 SelectItem.displayName = SelectPrimitive.Item.displayName
 
 const Select = React.forwardRef<HTMLDivElement, LegacySelectProps>(
-  ({ value, onChange, options, disabled, style, className, placeholder = "선택...", children }, ref) => {
+  ({ value, onChange, options, disabled, size = 'default', style, className, placeholder = "선택...", children }, ref) => {
     const parsedOptions: readonly SelectOption[] = options || React.Children.toArray(children)
       .filter((child): child is React.ReactElement<OptionProps> => React.isValidElement<OptionProps>(child))
       .map((child) => ({
@@ -123,7 +152,7 @@ const Select = React.forwardRef<HTMLDivElement, LegacySelectProps>(
           onValueChange={(val) => onChange?.(val)}
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger size={size}>
             <SelectPrimitive.Value placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>

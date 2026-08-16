@@ -112,7 +112,7 @@ const PercentageSliderField: React.FC<PercentageSliderFieldProps> = ({
           max={max}
           value={displayVal}
           onChange={(val) => onChange(val !== null && val !== undefined ? Number(val) : defaultValue)}
-          style={{ width: '70px' }}
+          style={{ width: '70px', textAlign: 'center' }}
           formatter={(v) => `${v}%`}
           parser={parsePercent}
         />
@@ -408,7 +408,7 @@ const ImageSection: React.FC<ImageSectionProps> = ({ settings, onSettingChange }
                   step={0.01}
                   value={settings.imageCropHeight ?? 1.0}
                   onChange={(val) => onSettingChange('imageCropHeight', val ?? 1.0)}
-                  style={{ width: '70px' }}
+                  style={{ width: '70px', textAlign: 'center' }}
                 />
               </div>
             </div>
