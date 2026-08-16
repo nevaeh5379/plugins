@@ -93,11 +93,24 @@ function computeContainerStyle({
     boxSizing: 'border-box',
     fontSize: fontSize ? `${fontSize}px` : `${DEFAULT_FONT_SIZE}px`,
     backgroundColor: color.background,
+    color: color.text,
     borderRadius: isLogTheme ? '8px' : '12px',
     overflow: 'hidden',
     padding: isLogTheme ? 0 : '24px 32px',
     border: isLogTheme ? 'none' : `1px solid ${color.border}`,
     boxShadow: isLogTheme ? 'none' : (color.shadow || 'none'),
+    // Isolate log typography and container CSS variables from modal UI themes
+    ['--text-primary' as string]: color.text,
+    ['--text-title' as string]: color.text,
+    ['--text-secondary' as string]: color.quoteText || color.text,
+    ['--text-white' as string]: '#ffffff',
+    ['--foreground' as string]: color.text,
+    ['--background' as string]: color.background,
+    ['--card' as string]: color.cardBg || color.background,
+    ['--border' as string]: color.border,
+    ['--border-color' as string]: color.border,
+    ['--risu-theme-bgcolor' as string]: color.background,
+    ['--color-bgcolor' as string]: color.background,
   };
 }
 

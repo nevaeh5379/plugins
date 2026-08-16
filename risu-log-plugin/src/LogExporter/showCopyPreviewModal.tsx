@@ -3,21 +3,12 @@ import ReactDOM from 'react-dom/client';
 import '../index.css';
 import './showCopyPreviewModal.css';
 import type { RisuCharacter } from '../types/risuai';
-import type { ColorPalette, GlobalSettings, LogContainerProps, ThemeInfo } from '../types';
-import { Spin, Button, Drawer, message, Toaster } from '../components/ui';
-import {
-  Settings as SettingIcon,
-  X,
-  Pencil,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-} from 'lucide-react';
+import type { ColorPalette, GlobalSettings, LogContainerProps } from '../types';
+import { Spin, Button, message, Toaster } from '../components/ui';
 
-import SettingsTabs from './components/SettingsTabs';
-import PreviewPanel from './components/PreviewPanel';
+import MobileView from './components/mobile/MobileView';
+import DesktopView from './components/desktop/DesktopView';
 import ArcaHelperModal from './components/ArcaHelperModal';
-import Actionbar from './components/Actionbar';
 import { THEMES, COLORS, CHAT_CONTENT_SELECTOR } from './components/constants';
 import { clearBlobUrlCache } from './utils/imageUtils';
 import { saveAsFile } from './services/fileService';
@@ -74,6 +65,16 @@ const MOBILE_BREAKPOINT_PX = 1024;
 
 /** Extra CSS appended to HTML preview for responsive tables and asset rendering */
 const HTML_PREVIEW_EXTRA_STYLES = `
+  #log-html-preview-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 auto !important;
+  }
+  #log-html-scaler {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
   .x-risu-asset-table,
   .x-risu-asset-table table {
     width: 100% !important;
@@ -105,12 +106,13 @@ function wrapTextInPreviewContainer(content: string, fontSize = 16, maxWidth = 8
   const containerStyle = [
     `font-size: ${fontSize}px`,
     `max-width: ${maxWidth}px`,
-    'margin: 20px auto',
+    'margin: 0 auto',
     'padding: 20px',
     'background-color: var(--card)',
     'color: var(--foreground)',
     'border: 1px solid var(--border)',
     'border-radius: 8px',
+    'box-sizing: border-box',
   ].join('; ');
 
   const preStyle = 'white-space: pre-wrap; word-wrap: break-word; margin: 0; font-family: monospace;';
@@ -246,210 +248,6 @@ function buildLogContainerProps(
   };
 }
 
-// ─── Sub-Components ──────────────────────────────────────────────────────────
-
-interface HeaderBarProps {
-  isMobile: boolean;
-  isEditable: boolean;
-  onClose: () => void;
-  onToggleEditable: () => void;
-  onOpenSettingsDrawer: () => void;
-}
-
-const HeaderBar: React.FC<HeaderBarProps> = ({
-  isMobile,
-  isEditable,
-  onClose,
-  onToggleEditable,
-  onOpenSettingsDrawer,
-}) => {
-  return (
-    <div
-      className="log-exporter-modal-header-bar"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--card)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            backgroundColor: 'var(--muted)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--foreground)',
-          }}
-        >
-          <FileText size={15} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-          <span
-            className="header-title"
-            style={{
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--foreground)',
-              lineHeight: 1.2,
-            }}
-          >
-            로그 플러그인
-          </span>
-        </div>
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Edit mode toggle */}
-      <button
-        type="button"
-        onClick={onToggleEditable}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '5px 10px',
-          fontSize: '12px',
-          fontWeight: 500,
-          borderRadius: 'var(--radius)',
-          border: isEditable ? '1px solid var(--primary)' : '1px solid var(--border)',
-          backgroundColor: isEditable ? 'var(--secondary)' : 'transparent',
-          color: isEditable ? 'var(--foreground)' : 'var(--muted-foreground)',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-        }}
-        title="로그 편집 활성화 토글"
-        aria-pressed={isEditable}
-      >
-        <Pencil size={13} style={{ opacity: isEditable ? 1 : 0.7 }} />
-      </button>
-
-      {/* Mobile settings drawer trigger */}
-      {isMobile && (
-        <button
-          type="button"
-          onClick={onOpenSettingsDrawer}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '5px 10px',
-            fontSize: '12px',
-            fontWeight: 500,
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)',
-            backgroundColor: 'transparent',
-            color: 'var(--foreground)',
-            cursor: 'pointer',
-          }}
-          aria-label="설정 메뉴 열기"
-        >
-          <SettingIcon size={14} />
-          <span>설정</span>
-        </button>
-      )}
-
-      {/* Modal close button */}
-      <button
-        type="button"
-        id="log-exporter-close"
-        onClick={onClose}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '28px',
-          height: '28px',
-          borderRadius: '6px',
-          border: '1px solid var(--border)',
-          backgroundColor: 'transparent',
-          color: 'var(--muted-foreground)',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-        }}
-        title="닫기 (Esc)"
-        aria-label="모달 닫기"
-      >
-        <X size={15} />
-      </button>
-    </div>
-  );
-};
-
-interface PreviewContentProps {
-  logContainerProps: Omit<LogContainerProps, 'onReady'>;
-  settings: LogExporterSettings;
-  otherFormatContent: string;
-  selectedIndices: Set<number>;
-  onSelectionChange: (newSelection: Set<number>) => void;
-  lastSelectedIndex: number | null;
-  onLastSelectedIndexChange: (index: number | null) => void;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
-  onInvertSelection: () => void;
-  onDimensionsChange: (dims: EstimatedImageSize) => void;
-  isConverting: boolean;
-  onSettingChange: (key: string, value: unknown) => void;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
-}
-
-const PreviewContent: React.FC<PreviewContentProps> = (props) => {
-  return <PreviewPanel {...props} />;
-};
-
-interface ActionbarContentProps {
-  charName: string;
-  chatName: string;
-  getPreviewContent: () => Promise<string>;
-  messageNodes: HTMLElement[];
-  settings: LogExporterSettings;
-  backgroundColor: string;
-  color: ColorPalette;
-  charAvatarUrl: string;
-  onOpenArcaHelper: () => void;
-  onProgressStart: (message: string, total?: number) => void;
-  onProgressUpdate: (update: { current?: number; message?: string }) => void;
-  onProgressEnd: () => void;
-  onSaveLogData: () => void;
-  onLoadLogData: () => void;
-  onDeleteSelected?: () => void;
-  hasSelection: boolean;
-  onSelectAll: () => void;
-  onDeselectAll: () => void;
-  onInvertSelection: () => void;
-}
-
-const ActionbarContent: React.FC<ActionbarContentProps> = (props) => {
-  return <Actionbar {...props} />;
-};
-
-interface SettingsDrawerProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  settings: LogExporterSettings;
-  onSettingChange: (key: string, value: unknown) => void;
-  participants: Set<string>;
-  globalSettings: GlobalSettings;
-  onGlobalSettingChange: (key: string, value: unknown) => void;
-  uiClasses: UIClassInfo[];
-  imageSizeWarning: string;
-  themes: Record<string, ThemeInfo>;
-  colors: Record<string, ColorPalette>;
-}
-
-const SettingsDrawerContent: React.FC<SettingsDrawerProps> = (props) => {
-  return <SettingsTabs {...props} />;
-};
-
 // ─── Main Modal Component ────────────────────────────────────────────────────
 
 export interface ShowCopyPreviewModalProps {
@@ -516,7 +314,6 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({
   const [isArcaHelperOpen, setIsArcaHelperOpen] = useState(false);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('filter');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(true);
 
   // ── Message Content Update Handler ──
   const handleMessageUpdate = useCallback((index: number, newHtml: string) => {
@@ -876,14 +673,6 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({
             data-theme={uiTheme}
             onClick={(e) => e.stopPropagation()}
           >
-            <HeaderBar
-              isMobile={isMobile}
-              isEditable={settings.isEditable}
-              onClose={handleClose}
-              onToggleEditable={() => handleSettingChange('isEditable', !settings.isEditable)}
-              onOpenSettingsDrawer={() => setIsSettingsDrawerOpen(true)}
-            />
-
             {modalState.isLoading ? (
               <div
                 className="desktop-modal-loading"
@@ -892,7 +681,10 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: '300px',
+                  width: '100%',
+                  height: '100%',
+                  minHeight: '300px',
+                  flex: 1,
                   gap: '12px',
                 }}
               >
@@ -900,197 +692,86 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({
                 <p>로그 데이터를 불러오는 중...</p>
               </div>
             ) : isMobile ? (
-              /* ── Mobile Layout ── */
-              <div
-                className="log-exporter-modal-content mobile-preview-tab"
-                style={{
-                  height: 'calc(100% - 71px)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                <PreviewContent
-                  logContainerProps={logContainerProps}
-                  settings={settings}
-                  otherFormatContent={conversionContent}
-                  selectedIndices={selection.selectedIndices}
-                  onSelectionChange={selection.handleSelectionChange}
-                  lastSelectedIndex={selection.lastSelectedIndex}
-                  onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
-                  onSelectAll={selection.selectAll}
-                  onDeselectAll={selection.deselectAll}
-                  onInvertSelection={selection.invertSelection}
-                  onDimensionsChange={setEstimatedImageSize}
-                  isConverting={converting}
-                  onSettingChange={handleSettingChange}
-                  themes={THEMES}
-                  colors={COLORS}
-                />
-                <div className="mobile-action-bar">
-                  <ActionbarContent
-                    charName={modalState.charInfo.charName}
-                    chatName={modalState.charInfo.chatName}
-                    getPreviewContent={getPreviewContentForExport}
-                    messageNodes={nodesForExport as unknown as HTMLElement[]}
-                    settings={settings}
-                    backgroundColor={backgroundColor}
-                    color={colorPalette}
-                    charAvatarUrl={modalState.charInfo.charAvatarUrl}
-                    onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                    onProgressStart={startProgress}
-                    onProgressUpdate={updateProgress}
-                    onProgressEnd={endProgress}
-                    onSaveLogData={handleSaveLogData}
-                    onLoadLogData={handleLoadLogData}
-                    onDeleteSelected={handleDeleteSelected}
-                    hasSelection={selection.hasSelection}
-                    onSelectAll={selection.selectAll}
-                    onDeselectAll={selection.deselectAll}
-                    onInvertSelection={selection.invertSelection}
-                  />
-                </div>
-              </div>
+              <MobileView
+                charInfo={modalState.charInfo}
+                settings={settings}
+                globalSettings={globalSettings}
+                onSettingChange={handleSettingChange}
+                onGlobalSettingChange={handleGlobalSettingChange}
+                logContainerProps={logContainerProps}
+                otherFormatContent={conversionContent}
+                selectedIndices={selection.selectedIndices}
+                onSelectionChange={selection.handleSelectionChange}
+                lastSelectedIndex={selection.lastSelectedIndex}
+                onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
+                onSelectAll={selection.selectAll}
+                onDeselectAll={selection.deselectAll}
+                onInvertSelection={selection.invertSelection}
+                onDimensionsChange={setEstimatedImageSize}
+                isConverting={converting}
+                themes={THEMES}
+                colors={COLORS}
+                backgroundColor={backgroundColor}
+                colorPalette={colorPalette}
+                uiTheme={uiTheme}
+                onClose={handleClose}
+                getPreviewContentForExport={getPreviewContentForExport}
+                nodesForExport={nodesForExport as HTMLElement[]}
+                onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                onProgressStart={startProgress}
+                onProgressUpdate={updateProgress}
+                onProgressEnd={endProgress}
+                onSaveLogData={handleSaveLogData}
+                onLoadLogData={handleLoadLogData}
+                onDeleteSelected={handleDeleteSelected}
+                hasSelection={selection.hasSelection}
+                participants={modalState.participants}
+                uiClasses={modalState.uiClasses}
+                imageSizeWarning={imageSizeWarning}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                isSettingsDrawerOpen={isSettingsDrawerOpen}
+                setIsSettingsDrawerOpen={setIsSettingsDrawerOpen}
+              />
             ) : (
-              /* ── Desktop Layout ── */
-              <div
-                className="log-exporter-modal-content"
-                style={{
-                  display: 'flex',
-                  height: 'calc(100% - 71px)',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
-              >
-                {/* Collapsible Settings Panel */}
-                <div
-                  className="desktop-settings-panel"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%',
-                    width: isSettingsOpen ? '450px' : '0px',
-                    borderRight: isSettingsOpen
-                      ? '1px solid var(--border)'
-                      : '0px solid transparent',
-                    background: 'var(--card)',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    transition: 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '450px',
-                      height: '100%',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <SettingsDrawerContent
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                      settings={settings}
-                      onSettingChange={handleSettingChange}
-                      participants={modalState.participants}
-                      globalSettings={globalSettings}
-                      onGlobalSettingChange={handleGlobalSettingChange}
-                      uiClasses={modalState.uiClasses}
-                      imageSizeWarning={imageSizeWarning}
-                      themes={THEMES}
-                      colors={COLORS}
-                    />
-                  </div>
-                </div>
-
-                {/* Preview & Action Panel */}
-                <div
-                  className="desktop-preview-panel"
-                  style={{
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: '100%',
-                    position: 'relative',
-                    flex: 1,
-                  }}
-                >
-                  {/* Sidebar Toggle Handle Button */}
-                  <Button
-                    className="sidebar-toggle-handle"
-                    icon={
-                      isSettingsOpen ? (
-                        <ChevronLeft size={14} />
-                      ) : (
-                        <ChevronRight size={14} />
-                      )
-                    }
-                    onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                    title={isSettingsOpen ? '설정 접기' : '설정 펼치기'}
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 100,
-                      borderRadius: '0 8px 8px 0',
-                      width: '18px',
-                      height: '48px',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderLeft: 'none',
-                      backgroundColor: 'var(--card)',
-                      borderColor: 'var(--border)',
-                      color: 'var(--muted-foreground)',
-                      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
-                      cursor: 'pointer',
-                    }}
-                  />
-                  <PreviewContent
-                    logContainerProps={logContainerProps}
-                    settings={settings}
-                    otherFormatContent={conversionContent}
-                    selectedIndices={selection.selectedIndices}
-                    onSelectionChange={selection.handleSelectionChange}
-                    lastSelectedIndex={selection.lastSelectedIndex}
-                    onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
-                    onSelectAll={selection.selectAll}
-                    onDeselectAll={selection.deselectAll}
-                    onInvertSelection={selection.invertSelection}
-                    onDimensionsChange={setEstimatedImageSize}
-                    isConverting={converting}
-                    onSettingChange={handleSettingChange}
-                    themes={THEMES}
-                    colors={COLORS}
-                  />
-                  <div className="desktop-floating-action-bar">
-                    <ActionbarContent
-                      charName={modalState.charInfo.charName}
-                      chatName={modalState.charInfo.chatName}
-                      getPreviewContent={getPreviewContentForExport}
-                      messageNodes={nodesForExport as unknown as HTMLElement[]}
-                      settings={settings}
-                      backgroundColor={backgroundColor}
-                      color={colorPalette}
-                      charAvatarUrl={modalState.charInfo.charAvatarUrl}
-                      onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
-                      onProgressStart={startProgress}
-                      onProgressUpdate={updateProgress}
-                      onProgressEnd={endProgress}
-                      onSaveLogData={handleSaveLogData}
-                      onLoadLogData={handleLoadLogData}
-                      onDeleteSelected={handleDeleteSelected}
-                      hasSelection={selection.hasSelection}
-                      onSelectAll={selection.selectAll}
-                      onDeselectAll={selection.deselectAll}
-                      onInvertSelection={selection.invertSelection}
-                    />
-                  </div>
-                </div>
-              </div>
+              <DesktopView
+                charInfo={modalState.charInfo}
+                settings={settings}
+                globalSettings={globalSettings}
+                onSettingChange={handleSettingChange}
+                onGlobalSettingChange={handleGlobalSettingChange}
+                logContainerProps={logContainerProps}
+                otherFormatContent={conversionContent}
+                selectedIndices={selection.selectedIndices}
+                onSelectionChange={selection.handleSelectionChange}
+                lastSelectedIndex={selection.lastSelectedIndex}
+                onLastSelectedIndexChange={selection.handleLastSelectedIndexChange}
+                onSelectAll={selection.selectAll}
+                onDeselectAll={selection.deselectAll}
+                onInvertSelection={selection.invertSelection}
+                onDimensionsChange={setEstimatedImageSize}
+                isConverting={converting}
+                themes={THEMES}
+                colors={COLORS}
+                backgroundColor={backgroundColor}
+                colorPalette={colorPalette}
+                onClose={handleClose}
+                getPreviewContentForExport={getPreviewContentForExport}
+                nodesForExport={nodesForExport as HTMLElement[]}
+                onOpenArcaHelper={() => setIsArcaHelperOpen(true)}
+                onProgressStart={startProgress}
+                onProgressUpdate={updateProgress}
+                onProgressEnd={endProgress}
+                onSaveLogData={handleSaveLogData}
+                onLoadLogData={handleLoadLogData}
+                onDeleteSelected={handleDeleteSelected}
+                hasSelection={selection.hasSelection}
+                participants={modalState.participants}
+                uiClasses={modalState.uiClasses}
+                imageSizeWarning={imageSizeWarning}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
             )}
           </div>
         )}
@@ -1128,34 +809,6 @@ const ShowCopyPreviewModal: React.FC<ShowCopyPreviewModalProps> = ({
           colorPalette={colorPalette}
         />
       )}
-
-      {/* Mobile Settings Drawer */}
-      <Drawer
-        className="mobile-settings-drawer"
-        title="설정"
-        placement="right"
-        open={isSettingsDrawerOpen}
-        onClose={() => setIsSettingsDrawerOpen(false)}
-        width="100%"
-        styles={{ body: { padding: 0, background: 'var(--bg-secondary)' } }}
-        getContainer={() =>
-          document.getElementById(MODAL_ROOT_ELEMENT_ID) || document.body
-        }
-      >
-        <SettingsDrawerContent
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          settings={settings}
-          onSettingChange={handleSettingChange}
-          participants={modalState.participants}
-          globalSettings={globalSettings}
-          onGlobalSettingChange={handleGlobalSettingChange}
-          uiClasses={modalState.uiClasses}
-          imageSizeWarning={imageSizeWarning}
-          themes={THEMES}
-          colors={COLORS}
-        />
-      </Drawer>
     </>
   );
 };

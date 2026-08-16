@@ -352,6 +352,9 @@ interface CompiledReplacementRule {
   apply: (text: string) => string;
 }
 
+/** Cache of compiled rules keyed by the source rules array reference. */
+const compiledRulesCache = new WeakMap<ReplacementRule[], CompiledReplacementRule[]>();
+
 /**
  * Applies regex and text replacement rules across all text nodes within a root DOM element.
  * Rules are pre-compiled and filtered upfront to maximize performance during DOM tree walking.
@@ -364,6 +367,13 @@ export const applyReplacements = (
   rules?: ReplacementRule[]
 ): void => {
   if (!rules || rules.length === 0) return;
+
+  const cached = compiledRulesCache.get(rules);
+  if (cached) {
+    if (cached.length === 0) return;
+    applyCompiledRules(root, cached);
+    return;
+  }
 
   const activeRules: CompiledReplacementRule[] = [];
 
@@ -389,16 +399,23 @@ export const applyReplacements = (
     }
   }
 
-  if (activeRules.length === 0) return;
-
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-  const textNodes: Node[] = [];
-
-  while (walker.nextNode()) {
-    textNodes.push(walker.currentNode);
+  if (activeRules.length === 0) {
+    compiledRulesCache.set(rules, []);
+    return;
   }
 
-  for (const node of textNodes) {
+  compiledRulesCache.set(rules, activeRules);
+  applyCompiledRules(root, activeRules);
+};
+
+/**
+ * Applies pre-compiled replacement rules across all text nodes within a root DOM element.
+ */
+function applyCompiledRules(root: HTMLElement, activeRules: CompiledReplacementRule[]): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
     const originalText = node.nodeValue;
     if (!originalText) continue;
 
@@ -411,4 +428,4 @@ export const applyReplacements = (
       node.nodeValue = currentText;
     }
   }
-};
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { imageUrlToBlob, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { applyReplacements } from '../utils/domUtils';
 import { showWarning } from '../utils/notify';
@@ -90,7 +90,13 @@ const embedImagesInElement = async (
   const mediaPromises = mediaElements.map(async (el) => {
     if (el.tagName === 'IMG') {
       const img = el as HTMLImageElement;
-      if (img.src && embedImages && !img.src.startsWith('data:')) {
+      if (!img.src) {
+        // src 없는 <img>는 렌더링될 내용이 없다. 제거하지 않으면 캡처 단계에서
+        // html-to-image가 fetch('')을 시도해 iframe CSP 위반과 캡처 실패로 이어진다.
+        img.remove();
+        return;
+      }
+      if (embedImages && !img.src.startsWith('data:')) {
         try {
           img.src = await imageUrlToBlob(img.src);
         } catch (e) {
@@ -676,7 +682,10 @@ export const useMessageProcessor = (
   imageCropHAlign?: number,
   imageCropHeight?: number
 ): string => {
-  const isSync = canProcessSynchronously(originalMessageEl, replacementRules);
+  const isSync = useMemo(
+    () => canProcessSynchronously(originalMessageEl, replacementRules),
+    [originalMessageEl, replacementRules]
+  );
 
   const [processedContent, setProcessedContent] = useState<string>(() => {
     if (!originalMessageEl) return '';

@@ -50,14 +50,13 @@ export function resolveColorPalette(
 }
 
 /**
- * Applies the `data-theme` attribute to the document body and modal container.
+ * Applies the `data-theme` attribute to the modal container root.
+ * NOTE: Never set data-theme on document.body to prevent host app & preview style contamination.
  *
  * @param theme - The active UI theme name (e.g., 'dark', 'light')
  */
 export function syncThemeAttributes(theme: string): void {
   if (typeof document === 'undefined') return;
-
-  document.body.setAttribute(THEME_DATA_ATTRIBUTE, theme);
 
   const rootEl = document.getElementById(MODAL_ROOT_ELEMENT_ID);
   if (rootEl) {

@@ -367,12 +367,18 @@ export const ScaledPreview: React.FC<ScaledPreviewProps> = ({ width, children, o
 
 interface ShadowDomPreviewProps {
   content: string;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 /**
  * Isolated Shadow DOM preview container for HTML / Markdown / Plain text formatted output.
  */
-const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({ content }) => {
+const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({
+  content,
+  backgroundColor,
+  textColor,
+}) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -380,18 +386,55 @@ const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({ content }) => {
     if (!host) return;
 
     const shadowRoot = host.shadowRoot || host.attachShadow({ mode: 'open' });
+    const bg = backgroundColor || '#1a1b26';
+    const fg = textColor || '#f4f4f5';
+
     shadowRoot.innerHTML = `
       <style>
         :host {
           all: initial;
           display: block;
           height: 100%;
-          overflow: auto;
+          overflow-y: auto;
+          overflow-x: hidden;
           box-sizing: border-box;
-          background-color: var(--risu-theme-bgcolor, var(--color-bgcolor, var(--background, #1a1b26)));
+          background-color: ${bg};
+          color: ${fg};
+          padding: 56px 20px 40px 20px;
+          --background: ${bg};
+          --foreground: ${fg};
+          --text-primary: ${fg};
+          --text-title: ${fg};
+          --text-white: #ffffff;
+        }
+        @media (max-width: 1024px) {
+          :host {
+            padding: 60px 12px 90px 12px;
+          }
         }
         #log-html-preview-container {
           margin: 0 auto;
+          width: 100%;
+          box-sizing: border-box;
+          color: inherit;
+        }
+        #log-html-scaler {
+          width: 100%;
+          box-sizing: border-box;
+          color: inherit;
+        }
+        .risu-log-container {
+          color: inherit !important;
+        }
+        .risu-log-container h1,
+        .risu-log-container h2,
+        .risu-log-container h3,
+        .risu-log-container h4,
+        .risu-log-container h5,
+        .risu-log-container h6,
+        .risu-log-container strong,
+        .risu-log-container b {
+          color: inherit;
         }
         img, video {
           max-width: 100%;
@@ -401,9 +444,9 @@ const ShadowDomPreview: React.FC<ShadowDomPreviewProps> = ({ content }) => {
       </style>
       ${content}
     `;
-  }, [content]);
+  }, [content, backgroundColor, textColor]);
 
-  return <div ref={hostRef} style={{ height: '100%' }} />;
+  return <div ref={hostRef} style={{ height: '100%', width: '100%' }} />;
 };
 
 interface RawHtmlViewerProps {
@@ -414,26 +457,36 @@ interface RawHtmlViewerProps {
  * Monospace textarea for viewing raw generated HTML source code.
  */
 const RawHtmlViewer: React.FC<RawHtmlViewerProps> = ({ content }) => (
-  <textarea
-    readOnly
+  <div
     style={{
       width: '100%',
       height: '100%',
-      whiteSpace: 'pre-wrap',
-      wordWrap: 'break-word',
-      backgroundColor: 'var(--card)',
-      color: 'var(--foreground)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '16px',
-      fontFamily: 'monospace',
-      fontSize: '12px',
+      padding: '56px 16px 40px 16px',
       boxSizing: 'border-box',
-      outline: 'none',
-      resize: 'none',
     }}
-    value={content}
-  />
+    className="raw-html-viewer-container"
+  >
+    <textarea
+      readOnly
+      style={{
+        width: '100%',
+        height: '100%',
+        whiteSpace: 'pre-wrap',
+        wordWrap: 'break-word',
+        backgroundColor: 'var(--card)',
+        color: 'var(--foreground)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '16px',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        boxSizing: 'border-box',
+        outline: 'none',
+        resize: 'none',
+      }}
+      value={content}
+    />
+  </div>
 );
 
 // ============================================================================
@@ -1184,7 +1237,13 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
       );
     }
 
-    return <ShadowDomPreview content={otherFormatContent} />;
+    return (
+      <ShadowDomPreview
+        content={otherFormatContent}
+        backgroundColor={logContainerProps.color?.background}
+        textColor={logContainerProps.color?.text}
+      />
+    );
   };
 
   return (
@@ -1203,26 +1262,30 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
       <div
         className="desktop-preview-content"
         ref={previewContentRef}
-        style={{ position: 'relative', height: 'calc(100% - 45px)' }}
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
       >
         {/* Loading overlay for non-basic format conversions */}
         {showSpinner && (
           <div
             style={{
               position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(9, 9, 11, 0.8)',
+              inset: 0,
+              backgroundColor: 'rgba(9, 9, 11, 0.75)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 10,
-              backdropFilter: 'blur(4px)',
+              zIndex: 200,
+              backdropFilter: 'blur(6px)',
               gap: '12px',
-              borderRadius: '8px',
             }}
           >
             <Spin size="large" />
@@ -1234,22 +1297,10 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
         <div
           className="log-exporter-modal-preview"
-          style={{ position: 'relative', height: '100%', overflow: 'hidden' }}
+          style={{ position: 'relative', flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }}
         >
           {/* Format selection floating toggle */}
-          <div
-            className="preview-format-toggle-container"
-            style={{
-              position: 'absolute',
-              top: '12px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 10,
-              background: 'transparent',
-              display: 'flex',
-              justifyContent: 'center',
-            }}
-          >
+          <div className="preview-format-toggle-container">
             <Segmented
               value={settings.format || 'basic'}
               onChange={(val) => onSettingChange('format', val)}
@@ -1257,19 +1308,9 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             />
           </div>
 
-          {/* Zoom floating controls - exactly matched with format toggle top offset */}
+          {/* Zoom floating controls */}
           {isBasicFormat && zoomProps && (
-            <div
-              className="preview-zoom-toggle-container"
-              style={{
-                position: 'absolute',
-                top: '12px',
-                right: '16px',
-                zIndex: 10,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
+            <div className="preview-zoom-toggle-container">
               <ZoomControls {...zoomProps} />
             </div>
           )}

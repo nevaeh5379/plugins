@@ -17,7 +17,7 @@ import { loadGlobalSettings } from './settingsService';
 import { mergePNGsBinary } from './image/png';
 import { mergeJPEGsBinary } from './image/jpeg';
 import { mergeWebPsBinary } from './image/webp';
-import { imageUrlToBlob, fetchToBlobNative, hexToString } from '../utils/imageUtils';
+import { imageUrlToBlob, fetchToBlobNative, hexToString, extractBackgroundImageUrl } from '../utils/imageUtils';
 import { createOffscreenContainer } from '../utils/domUtils';
 import { message } from '../../components/ui';
 import {
@@ -125,6 +125,56 @@ const waitForMedia = async (
     await Promise.race([
         Promise.all(promises),
         delay(timeoutMs),
+    ]);
+};
+
+/**
+ * Converts any remaining remote/blob image sources inside an element to data URLs
+ * immediately before capture.
+ *
+ * Capture libraries (html-to-image / dom-to-image / snapdom) inline images via
+ * `fetch()`, which is blocked by the iframe CSP `connect-src 'none'`. Message-level
+ * embedding is asynchronous and can be skipped by the export safety timeout, so this
+ * acts as a final synchronous safety net: any `<img>` or `background-image` still
+ * pointing at a non-`data:` URL is converted to a data URL (or removed on failure)
+ * so the capture never triggers a blocked network request.
+ */
+const inlineRemainingImages = async (element: HTMLElement): Promise<void> => {
+    const images = Array.from(element.querySelectorAll<HTMLImageElement>('img'));
+    const bgElements = Array.from(
+        element.querySelectorAll<HTMLElement>('[style*="background-image"]')
+    );
+
+    await Promise.all([
+        ...images.map(async (img) => {
+            const src = img.getAttribute('src') || img.src;
+            if (src.startsWith('data:')) return;
+            if (!src) {
+                // src 없는 <img>는 아무것도 렌더링하지 않는다. 그대로 두면 html-to-image가
+                // fetch('')을 시도해 iframe CSP(connect-src 'none')에 막히고, 이후 발생하는
+                // error 이벤트가 toBlob()을 reject시켜 캡처 전체가 실패한다.
+                img.remove();
+                return;
+            }
+            try {
+                img.src = await imageUrlToBlob(src);
+            } catch (e) {
+                console.warn('[Log Exporter] Failed to inline image before capture, removing:', src, e);
+                img.remove();
+            }
+        }),
+        ...bgElements.map(async (el) => {
+            const styleAttr = el.getAttribute('style');
+            if (!styleAttr) return;
+            const bgUrl = extractBackgroundImageUrl(styleAttr);
+            if (!bgUrl || bgUrl.startsWith('data:')) return;
+            try {
+                const dataUrl = await imageUrlToBlob(bgUrl);
+                el.setAttribute('style', styleAttr.replace(bgUrl, dataUrl));
+            } catch (e) {
+                console.warn('[Log Exporter] Failed to inline background image before capture:', bgUrl, e);
+            }
+        }),
     ]);
 };
 
@@ -639,6 +689,7 @@ const exportSingleElementPipeline = async (
                 onProgressUpdate,
             });
 
+            await inlineRemainingImages(elementToRender);
             await waitForMedia(elementToRender);
             await saveElementAsImage({
                 element: elementToRender,
@@ -738,6 +789,7 @@ const exportNodeArrayPipeline = async (
                 onProgressUpdate,
             });
 
+            await inlineRemainingImages(elementToRender);
             await waitForMedia(elementToRender);
             await saveElementAsImage({
                 element: elementToRender,

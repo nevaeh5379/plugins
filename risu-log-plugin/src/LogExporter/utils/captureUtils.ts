@@ -19,6 +19,15 @@ export interface CaptureOptions {
 /** Default quality setting for JPEG conversion (0.0 to 1.0) */
 const DEFAULT_JPEG_QUALITY = 0.95;
 
+/**
+ * 1x1 transparent PNG used as html-to-image's `imagePlaceholder`.
+ * Without it, a failed image fetch leaves an empty src on the cloned <img>,
+ * which fires an error event and rejects the whole capture under the
+ * plugin iframe CSP (connect-src 'none').
+ */
+const TRANSPARENT_PIXEL_PLACEHOLDER =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
 /** Delay (ms) to allow the browser to register download triggers before resolving */
 const DOWNLOAD_CLEANUP_DELAY_MS = 100;
 
@@ -131,6 +140,7 @@ async function captureWithHtmlToImage(
         width: options.width,
         height: options.height,
         backgroundColor: bgColor,
+        imagePlaceholder: TRANSPARENT_PIXEL_PLACEHOLDER,
     };
 
     if (captureFormat === 'png') {
